@@ -15,58 +15,171 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/analyzing"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:textColor="@color/pipa_primary_dark"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/headline"
+        <!-- 综合评分卡 -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/scoreCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:layout_marginTop="10dp"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="3dp"
+            android:visibility="gone"
+            xmlns:app="http://schemas.android.com/apk/res-auto">
 
-        <TextView
-            android:id="@+id/report"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@color/pipa_primary"
+                android:padding="18dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/scoreNum"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="--"
+                        android:textSize="52sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/white" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="分"
+                        android:textColor="@color/white"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/scoreGrade"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:text=""
+                        android:textColor="@color/white"
+                        android:textSize="24sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/headline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="13sp"
+                    android:textColor="@color/white" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- 三个维度卡横排 -->
+        <LinearLayout
+            android:id="@+id/dimRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textSize="14sp"
-            android:textColor="@color/black"
-            android:lineSpacingExtra="4dp" />
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal"
+            android:weightSum="3" />
+
+        <!-- 总结 -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/summaryCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            android:visibility="gone"
+            xmlns:app="http://schemas.android.com/apk/res-auto">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@color/white"
+                android:padding="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="总结"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:textColor="@color/pipa_primary_dark" />
+
+                <TextView
+                    android:id="@+id/summaryText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/black"
+                    android:lineSpacingExtra="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="练习建议"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:textColor="@color/pipa_primary_dark" />
+
+                <TextView
+                    android:id="@+id/adviceText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/black"
+                    android:lineSpacingExtra="4dp" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
         <TextView
+            android:id="@+id/lblFlux"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Onset envelope + detected strokes"
+            android:layout_marginTop="18dp"
+            android:text="@string/chart_flux"
             android:textStyle="bold" />
 
         <com.github.mikephil.charting.charts.LineChart
             android:id="@+id/chartFlux"
             android:layout_width="match_parent"
-            android:layout_height="220dp"
+            android:layout_height="200dp"
             android:layout_marginTop="4dp" />
 
         <TextView
+            android:id="@+id/lblIoi"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Inter-onset interval over time (ms)"
+            android:text="@string/chart_ioi"
             android:textStyle="bold" />
 
         <com.github.mikephil.charting.charts.ScatterChart
             android:id="@+id/chartIoi"
             android:layout_width="match_parent"
-            android:layout_height="220dp"
+            android:layout_height="200dp"
             android:layout_marginTop="4dp" />
 
         <TextView
+            android:id="@+id/lblFinger"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Per-position loudness (5-stroke fold)"
+            android:text="@string/chart_finger"
             android:textStyle="bold" />
 
         <com.github.mikephil.charting.charts.BarChart

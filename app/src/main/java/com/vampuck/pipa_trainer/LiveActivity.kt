@@ -100,11 +100,14 @@ class LiveActivity : AppCompatActivity() {
             s.fingerProfile, s.totalStrokes, s.durationSec
         )
         val sb = StringBuilder()
-        sb.append("=== Session evaluation ===\n")
-        sb.append("Grade ${rep.grade}  •  ${rep.headline}\n\n")
-        rep.bullets.forEach { sb.append("• ").append(it).append('\n') }
-        sb.append('\n')
-        rep.fingerBullets.forEach { sb.append("• ").append(it).append('\n') }
+        sb.append("【整段评估】\n")
+        sb.append("综合 ${rep.score} 分 · ${rep.grade}\n")
+        sb.append(rep.headline).append("\n\n")
+        rep.dimensions.forEach {
+            sb.append("· ${it.title}：${it.valueText}（${it.grade}）\n")
+        }
+        sb.append('\n').append(rep.summary).append("\n\n练习建议：\n")
+        rep.advice.forEachIndexed { i, s2 -> sb.append("${i + 1}. ").append(s2).append('\n') }
         b.finalReport.text = sb.toString()
     }
 

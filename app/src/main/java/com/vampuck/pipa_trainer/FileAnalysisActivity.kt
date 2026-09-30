@@ -1,16 +1,20 @@
 package com.vampuck.pipa_trainer
 
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.github.mikephil.charting.charts.BarChart
-import com.github.mikephil.charting.charts.LineChart
-import com.github.mikephil.charting.charts.ScatterChart
 import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.data.*
+import com.github.mikephil.charting.formatter.ValueFormatter
 import com.vampuck.pipa_trainer.databinding.ActivityFileAnalysisBinding
+import com.vampuck.pipa_trainer.databinding.ItemDimensionBinding
 import com.vampuck.pipa_trainer.dsp.AudioDecoder
 import com.vampuck.pipa_trainer.dsp.Evaluation
 import com.vampuck.pipa_trainer.dsp.LunzhiAnalyzer
@@ -46,29 +50,44 @@ class FileAnalysisActivity : AppCompatActivity() {
                 }
                 render(res)
             } catch (e: Exception) {
-                b.status.text = "Failed: ${e.message}"
+                b.status.text = "分析失败：${e.message}"
             }
         }
     }
 
     private fun render(res: LunzhiAnalyzer.Result) {
-        b.status.text = "Analysis complete"
+        b.status.text = getString(R.string.analysis_done)
         val rep = Evaluation.build(
             res.strokesPerMin, res.strokesPerSec, res.cv, res.modalCv,
-            res.fingerProfile, res.onsetTimes.size, res.durationSec
+            res.fingerProfile, res.onsetTimes.size, res.durationSec, res.perWindow
         )
-        b.headline.text = "Grade ${rep.grade}   •   ${rep.headline}"
-        val sb = StringBuilder()
-        rep.bullets.forEach { sb.append("• ").append(it).append('\n') }
-        sb.append('\n')
-        rep.fingerBullets.forEach { sb.append("• ").append(it).append('\n') }
-        sb.append("\nPer-5s windows:\n")
-        res.perWindow.forEach {
-            sb.append("  ${it.startSec.toInt()}-${(it.startSec + 5).toInt()}s: " +
-                "n=${it.strokes}  rate=${"%.1f".format(it.ratePerSec)}/s  " +
-                "CV=${"%.3f".format(it.cv)}\n")
+
+        // 综合评分卡
+        b.scoreCard.visibility = android.view.View.VISIBLE
+        b.scoreNum.text = rep.score.toString()
+        b.scoreGrade.text = rep.grade
+        b.headline.text = rep.headline
+        (b.scoreCard.getChildAt(0) as LinearLayout).background =
+            GradientDrawable().apply { setColor(Evaluation.levelColor(rep.level)) }
+
+        // 维度卡
+        b.dimRow.removeAllViews()
+        for (d in rep.dimensions) {
+            val item = ItemDimensionBinding.inflate(LayoutInflater.from(this), b.dimRow, false)
+            item.dimTitle.text = d.title
+            item.dimValue.text = d.valueText
+            item.dimGrade.text = d.grade
+            item.dimGrade.background = GradientDrawable().apply {
+                cornerRadius = 24f; setColor(Evaluation.levelColor(d.level))
+            }
+            item.dimSub.text = d.subText
+            b.dimRow.addView(item.root)
         }
-        b.report.text = sb.toString()
+
+        // 总结 + 建议
+        b.summaryCard.visibility = android.view.View.VISIBLE
+        b.summaryText.text = rep.summary
+        b.adviceText.text = rep.advice.mapIndexed { i, s -> "${i + 1}. $s" }.joinToString("\n")
 
         drawFlux(res)
         drawIoi(res)
@@ -77,23 +96,22 @@ class FileAnalysisActivity : AppCompatActivity() {
 
     private fun drawFlux(res: LunzhiAnalyzer.Result) {
         val entries = ArrayList<Entry>()
-        // subsample for performance
         val step = maxOf(1, res.fluxEnvelope.size / 2000)
         var i = 0
         while (i < res.fluxEnvelope.size) {
             entries.add(Entry(res.fluxTimes[i].toFloat(), res.fluxEnvelope[i]))
             i += step
         }
-        val ds = LineDataSet(entries, "flux").apply {
+        val ds = LineDataSet(entries, "波形").apply {
             setDrawCircles(false); lineWidth = 1f
             color = 0xFF33BB66.toInt(); setDrawValues(false)
         }
         val chart = b.chartFlux
         chart.data = LineData(ds)
         chart.description.isEnabled = false
+        chart.legend.isEnabled = false
         chart.axisRight.isEnabled = false
         chart.xAxis.setDrawGridLines(false)
-        // mark onsets as vertical limit lines (cap count)
         chart.xAxis.removeAllLimitLines()
         val cap = minOf(res.onsetTimes.size, 400)
         for (k in 0 until cap) {
@@ -112,16 +130,17 @@ class FileAnalysisActivity : AppCompatActivity() {
                 entries.add(Entry(res.onsetTimes[k].toFloat(), (d * 1000).toFloat()))
             }
         }
-        val ds = ScatterDataSet(entries, "IOI (ms)").apply {
+        val ds = ScatterDataSet(entries, "间隔").apply {
             color = 0xFF2255CC.toInt(); scatterShapeSize = 8f; setDrawValues(false)
         }
         val chart = b.chartIoi
         chart.data = ScatterData(ds)
         chart.description.isEnabled = false
+        chart.legend.isEnabled = false
         chart.axisRight.isEnabled = false
         chart.axisLeft.axisMinimum = 0f
         chart.axisLeft.axisMaximum = 300f
-        val mean = LimitLine(res.meanIoiMs.toFloat(), "mean ${res.meanIoiMs.toInt()}ms")
+        val mean = LimitLine(res.meanIoiMs.toFloat(), "平均 ${res.meanIoiMs.toInt()}ms")
         mean.lineColor = 0xFFEE3333.toInt(); mean.lineWidth = 1.2f
         chart.axisLeft.removeAllLimitLines()
         chart.axisLeft.addLimitLine(mean)
@@ -129,20 +148,24 @@ class FileAnalysisActivity : AppCompatActivity() {
     }
 
     private fun drawFinger(res: LunzhiAnalyzer.Result) {
+        val names = arrayOf("食指", "中指", "名指", "小指", "挑")
         val entries = ArrayList<BarEntry>()
         for (p in res.fingerProfile.indices) {
             entries.add(BarEntry(p.toFloat(), (res.fingerProfile[p] * 100).toFloat()))
         }
-        val ds = BarDataSet(entries, "loudness %").apply {
-            color = 0xFF8D3B2E.toInt()
-        }
+        val ds = BarDataSet(entries, "力度%").apply { color = 0xFF8D3B2E.toInt() }
         val chart = b.chartFinger
         chart.data = BarData(ds)
         chart.description.isEnabled = false
+        chart.legend.isEnabled = false
         chart.axisRight.isEnabled = false
         chart.axisLeft.axisMinimum = 0f
         chart.axisLeft.axisMaximum = 110f
         chart.xAxis.granularity = 1f
+        chart.xAxis.valueFormatter = object : ValueFormatter() {
+            override fun getFormattedValue(value: Float): String =
+                names.getOrElse(value.toInt()) { "" }
+        }
         chart.invalidate()
     }
 }
