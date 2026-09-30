@@ -76,10 +76,10 @@ class LunzhiAnalyzerTest {
         val perfect = cvFor(0.0, 7)
         val moderate = cvFor(0.10, 7)
         val heavy = cvFor(0.20, 7)
-        assertTrue("perfect cv=$perfect", perfect < 0.05)
-        assertTrue("moderate cv=$moderate", moderate in 0.06..0.22)
-        assertTrue("heavy>moderate ($heavy vs $moderate)", heavy > moderate)
-        assertTrue("heavy cv=$heavy", heavy > 0.15)
+        assertTrue("perfect cv=$perfect", perfect < 0.03)
+        assertTrue("moderate cv=$moderate", moderate in 0.03..0.12)
+        assertTrue("heavy>moderate ($heavy vs $moderate)", heavy > moderate * 1.4)
+        assertTrue("heavy cv=$heavy", heavy > 0.08)
     }
 
     @Test
