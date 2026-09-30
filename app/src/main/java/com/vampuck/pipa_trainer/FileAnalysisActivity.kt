@@ -342,19 +342,23 @@ class FileAnalysisActivity : AppCompatActivity() {
             setDrawCircles(false); lineWidth = 1f
             color = 0xFF33BB66.toInt(); setDrawValues(false)
         }
-        // onset markers as a scatter dataset -> evenly spread, no stacking
+        // onset markers as a second dataset with an invisible line -> dots spread
+        // naturally across the whole range (no stacking like limit lines did)
         val marks = ArrayList<Entry>()
         for (t in res.onsetTimes) {
             if (t >= s && t <= e) marks.add(Entry(t.toFloat(), fluxAt(res, t) * 1.04f))
         }
-        val markSet = ScatterDataSet(marks, "击").apply {
-            color = 0xFF9933DD.toInt(); scatterShapeSize = 14f; setDrawValues(false)
+        val markSet = LineDataSet(marks, "击").apply {
+            color = 0x00000000
+            lineWidth = 0f
+            setDrawCircles(true)
+            circleRadius = 2.5f
+            setCircleColor(0xFF9933DD.toInt())
+            setDrawFilled(false)
+            setDrawValues(false)
         }
         val chart = b.chartFlux
-        chart.data = CombinedData().apply {
-            setData(LineData(line))
-            setData(ScatterData(markSet))
-        }
+        chart.data = LineData(line, markSet)
         chart.description.isEnabled = false
         chart.legend.isEnabled = false
         chart.axisRight.isEnabled = false
