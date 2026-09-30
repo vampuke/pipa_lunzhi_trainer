@@ -194,7 +194,13 @@ class FileAnalysisActivity : AppCompatActivity() {
     private fun movePlayheadFromProgress(p: Int) {
         val res = lastResult ?: return
         val t = res.durationSec * p / 1000.0
-        playhead?.let { it.limit = t.toFloat(); b.chartFlux.invalidate() }
+        val axis = b.chartFlux.xAxis
+        playhead?.let { axis.removeLimitLine(it) }
+        val ph = LimitLine(t.toFloat())
+        ph.lineColor = 0xCC2255CC.toInt(); ph.lineWidth = 2f
+        axis.addLimitLine(ph)
+        playhead = ph
+        b.chartFlux.invalidate()
     }
 
     private fun updateTimeText() {
