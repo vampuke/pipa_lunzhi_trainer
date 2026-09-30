@@ -29,7 +29,11 @@ class FileAnalysisActivity : AppCompatActivity() {
     private val picker = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        if (uri == null) { finish(); return@registerForActivityResult }
+        // User cancelled — don't kill the screen; let them pick again.
+        if (uri == null) {
+            if (::b.isInitialized) b.status.text = "未选择文件，可重新选择"
+            return@registerForActivityResult
+        }
         analyze(uri)
     }
 
@@ -37,7 +41,14 @@ class FileAnalysisActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         b = ActivityFileAnalysisBinding.inflate(layoutInflater)
         setContentView(b.root)
-        picker.launch(arrayOf("audio/*", "video/*"))
+        b.btnPick.setOnClickListener { launchPicker() }
+        launchPicker()
+    }
+
+    private fun launchPicker() {
+        // posting avoids firing the picker before the activity is RESUMED,
+        // which on some ROMs returns an immediate null/cancel.
+        b.root.post { picker.launch(arrayOf("audio/*", "video/*")) }
     }
 
     private fun analyze(uri: Uri) {
@@ -49,8 +60,11 @@ class FileAnalysisActivity : AppCompatActivity() {
                     LunzhiAnalyzer.analyze(pcm.samples, pcm.sampleRate)
                 }
                 render(res)
-            } catch (e: Exception) {
-                b.status.text = "分析失败：${e.message}"
+            } catch (oom: OutOfMemoryError) {
+                // OOM is an Error, not an Exception — must be caught explicitly.
+                b.status.text = "分析失败：文件太长，内存不足。请截取一段较短的音频/视频再试。"
+            } catch (t: Throwable) {
+                b.status.text = "分析失败：${t.message ?: t.javaClass.simpleName}"
             }
         }
     }

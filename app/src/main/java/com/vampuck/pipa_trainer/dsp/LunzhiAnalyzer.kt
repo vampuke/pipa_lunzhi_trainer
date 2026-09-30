@@ -119,20 +119,21 @@ object LunzhiAnalyzer {
 
     /** Full-signal analysis (file mode). */
     fun analyze(samples: FloatArray, sampleRate: Int): Result {
-        // normalize
+        // normalize (no full-length copy — read straight from the FloatArray)
         var peak = 1e-9f
         for (v in samples) { val a = abs(v); if (a > peak) peak = a }
-        val x = DoubleArray(samples.size) { samples[it] / peak.toDouble() }
-        val dur = x.size.toDouble() / sampleRate
+        val invPeak = 1.0 / peak.toDouble()
+        val n = samples.size
+        val dur = n.toDouble() / sampleRate
 
-        val nFrames = if (x.size >= WIN) 1 + (x.size - WIN) / HOP else 0
+        val nFrames = if (n >= WIN) 1 + (n - WIN) / HOP else 0
         val window = hann(WIN)
         var prev = DoubleArray(WIN / 2 + 1)
         val flux = DoubleArray(nFrames)
         val buf = DoubleArray(WIN)
         for (i in 0 until nFrames) {
             val off = i * HOP
-            for (k in 0 until WIN) buf[k] = x[off + k] * window[k]
+            for (k in 0 until WIN) buf[k] = samples[off + k] * invPeak * window[k]
             val mag = rfftMag(buf)
             var s = 0.0
             for (k in mag.indices) { val d = mag[k] - prev[k]; if (d > 0) s += d }
@@ -172,7 +173,10 @@ object LunzhiAnalyzer {
             val start = onsets[i] * HOP
             var acc = 0.0; var cnt = 0
             var k = start
-            while (k < minOf(x.size, start + halfWin)) { acc += x[k] * x[k]; cnt++; k++ }
+            while (k < minOf(n, start + halfWin)) {
+                val v = samples[k] * invPeak
+                acc += v * v; cnt++; k++
+            }
             amp[i] = if (cnt > 0) sqrt(acc / cnt) else 0.0
         }
 
