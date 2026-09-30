@@ -57,7 +57,7 @@ jobs:
           APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
           APKSIGNER=$(ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/"*/apksigner | head -1)
           "$APKSIGNER" verify --print-certs "$APK" 2>&1 | tee /tmp/sig.txt
-          grep -qi "9e:6e:8c:53:5d:d6:21:85:2a:5e:82:54:eb:ed:c8:d1" /tmp/sig.txt && \
+          grep -qi "9e6e8c535dd621852a5e8254ebedc8d1" /tmp/sig.txt && \
             echo "OK: expected SHA-256 prefix matches" || \
             (echo "FAIL: signature mismatch"; exit 1)
 
