@@ -1,0 +1,12 @@
+<resources>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="pipa_primary">#FF8D3B2E</color>
+    <color name="pipa_primary_dark">#FF5E271E</color>
+    <color name="pipa_accent">#FFD98C5F</color>
+    <color name="good">#FF2E9E5B</color>
+    <color name="warn">#FFE0A32E</color>
+    <color name="bad">#FFD64545</color>
+    <color name="chart_line">#FF2255CC</color>
+    <color name="bg">#FFF7F2EC</color>
+</resources>

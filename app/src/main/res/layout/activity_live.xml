@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/live_hint"
+            android:textSize="14sp"
+            android:textColor="@color/black" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="24dp"
+            android:weightSum="2">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:id="@+id/valBpm"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="--" android:textSize="44sp" android:textStyle="bold"
+                    android:textColor="@color/pipa_primary_dark" />
+                <TextView
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="@string/metric_bpm" android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:id="@+id/valCv"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="--" android:textSize="44sp" android:textStyle="bold"
+                    android:textColor="@color/pipa_primary_dark" />
+                <TextView
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="@string/metric_cv" android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView android:id="@+id/valStrokes"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:gravity="center"
+            android:text="0 strokes" android:textSize="14sp" />
+
+        <!-- live loudness bar -->
+        <ProgressBar android:id="@+id/ampBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="24dp"
+            android:layout_marginTop="24dp" android:max="100" android:progress="0" />
+        <TextView
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_gravity="center" android:text="current stroke loudness"
+            android:textSize="12sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnToggle"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="32dp"
+            android:text="@string/btn_start"
+            android:textSize="16sp" />
+
+        <TextView android:id="@+id/finalReport"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="24dp" android:textSize="14sp"
+            android:textColor="@color/black" android:lineSpacingExtra="4dp" />
+    </LinearLayout>
+</ScrollView>

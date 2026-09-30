@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Pipa Lunzhi Trainer</string>
+    <string name="title_home">Pipa Lunzhi Trainer</string>
+    <string name="subtitle_home">Analyze your tremolo (lunzhi) practice</string>
+    <string name="btn_pick_file">Analyze an audio file</string>
+    <string name="btn_live">Live microphone practice</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop &amp; evaluate</string>
+    <string name="live_hint">Play your lunzhi. Metrics update live; tap Stop for a full evaluation.</string>
+    <string name="metric_bpm">Strokes / min</string>
+    <string name="metric_cps">Strokes / sec</string>
+    <string name="metric_cv">Evenness (CV)</string>
+    <string name="metric_strokes">Strokes detected</string>
+    <string name="analyzing">Analyzing…</string>
+    <string name="need_mic">Microphone permission is required for live mode.</string>
+</resources>

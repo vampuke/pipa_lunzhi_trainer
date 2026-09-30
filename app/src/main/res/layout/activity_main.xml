@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@color/bg"
+    android:padding="32dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/title_home"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:textColor="@color/pipa_primary_dark" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="48dp"
+        android:text="@string/subtitle_home"
+        android:textSize="15sp"
+        android:textColor="@color/black" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnFile"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginBottom="20dp"
+        android:text="@string/btn_pick_file"
+        android:textSize="16sp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnLive"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:text="@string/btn_live"
+        android:textSize="16sp" />
+</LinearLayout>
