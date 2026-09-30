@@ -52,6 +52,7 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
                 val v = p + 20
                 b.valMetroBpm.text = v.toString()
                 metronome.setBpm(v.toDouble())
+                analyzer?.setMetronomeBeat(60.0 / v)
             }
             override fun onStartTrackingTouch(sb: SeekBar?) {}
             override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -103,6 +104,7 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
 
         val an = StreamingAnalyzer(sampleRate)
         an.setSensitivity(b.seekSens.progress)
+        an.setMetronomeBeat(60.0 / (b.seekBpm.progress + 20))
         analyzer = an
         b.finalReport.text = ""
         b.btnToggle.setText(R.string.btn_stop)
@@ -135,8 +137,8 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun updateLive(live: StreamingAnalyzer.Live) {
         b.valBpm.text = if (live.strokesPerMin > 0) live.strokesPerMin.roundToInt().toString() else "--"
-        b.valCv.text = if (live.cv > 0) "%.2f".format(live.cv) else "--"
-        b.valStrokes.text = "${live.totalStrokes} 击"
+        b.valCv.text = if (live.modalCv > 0) "≈${live.jitterPct.roundToInt()}%" else "--"
+        b.valStrokes.text = "${live.totalStrokes} 击　·　全段CV ${"%.2f".format(live.cv)}"
         b.ampBar.progress = (live.rms / maxOf(live.gate * 4, 0.05) * 100)
             .roundToInt().coerceIn(0, 100)
         b.gateStatus.text = "底噪 %.4f · 门限 %.4f · 当前 %.4f".format(

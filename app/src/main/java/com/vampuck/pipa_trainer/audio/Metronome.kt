@@ -2,34 +2,33 @@ package com.vampuck.pipa_trainer.audio
 
 import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioManager
 import android.media.AudioTrack
+import java.util.Arrays
 import kotlin.concurrent.thread
 import kotlin.math.exp
-import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Software metronome: plays a short "click" on each beat using AudioTrack
- * in low-latency STREAM mode. No file resources needed — synthesized on
- * the fly as a decaying 2-band tone burst.
+ * Sample-accurate metronome.
  *
- * Playback is routed with USAGE_MEDIA + content-type MUSIC so the system
- * takes care of routing alongside other apps (and won't compete with the
- * mic input for processor priority).
+ * The old implementation slept on a worker thread and restarted a MODE_STATIC
+ * track per beat, which drifted by tens of milliseconds and accumulated error
+ * (audibly uneven). This one streams silence+clicks through a MODE_STREAM
+ * AudioTrack: every beat is placed at an exact sample index, so the hardware
+ * clock guarantees even spacing (jitter <= 1 sample).
  *
- * The metronome runs on its own background thread; callbacks deliver
- * each click timestamp so callers can feed it to the onset suppressor.
+ * [Listener.onClick] is invoked when a beat is *scheduled*, with the estimated
+ * wall-clock time at which it will be audible.
  */
 class Metronome {
 
     interface Listener {
         /**
-         * Called on the metronome's worker thread at every beat.
-         * [absoluteNanos] is System.nanoTime() at the click so callers can map
-         * it onto their own clock (e.g. the audio capture timeline).
+         * @param beatIndex   0-based beat counter
+         * @param audibleNanos System.nanoTime()-based estimate of when the click
+         *                     reaches the speaker (scheduled time + output latency)
          */
-        fun onClick(beatIndex: Long, absoluteNanos: Long)
+        fun onClick(beatIndex: Long, audibleNanos: Long)
     }
 
     @Volatile private var bpm: Double = 80.0
@@ -52,85 +51,105 @@ class Metronome {
         running = false
         worker?.interrupt()
         worker = null
-        try { track?.let { if (it.playState == AudioTrack.PLAYSTATE_PLAYING) it.stop() } } catch (_: Throwable) {}
+        try { track?.stop() } catch (_: Throwable) {}
         try { track?.release() } catch (_: Throwable) {}
         track = null
     }
 
-    private fun run() {
-        // synthesize a SHORT click (~28ms) so masking around it can be tight
-        val sampleRate = 44100
-        val dur = 0.028
-        val n = (sampleRate * dur).toInt()
+    /** ~14ms high-frequency click: short enough that masking can be tight. */
+    private fun makeClick(sr: Int): ShortArray {
+        val dur = 0.014
+        val n = (sr * dur).toInt()
         val pcm = ShortArray(n)
         for (i in 0 until n) {
-            val t = i.toDouble() / sampleRate
-            val env = exp(-t * 120.0)
-            val s = (sin(2 * Math.PI * 1200.0 * t) * 0.6 + sin(2 * Math.PI * 2400.0 * t) * 0.4) * env
-            pcm[i] = (s * 26000.0).toInt().coerceIn(-32768, 32767).toShort()
+            val t = i.toDouble() / sr
+            val env = exp(-t * 220.0)
+            val s = (sin(2 * Math.PI * 3200.0 * t) * 0.75 + sin(2 * Math.PI * 6400.0 * t) * 0.25) * env
+            pcm[i] = (s * 24000.0).toInt().coerceIn(-32768, 32767).toShort()
         }
+        return pcm
+    }
+
+    private fun run() {
+        val sr = 44100
+        val click = makeClick(sr)
+        val block = 1024
 
         val minBuf = AudioTrack.getMinBufferSize(
-            sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
+            sr, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
-        val bufSize = maxOf(minBuf, n * 4)
-        val at = AudioTrack.Builder()
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setSampleRate(sampleRate)
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                    .build()
-            )
-            .setBufferSizeInBytes(bufSize)
-            .setTransferMode(AudioTrack.MODE_STATIC)
-            .build()
+        val bufBytes = maxOf(minBuf, block * 2 * 2)
+        val at = try {
+            AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(sr)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setBufferSizeInBytes(bufBytes)
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+        } catch (_: Throwable) { return }
         track = at
-        at.write(pcm, 0, n)
-        at.setNotificationMarkerPosition(0)
-        at.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
-            override fun onMarkerReached(t: AudioTrack) {}
-            override fun onPeriodicNotification(t: AudioTrack) {}
-        })
-        at.play()
+        try { at.play() } catch (_: Throwable) { return }
 
-        val startNs = System.nanoTime()
+        // conservative estimate of the output path latency (buffer half-fill)
+        val latencyNs = ((bufBytes / 2).toLong() * 1_000_000_000L / (sr * 2)).coerceIn(
+            5_000_000L, 120_000_000L
+        )
+
+        val buf = ShortArray(block)
+        val scheduled = ArrayList<Long>()   // absolute sample indices awaiting playback
+        var pos = 0L                        // absolute index of the next sample to write
+        var nextBeat = 0L
         var beatIndex = 0L
-        var nextBeatNs = startNs
+        val startNs = System.nanoTime()
+
         try {
             while (running && !Thread.currentThread().isInterrupted) {
-                val intervalNs = (60_000_000_000L / bpm).toLong()
-                val now = System.nanoTime()
-                val wait = nextBeatNs - now
-                if (wait > 0) Thread.sleep(wait / 1_000_000, (wait % 1_000_000).toInt())
-                // re-check
-                if (!running || Thread.currentThread().isInterrupted) break
+                val beatSamples = (sr * 60.0 / bpm).toLong().coerceAtLeast(1)
 
-                // rewind & replay
-                try {
-                    if (at.playState != AudioTrack.PLAYSTATE_PLAYING) at.play()
-                    at.pause()
-                    at.reloadStaticData()
-                    at.play()
-                } catch (e: Throwable) { /* ignore transient device errors */ }
+                // schedule every beat that starts within this block
+                while (nextBeat < pos + block) {
+                    scheduled.add(nextBeat)
+                    val audible = startNs + nextBeat * 1_000_000_000L / sr + latencyNs
+                    listener?.onClick(beatIndex, audible)
+                    beatIndex++
+                    nextBeat += beatSamples
+                }
 
-                // report the scheduled beat time as an absolute timestamp so the
-                // caller can map it onto its own (audio) clock
-                listener?.onClick(beatIndex, System.nanoTime())
-                beatIndex++
-                nextBeatNs += intervalNs
-                // If we fell behind (system pause), catch up to current time.
-                val nowAfter = System.nanoTime()
-                if (nextBeatNs < nowAfter) nextBeatNs = nowAfter + intervalNs - (nowAfter - nextBeatNs) % intervalNs
+                Arrays.fill(buf, 0.toShort())
+                val it = scheduled.iterator()
+                while (it.hasNext()) {
+                    val b = it.next()
+                    val off = (b - pos).toInt()
+                    for (k in click.indices) {
+                        val i = off + k
+                        if (i in 0 until block) {
+                            val v = buf[i] + click[k]
+                            buf[i] = v.coerceIn(-32768, 32767).toShort()
+                        }
+                    }
+                    if (b + click.size <= pos + block) it.remove()
+                }
+
+                val written = at.write(buf, 0, block)   // blocks when the buffer is full
+                if (written < 0) break
+                pos += block
             }
-        } catch (_: InterruptedException) {
-            // exit
+        } catch (_: Throwable) {
+            // interrupted / device error -> exit
         }
+        try { at.stop() } catch (_: Throwable) {}
+        try { at.release() } catch (_: Throwable) {}
+        track = null
     }
 }

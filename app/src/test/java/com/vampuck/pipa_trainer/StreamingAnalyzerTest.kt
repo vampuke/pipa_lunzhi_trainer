@@ -62,6 +62,18 @@ class StreamingAnalyzerTest {
     }
 
     @Test
+    fun evenRollGivesLowJitter() {
+        val an = StreamingAnalyzer(sr)
+        an.push(roomTone(1.5, 0.001f, 5), (1.5 * sr).toInt())
+        val r = roll(6.0, 0.11)
+        an.push(r, r.size)
+        // tail so the look-ahead has frames to confirm the last peaks
+        val live = an.push(FloatArray(sr / 2), sr / 2)
+        assertTrue("strokes=${live.totalStrokes}", live.totalStrokes >= 40)
+        assertTrue("jitter=${live.jitterPct}", live.jitterPct < 8.0)
+    }
+
+    @Test
     fun floorDoesNotCreepUpDuringSustainedPlay() {
         val an = StreamingAnalyzer(sr)
         val quiet = roomTone(1.5, 0.001f, 3)

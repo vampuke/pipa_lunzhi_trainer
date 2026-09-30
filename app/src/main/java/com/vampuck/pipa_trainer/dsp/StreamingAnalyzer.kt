@@ -1,22 +1,27 @@
 package com.vampuck.pipa_trainer.dsp
 
 import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
  * Streaming lunzhi analyzer for live microphone mode.
- * Feed raw mono float samples via [push]; it maintains a running spectral-flux
- * onset detector and reports rolling metrics (recent strokes/sec, CV) plus the
- * instantaneous stroke loudness. Keeps ALL onset times so [metrics] can run
- * the same evaluation as file mode over the whole session.
  *
- * Noise gate design (rewritten — the old one was far too aggressive):
- *  - the floor is measured during the first [FLOOR_INIT_SEC] of the session and
- *    afterwards can only track DOWNWARD quickly; it may rise only while the
- *    input is quiet (so a louder room adapts) and NEVER while you are playing.
- *  - the gate is `max(gateAbsMin, floor * gateRatio)` with a low absolute
- *    minimum, and all three are user-tunable via [sensitivity].
- *  - the gate tests the RMS at the peak frame, not the current frame.
+ * Now shares the file-mode detection rules:
+ *  - spectral flux (win=1024, hop=128) normalized by a slowly-decaying running max
+ *  - relative adaptive threshold (movavg*1.2 + 0.02)
+ *  - local maximum + PROMINENCE (>= 0.04) + 40ms minimum distance
+ *  Prominence needs look-ahead, so a peak is confirmed [W] frames after it
+ *  occurs (W = 0.12s). This is what the file pipeline does in one pass, and its
+ *  absence was why live mode reported many more (irregular) onsets than file mode.
+ *
+ *  - noise floor: learned in the first ~1.2s, then only tracks down / rises only
+ *    while quiet, so sustained playing can never close the gate
+ *  - metronome clicks: masked by time, AND masked frames are excluded from the
+ *    flux statistics so a loud click cannot desensitize the detector
+ *  - the displayed evenness uses the SAME definition as the final report
+ *    (modal CV -> jitter%), so live and file numbers are comparable
  */
 class StreamingAnalyzer(private val sampleRate: Int) {
 
@@ -28,46 +33,43 @@ class StreamingAnalyzer(private val sampleRate: Int) {
 
     private val ring = FloatArray(win)
     private var ringFill = 0
-    private var hopCounter = 0
 
     private var frameIndex = 0L
-    private var lastPeakFrame = -1000L
+    private var lastPeakFrame = -100000L
     private val minGapFrames = (0.040 * fps).toInt().coerceAtLeast(1)
 
-    // recent flux for adaptive threshold (approx uniform filter over 0.12s)
-    private val fluxHistory = ArrayDeque<Double>()
     private val fluxWindowLen = (0.12 * fps).toInt().coerceAtLeast(1)
+    private val fluxHistory = ArrayDeque<Double>()
     private var fluxSum = 0.0
-    private var prevFlux = 0.0
-    private var prevPrevFlux = 0.0
     private var runningMax = 1e-9
 
-    // ---------------- noise floor ----------------
+    // ---- look-ahead ring so prominence can be evaluated like file mode ----
+    private val PROMINENCE = 0.04
+    private val W = (0.12 * fps).toInt().coerceAtLeast(3)
+    private val ringLen = 2 * W + 3
+    private val nfRing = DoubleArray(ringLen)
+    private val medRing = DoubleArray(ringLen)
+    private val rmsRing = DoubleArray(ringLen)
+    private fun slot(f: Long): Int = (((f % ringLen) + ringLen) % ringLen).toInt()
+
+    // ---- noise floor ----
     private val floorInitFrames = (1.2 * fps).toInt().coerceAtLeast(1)
     private var floorInitSum = 0.0
     private var floorInitCount = 0
     private var floorReady = false
 
-    /** Estimated background level (0..1). */
     @Volatile var noiseFloor = 0.004
         private set
-    /** Current gate threshold (0..1) — exposed for the UI. */
     @Volatile var currentGate = 0.006
         private set
-    /** Most recent frame RMS — exposed for the UI. */
     @Volatile var lastRms = 0.0
         private set
 
-    /** When false the RMS gate is bypassed entirely. */
     var noiseGateEnabled = true
 
-    // sensitivity presets: (floorRatio, absoluteMin)
     private var gateRatio = 3.0
     private var gateAbsMin = 0.004
 
-    /**
-     * 0 = 严格 (loud playing / noisy room), 1 = 标准, 2 = 灵敏 (quiet playing).
-     */
     fun setSensitivity(level: Int) {
         when (level) {
             0 -> { gateRatio = 6.0; gateAbsMin = 0.015 }
@@ -79,14 +81,17 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     val onsetTimes = ArrayList<Double>()
     val strokeAmp = ArrayList<Double>()
 
-    // ---------------- metronome masking ----------------
+    // ---- metronome masking ----
     private val clickTimes = ArrayList<Double>()
+    var clickMaskBefore = 0.012
+    var clickMaskAfter = 0.038
 
-    /** Asymmetric mask: real clicks arrive late via output+acoustic latency. */
-    var clickMaskBefore = 0.025
-    var clickMaskAfter = 0.070
+    /** Scale the mask with the beat so it can never eat most of a fast beat. */
+    fun setMetronomeBeat(periodSec: Double) {
+        clickMaskBefore = (0.10 * periodSec).coerceIn(0.006, 0.015)
+        clickMaskAfter = (0.16 * periodSec).coerceIn(0.015, 0.045)
+    }
 
-    /** Append a metronome click at session-relative time [tSec]. */
     fun addMetronomeClick(tSec: Double) {
         clickTimes.add(tSec)
         if (clickTimes.size > 4000) clickTimes.subList(0, clickTimes.size - 4000).clear()
@@ -113,7 +118,9 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     data class Live(
         val strokesPerSec: Double,
         val strokesPerMin: Double,
-        val cv: Double,
+        val cv: Double,          // classic CV over the rolling window
+        val modalCv: Double,     // modal CV (same definition as the final report)
+        val jitterPct: Double,   // modalCv * 74
         val totalStrokes: Int,
         val lastAmp: Double,
         val noiseFloor: Double,
@@ -122,19 +129,16 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val gateOpen: Boolean
     )
 
-    /** Push a block of mono float samples. Returns updated live metrics. */
     fun push(block: FloatArray, len: Int = block.size): Live {
         var i = 0
         while (i < len) {
             ring[ringFill] = block[i]
             ringFill++
-            hopCounter++
             totalSamples++
             if (ringFill == win) {
                 processFrame()
                 System.arraycopy(ring, hop, ring, 0, win - hop)
                 ringFill = win - hop
-                hopCounter = 0
             }
             i++
         }
@@ -143,7 +147,8 @@ class StreamingAnalyzer(private val sampleRate: Int) {
 
     private val re = DoubleArray(win)
     private val im = DoubleArray(win)
-    private var prevRms = 0.0
+
+    private fun frameTime(f: Long) = f * hop.toDouble() / sampleRate
 
     private fun processFrame() {
         for (k in 0 until win) { re[k] = ring[k] * window[k]; im[k] = 0.0 }
@@ -156,8 +161,6 @@ class StreamingAnalyzer(private val sampleRate: Int) {
             if (d > 0) flux += d
             prevMag[k] = mag
         }
-
-        // per-frame RMS (background-energy proxy)
         var rms = 0.0
         for (k in 0 until win) rms += ring[k] * ring[k]
         rms = sqrt(rms / win)
@@ -165,46 +168,65 @@ class StreamingAnalyzer(private val sampleRate: Int) {
 
         updateFloor(rms)
 
-        // normalize by a slowly-decaying running max, then a relative threshold
-        runningMax = maxOf(runningMax * 0.9995, flux)
-        val nf = if (runningMax > 1e-9) flux / runningMax else 0.0
+        val f = frameIndex
+        val masked = isMetronomeMasked(frameTime(f))
 
-        fluxHistory.addLast(nf); fluxSum += nf
-        if (fluxHistory.size > fluxWindowLen) fluxSum -= fluxHistory.removeFirst()
-        val med = fluxSum / fluxHistory.size
-        val thr = med * 1.2 + 0.02
-
-        // gate on the RMS at the peak frame (prevRms), not the current frame
-        val gate = maxOf(gateAbsMin, noiseFloor * gateRatio)
-        currentGate = gate
-        val peakRms = maxOf(prevRms, rms)
-        val gateOk = !noiseGateEnabled || peakRms > gate
-
-        if (gateOk && prevFlux > thr && prevFlux >= prevPrevFlux && prevFlux > nf &&
-            (frameIndex - 1) - lastPeakFrame >= minGapFrames) {
-            val t = (frameIndex - 1) * hop.toDouble() / sampleRate
-            if (!isMetronomeMasked(t)) {
-                onsetTimes.add(t)
-                lastPeakFrame = frameIndex - 1
-                lastStrokeAmp = prevFlux
-                strokeAmp.add(prevFlux)
-            }
+        // Never let a (loud) metronome click skew the normalisation or the
+        // moving average — that would desensitise the detector for ~1s after
+        // every click and swallow real strokes.
+        if (!masked) {
+            runningMax = maxOf(runningMax * 0.9995, flux)
+            val nf0 = if (runningMax > 1e-9) flux / runningMax else 0.0
+            fluxHistory.addLast(nf0); fluxSum += nf0
+            if (fluxHistory.size > fluxWindowLen) fluxSum -= fluxHistory.removeFirst()
         }
-        prevPrevFlux = prevFlux
-        prevFlux = nf
-        prevRms = rms
+        val nf = if (runningMax > 1e-9) flux / runningMax else 0.0
+        val med = if (fluxHistory.isEmpty()) 0.0 else fluxSum / fluxHistory.size
+
+        nfRing[slot(f)] = nf
+        medRing[slot(f)] = med
+        rmsRing[slot(f)] = rms
+
+        // confirm the frame W back (we now have the look-ahead it needs)
+        val c = f - W
+        if (c >= 1) confirmPeak(c, f)
+
         frameIndex++
     }
 
-    /**
-     * Minimum-statistics style floor: learn the room during the first second,
-     * then track downward quickly and upward only while the input is quiet.
-     * Crucially it can NEVER be dragged up by sustained playing.
-     */
+    /** File-mode-equivalent peak test for frame [c], with [latest] = newest frame. */
+    private fun confirmPeak(c: Long, latest: Long) {
+        val cv = nfRing[slot(c)]
+        if (cv <= 0.0) return
+        // local maximum
+        if (!(cv > nfRing[slot(c - 1)] && cv >= nfRing[slot(c + 1)])) return
+        // relative adaptive threshold
+        if (cv <= medRing[slot(c)] * 1.2 + 0.02) return
+        // prominence within +/- W
+        val lo = max(0L, c - W); val hi = min(c + W, latest)
+        var lm = cv; var i = c - 1
+        while (i >= lo && nfRing[slot(i)] <= cv) { lm = min(lm, nfRing[slot(i)]); i-- }
+        var rm = cv; var j = c + 1
+        while (j <= hi && nfRing[slot(j)] <= cv) { rm = min(rm, nfRing[slot(j)]); j++ }
+        if (cv - max(lm, rm) < PROMINENCE) return
+        // min distance
+        if (c - lastPeakFrame < minGapFrames) return
+        // energy gate at the peak (use the louder of this frame and the previous)
+        val g = maxOf(gateAbsMin, noiseFloor * gateRatio)
+        currentGate = g
+        if (noiseGateEnabled && max(rmsRing[slot(c)], rmsRing[slot(c - 1)]) <= g) return
+        // metronome mask
+        if (isMetronomeMasked(frameTime(c))) return
+
+        onsetTimes.add(frameTime(c))
+        strokeAmp.add(cv)
+        lastStrokeAmp = cv
+        lastPeakFrame = c
+    }
+
     private fun updateFloor(rms: Double) {
         if (!floorReady) {
-            floorInitSum += rms
-            floorInitCount++
+            floorInitSum += rms; floorInitCount++
             if (floorInitCount >= floorInitFrames) {
                 noiseFloor = (floorInitSum / floorInitCount).coerceIn(1e-4, 0.2)
                 floorReady = true
@@ -212,19 +234,16 @@ class StreamingAnalyzer(private val sampleRate: Int) {
             return
         }
         if (rms < noiseFloor) {
-            // quieter than before -> track down fast
             noiseFloor = noiseFloor * 0.7 + rms * 0.3
         } else if (rms < noiseFloor * 1.5) {
-            // roughly at the floor -> allow a very slow upward adaptation
             noiseFloor *= 1.0005
         }
-        // else: this frame is signal (playing) -> leave the floor untouched
         if (noiseFloor < 1e-4) noiseFloor = 1e-4
     }
 
     private fun live(): Live {
         val now = totalSamples.toDouble() / sampleRate
-        val recent = onsetTimes.filter { it >= now - 4.0 }
+        val recent = onsetTimes.filter { it >= now - 6.0 }
         val ioi = ArrayList<Double>()
         for (j in 1 until recent.size) {
             val d = recent[j] - recent[j - 1]
@@ -232,15 +251,16 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         }
         val mean = if (ioi.isNotEmpty()) ioi.average() else 0.0
         val cps = if (mean > 0) 1.0 / mean else 0.0
-        var sd = 0.0
-        if (ioi.isNotEmpty()) { for (d in ioi) sd += (d - mean) * (d - mean); sd = sqrt(sd / ioi.size) }
-        val cv = if (mean > 0) sd / mean else 0.0
+        val cv = if (mean > 0) std(ioi, mean) / mean else 0.0
+        val med = median(ioi)
+        val band = ioi.filter { it > med * 0.6 && it < med * 1.6 }
+        val bandMean = if (band.isNotEmpty()) band.average() else 0.0
+        val modalCv = if (bandMean > 0) std(band, bandMean) / bandMean else 0.0
         val gate = maxOf(gateAbsMin, noiseFloor * gateRatio)
-        return Live(cps, cps * 60, cv, onsetTimes.size, lastStrokeAmp,
-            noiseFloor, gate, lastRms, gateOpen = lastRms > gate)
+        return Live(cps, cps * 60, cv, modalCv, modalCv * 74.0, onsetTimes.size,
+            lastStrokeAmp, noiseFloor, gate, lastRms, gateOpen = lastRms > gate)
     }
 
-    /** Full-session metrics over all collected onsets/amps (shared with file mode). */
     fun metrics(): LunzhiAnalyzer.Metrics =
         LunzhiAnalyzer.metrics(onsetTimes.toDoubleArray(), strokeAmp.toDoubleArray())
 
@@ -248,6 +268,13 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         if (v.isEmpty()) return 0.0
         val s = v.sorted(); val m = s.size / 2
         return if (s.size % 2 == 1) s[m] else (s[m - 1] + s[m]) / 2
+    }
+
+    private fun std(v: List<Double>, mean: Double): Double {
+        if (v.isEmpty()) return 0.0
+        var acc = 0.0
+        for (x in v) acc += (x - mean) * (x - mean)
+        return sqrt(acc / v.size)
     }
 
     private fun fft(re: DoubleArray, im: DoubleArray) {
