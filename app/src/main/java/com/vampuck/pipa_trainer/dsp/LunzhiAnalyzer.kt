@@ -193,28 +193,31 @@ object LunzhiAnalyzer {
         return t
     }
 
-    fun analyze(samples: FloatArray, sampleRate: Int): Result {
+    fun analyze(samples: FloatArray, sampleRate: Int, durationOverrideSec: Double = 0.0): Result {
         val (flux, fps) = fluxOf(samples, sampleRate)
         val peaks = pickPeaks(flux, fps)
-        val onsetTimes = refine(flux, peaks, fps)
-        val dur = samples.size.toDouble() / sampleRate
-        val fluxTimes = DoubleArray(flux.size) { it * HOP.toDouble() / sampleRate }
+        val rawOnsets = refine(flux, peaks, fps)
+        val decodedDur = samples.size.toDouble() / sampleRate
+        val scale = if (durationOverrideSec > 0 && decodedDur > 0) durationOverrideSec / decodedDur else 1.0
+        val dur = if (durationOverrideSec > 0) durationOverrideSec else decodedDur
 
-        // stroke loudness: RMS in a 45ms window after each onset
+        // stroke loudness: RMS in a 45ms window after each onset (raw sample positions)
         var peak = 1e-9f
         for (v in samples) { val a = abs(v); if (a > peak) peak = a }
         val invPeak = 1.0 / peak.toDouble()
         val n = samples.size
         val halfWin = (0.045 * sampleRate).toInt()
-        val amp = DoubleArray(onsetTimes.size)
-        for (i in onsetTimes.indices) {
-            val start = (onsetTimes[i] * sampleRate).toInt()
+        val amp = DoubleArray(rawOnsets.size)
+        for (i in rawOnsets.indices) {
+            val start = (rawOnsets[i] * sampleRate).toInt()
             var acc = 0.0; var cnt = 0
             var k = start
             while (k < min(n, start + halfWin)) { val v = samples[k] * invPeak; acc += v * v; cnt++; k++ }
             amp[i] = if (cnt > 0) sqrt(acc / cnt) else 0.0
         }
 
+        val onsetTimes = DoubleArray(rawOnsets.size) { rawOnsets[it] * scale }
+        val fluxTimes = DoubleArray(flux.size) { it * HOP.toDouble() / sampleRate * scale }
         val m = metrics(onsetTimes, amp, 0.0, Double.MAX_VALUE)
         return Result(sampleRate, dur, onsetTimes, amp,
             FloatArray(flux.size) { flux[it].toFloat() }, fluxTimes, m)

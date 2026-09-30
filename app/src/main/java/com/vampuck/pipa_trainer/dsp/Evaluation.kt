@@ -4,7 +4,10 @@ import kotlin.math.roundToInt
 
 /**
  * 把指标转成直观的中文评估。均匀度不再只看裸 CV，而是用合成音频标定的
- * 换算：jitter% ≈ modalCv × 74，直接读成「时值抖动约百分之几」，更好判断。
+ * 换算：jitter% ≈ modalCv × 74，直接读成「时值抖动约百分之几」。
+ *
+ * 注意：速度**不参与评分**——轮指快慢都是正常练习状态，只作参考显示。
+ * 综合分只由「均匀度（权重 72%）」和「手指力度均衡（权重 28%）」决定。
  */
 object Evaluation {
 
@@ -13,7 +16,7 @@ object Evaluation {
         val valueText: String,
         val subText: String,
         val grade: String,
-        val level: Int          // 0好 1一般 2较差
+        val level: Int          // 0好 1一般 2较差 3仅参考
     )
 
     data class Report(
@@ -43,19 +46,14 @@ object Evaluation {
         val (evenGrade, evenLevel) = evennessGrade(effCv)
         val evenScore = evennessScore(jitter)
 
-        // 速度
+        // 速度：仅显示，不评分
         val cps = m.strokesPerSec
         val speedText = "${m.strokesPerMin.roundToInt()} 音/分"
         val speedSub = "约 ${"%.1f".format(cps)} 音/秒 · ${"%.1f".format(cps / 5)} 轮/秒"
-        val (speedGrade, speedLevel) = when {
-            cps < 4 -> "较慢" to 1
-            cps <= 9 -> "适中" to 0
-            else -> "偏快" to 1
-        }
 
         // 手指力度
-        var fingerGrade = "—"; var fingerLevel = 0
-        var fingerValue = "—"; var fingerSub = ""
+        var fingerGrade = "—"; var fingerLevel = 3
+        var fingerValue = "数据不足"; var fingerSub = ""
         var weakestPos = -1; var fingerRatio = 1.0
         if (m.fingerProfile.size == 5 && m.strokes >= 10) {
             val strongest = m.fingerProfile.indices.maxByOrNull { m.fingerProfile[it] } ?: 0
@@ -73,9 +71,11 @@ object Evaluation {
             }
         }
 
-        val fingerScore = when (fingerLevel) { 0 -> 90; 1 -> 70; else -> 50 }
-        val speedScore = when (speedLevel) { 0 -> 90; 1 -> 75; else -> 60 }
-        val score = (evenScore * 0.6 + fingerScore * 0.25 + speedScore * 0.15).roundToInt()
+        // 综合分：只看均匀度与手指均衡（速度不计分）
+        val fingerScore = when (fingerLevel) { 0 -> 90; 1 -> 70; 2 -> 50; else -> null }
+        val score = if (fingerScore != null)
+            (evenScore * 0.72 + fingerScore * 0.28).roundToInt()
+        else evenScore
         val (grade, level) = when {
             score >= 85 -> "优秀" to 0
             score >= 70 -> "良好" to 0
@@ -83,10 +83,10 @@ object Evaluation {
             else -> "待提升" to 2
         }
 
-        val headline = "综合 $score 分 · $grade   |   ${speedText}，时值抖动 ≈ ${jitter.roundToInt()}%"
+        val headline = "综合 $score 分 · $grade   |   时值抖动 ≈ ${jitter.roundToInt()}%，$speedText"
 
         val dimensions = listOf(
-            Dimension("速度", speedText, speedSub, speedGrade, speedLevel),
+            Dimension("速度（参考）", speedText, speedSub, "参考", 3),
             Dimension("均匀度", "≈ ${jitter.roundToInt()}% 抖动",
                 "主带 CV ${"%.3f".format(effCv)} · 全段 ${"%.3f".format(m.cv)}", evenGrade, evenLevel),
             Dimension("手指力度", fingerValue, fingerSub, fingerGrade, fingerLevel)
@@ -115,12 +115,11 @@ object Evaluation {
         val advice = ArrayList<String>()
         if (effCv > 0.17) advice.add("放慢到能保持均匀的档位，用节拍器把每一击咬在同一时值上。")
         if (fingerRatio >= 1.5) advice.add("单独强化${fingerName(weakestPos)}的发力，慢速轮指让各指音量趋同。")
-        if (cps > 9 && effCv > 0.17) advice.add("当前偏快且不稳，建议降速再逐步提速。")
         if (m.perWindow.size >= 2) {
             val first = m.perWindow.first().cv; val last = m.perWindow.last().cv
             if (last > first * 1.3) advice.add("越到后段越乱，注意耐力与收尾段控制。")
         }
-        if (advice.isEmpty()) advice.add("整体不错，可尝试在更高速度下维持同样的均匀度。")
+        if (advice.isEmpty()) advice.add("整体不错，可尝试在保持均匀的前提下自然提速。")
 
         return Report(score, grade, level, headline, dimensions, sb.toString(), advice)
     }
@@ -138,6 +137,7 @@ object Evaluation {
     fun levelColor(level: Int): Int = when (level) {
         0 -> 0xFF2E9E5B.toInt()
         1 -> 0xFFE0A32E.toInt()
-        else -> 0xFFD64545.toInt()
+        2 -> 0xFFD64545.toInt()
+        else -> 0xFF9E9E9E.toInt()   // 仅参考
     }
 }

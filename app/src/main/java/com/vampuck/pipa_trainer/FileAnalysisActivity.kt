@@ -101,7 +101,7 @@ class FileAnalysisActivity : AppCompatActivity() {
             try {
                 val res = withContext(Dispatchers.Default) {
                     val pcm = AudioDecoder.decode(this@FileAnalysisActivity, uri)
-                    LunzhiAnalyzer.analyze(pcm.samples, pcm.sampleRate)
+                    LunzhiAnalyzer.analyze(pcm.samples, pcm.sampleRate, pcm.containerDurationSec)
                 }
                 render(res)
             } catch (oom: OutOfMemoryError) {

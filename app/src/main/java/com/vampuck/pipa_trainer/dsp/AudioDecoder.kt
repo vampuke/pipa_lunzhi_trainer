@@ -26,7 +26,13 @@ object AudioDecoder {
     private const val TARGET_RATE = 22050
     private const val MAX_SECONDS = 30 * 60
 
-    data class Pcm(val samples: FloatArray, val sampleRate: Int, val truncated: Boolean)
+    data class Pcm(
+        val samples: FloatArray,
+        val sampleRate: Int,
+        val truncated: Boolean,
+        /** Real media duration from container metadata (seconds), 0 if unknown. */
+        val containerDurationSec: Double
+    )
 
     private class FloatList(initial: Int) {
         var arr = FloatArray(initial.coerceAtLeast(1024))
@@ -67,6 +73,9 @@ object AudioDecoder {
 
         val inRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE).coerceAtLeast(8000)
         val mime = format.getString(MediaFormat.KEY_MIME)!!
+        // container-declared duration (microseconds); used to correct the timeline
+        val containerDur = if (format.containsKey(MediaFormat.KEY_DURATION))
+            format.getLong(MediaFormat.KEY_DURATION) / 1_000_000.0 else 0.0
 
         val codec = MediaCodec.createDecoderByType(mime)
         codec.configure(format, null, null, 0)
@@ -156,13 +165,13 @@ object AudioDecoder {
                 }
                 codec.releaseOutputBuffer(outIdx, false)
                 if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) sawOutputEOS = true
-                if (truncated) { codec.releaseOutputBuffer(outIdx, false); break@loop }
+                if (truncated) break@loop
             }
         }
         try { codec.stop() } catch (_: Throwable) {}
         codec.release()
         extractor.release()
 
-        return Pcm(out.toArray(), outRate, truncated)
+        return Pcm(out.toArray(), outRate, truncated, containerDur)
     }
 }
