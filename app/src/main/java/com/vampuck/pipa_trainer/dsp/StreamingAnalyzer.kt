@@ -1,6 +1,5 @@
 package com.vampuck.pipa_trainer.dsp
 
-import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sqrt
 
@@ -10,6 +9,14 @@ import kotlin.math.sqrt
  * onset detector and reports rolling metrics (recent strokes/sec, CV) plus the
  * instantaneous stroke loudness. Keeps ALL onset times so [metrics] can run
  * the same evaluation as file mode over the whole session.
+ *
+ * Noise gate design (rewritten — the old one was far too aggressive):
+ *  - the floor is measured during the first [FLOOR_INIT_SEC] of the session and
+ *    afterwards can only track DOWNWARD quickly; it may rise only while the
+ *    input is quiet (so a louder room adapts) and NEVER while you are playing.
+ *  - the gate is `max(gateAbsMin, floor * gateRatio)` with a low absolute
+ *    minimum, and all three are user-tunable via [sensitivity].
+ *  - the gate tests the RMS at the peak frame, not the current frame.
  */
 class StreamingAnalyzer(private val sampleRate: Int) {
 
@@ -33,49 +40,71 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     private var fluxSum = 0.0
     private var prevFlux = 0.0
     private var prevPrevFlux = 0.0
+    private var runningMax = 1e-9
 
-    // --- noise gate ---
-    // Track the running minimum of per-frame RMS as an estimate of the
-    // background noise floor. Require an onset frame's RMS to be at least
-    // NOISE_GATE_RATIO * floor (or absolute FLOOR_MIN if floor is lower).
-    // The floor adapts every ~0.5s so quiet-room vs. noisy-room both work.
-    private var noiseFloor = 0.02       // conservative start
-    private val floorDecay = 0.992      // slow adaptation upward
+    // ---------------- noise floor ----------------
+    private val floorInitFrames = (1.2 * fps).toInt().coerceAtLeast(1)
+    private var floorInitSum = 0.0
+    private var floorInitCount = 0
+    private var floorReady = false
 
-    /** When true, onsets are gated by the per-frame RMS noise floor. */
+    /** Estimated background level (0..1). */
+    @Volatile var noiseFloor = 0.004
+        private set
+    /** Current gate threshold (0..1) — exposed for the UI. */
+    @Volatile var currentGate = 0.006
+        private set
+    /** Most recent frame RMS — exposed for the UI. */
+    @Volatile var lastRms = 0.0
+        private set
+
+    /** When false the RMS gate is bypassed entirely. */
     var noiseGateEnabled = true
 
-    /** Public read of the current noise floor (0..1). */
-    @Volatile var currentNoiseFloor: Double = noiseFloor
-        private set
+    // sensitivity presets: (floorRatio, absoluteMin)
+    private var gateRatio = 3.0
+    private var gateAbsMin = 0.004
+
+    /**
+     * 0 = 严格 (loud playing / noisy room), 1 = 标准, 2 = 灵敏 (quiet playing).
+     */
+    fun setSensitivity(level: Int) {
+        when (level) {
+            0 -> { gateRatio = 6.0; gateAbsMin = 0.015 }
+            2 -> { gateRatio = 1.8; gateAbsMin = 0.0015 }
+            else -> { gateRatio = 3.0; gateAbsMin = 0.004 }
+        }
+    }
 
     val onsetTimes = ArrayList<Double>()
     val strokeAmp = ArrayList<Double>()
 
-    /** Times (sec, from start) when the metronome clicked. Used to mask self-click onsets. */
+    // ---------------- metronome masking ----------------
     private val clickTimes = ArrayList<Double>()
-    /** Window around each metronome click to ignore onsets (sec). */
-    private val clickMaskWindow = 0.10
+
+    /** Asymmetric mask: real clicks arrive late via output+acoustic latency. */
+    var clickMaskBefore = 0.025
+    var clickMaskAfter = 0.070
 
     /** Append a metronome click at session-relative time [tSec]. */
     fun addMetronomeClick(tSec: Double) {
         clickTimes.add(tSec)
-        // keep array bounded
-        if (clickTimes.size > 2000) clickTimes.subList(0, clickTimes.size - 2000).clear()
+        if (clickTimes.size > 4000) clickTimes.subList(0, clickTimes.size - 4000).clear()
     }
 
-    /** Returns true if [t] is within any recent metronome click mask. */
+    fun clearMetronomeClicks() { clickTimes.clear() }
+
     private fun isMetronomeMasked(t: Double): Boolean {
-        // scan only the last ~2 seconds of clicks (cheap)
+        if (clickTimes.isEmpty()) return false
         var i = clickTimes.size - 1
         while (i >= 0 && clickTimes[i] > t - 2.0) {
-            if (abs(clickTimes[i] - t) < clickMaskWindow) return true
+            val d = t - clickTimes[i]
+            if (d > -clickMaskBefore && d < clickMaskAfter) return true
             i--
         }
         return false
     }
 
-    // for instantaneous loudness we track recent peak sample amplitude
     @Volatile var lastStrokeAmp: Double = 0.0
         private set
     @Volatile var totalSamples: Long = 0
@@ -88,6 +117,8 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val totalStrokes: Int,
         val lastAmp: Double,
         val noiseFloor: Double,
+        val gate: Double,
+        val rms: Double,
         val gateOpen: Boolean
     )
 
@@ -100,9 +131,7 @@ class StreamingAnalyzer(private val sampleRate: Int) {
             hopCounter++
             totalSamples++
             if (ringFill == win) {
-                // full frame available; compute flux, then slide by hop
                 processFrame()
-                // shift left by hop
                 System.arraycopy(ring, hop, ring, 0, win - hop)
                 ringFill = win - hop
                 hopCounter = 0
@@ -112,9 +141,9 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         return live()
     }
 
-    private val buf = DoubleArray(win)
     private val re = DoubleArray(win)
     private val im = DoubleArray(win)
+    private var prevRms = 0.0
 
     private fun processFrame() {
         for (k in 0 until win) { re[k] = ring[k] * window[k]; im[k] = 0.0 }
@@ -127,32 +156,30 @@ class StreamingAnalyzer(private val sampleRate: Int) {
             if (d > 0) flux += d
             prevMag[k] = mag
         }
-        // per-frame RMS in time domain (background-energy proxy)
+
+        // per-frame RMS (background-energy proxy)
         var rms = 0.0
-        for (k in 0 until win) { rms += ring[k] * ring[k] }
+        for (k in 0 until win) rms += ring[k] * ring[k]
         rms = sqrt(rms / win)
+        lastRms = rms
 
-        // update noise floor: slowly decay floor upward to track new ambient;
-        // quickly drop to current rms if it's lower than floor.
-        noiseFloor = maxOf(noiseFloor * floorDecay, rms.coerceAtMost(noiseFloor * 0.95 + rms * 0.05))
-        currentNoiseFloor = noiseFloor
+        updateFloor(rms)
 
-        // normalize loosely by a running max to keep threshold ~ same scale as file mode
+        // normalize by a slowly-decaying running max, then a relative threshold
         runningMax = maxOf(runningMax * 0.9995, flux)
         val nf = if (runningMax > 1e-9) flux / runningMax else 0.0
 
-        // adaptive threshold via moving average
         fluxHistory.addLast(nf); fluxSum += nf
         if (fluxHistory.size > fluxWindowLen) fluxSum -= fluxHistory.removeFirst()
         val med = fluxSum / fluxHistory.size
         val thr = med * 1.2 + 0.02
 
-        // gate threshold for the per-frame RMS:
-        // accept frames whose RMS exceeds max(absolute_min, K * floor)
-        val gateOk = !noiseGateEnabled ||
-            rms > maxOf(0.02, noiseFloor * 3.0)
+        // gate on the RMS at the peak frame (prevRms), not the current frame
+        val gate = maxOf(gateAbsMin, noiseFloor * gateRatio)
+        currentGate = gate
+        val peakRms = maxOf(prevRms, rms)
+        val gateOk = !noiseGateEnabled || peakRms > gate
 
-        // peak test on prevFlux (center of 3)
         if (gateOk && prevFlux > thr && prevFlux >= prevPrevFlux && prevFlux > nf &&
             (frameIndex - 1) - lastPeakFrame >= minGapFrames) {
             val t = (frameIndex - 1) * hop.toDouble() / sampleRate
@@ -165,13 +192,37 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         }
         prevPrevFlux = prevFlux
         prevFlux = nf
+        prevRms = rms
         frameIndex++
     }
 
-    private var runningMax = 1e-9
+    /**
+     * Minimum-statistics style floor: learn the room during the first second,
+     * then track downward quickly and upward only while the input is quiet.
+     * Crucially it can NEVER be dragged up by sustained playing.
+     */
+    private fun updateFloor(rms: Double) {
+        if (!floorReady) {
+            floorInitSum += rms
+            floorInitCount++
+            if (floorInitCount >= floorInitFrames) {
+                noiseFloor = (floorInitSum / floorInitCount).coerceIn(1e-4, 0.2)
+                floorReady = true
+            }
+            return
+        }
+        if (rms < noiseFloor) {
+            // quieter than before -> track down fast
+            noiseFloor = noiseFloor * 0.7 + rms * 0.3
+        } else if (rms < noiseFloor * 1.5) {
+            // roughly at the floor -> allow a very slow upward adaptation
+            noiseFloor *= 1.0005
+        }
+        // else: this frame is signal (playing) -> leave the floor untouched
+        if (noiseFloor < 1e-4) noiseFloor = 1e-4
+    }
 
     private fun live(): Live {
-        // rolling window: last 4 seconds of onsets
         val now = totalSamples.toDouble() / sampleRate
         val recent = onsetTimes.filter { it >= now - 4.0 }
         val ioi = ArrayList<Double>()
@@ -184,8 +235,9 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         var sd = 0.0
         if (ioi.isNotEmpty()) { for (d in ioi) sd += (d - mean) * (d - mean); sd = sqrt(sd / ioi.size) }
         val cv = if (mean > 0) sd / mean else 0.0
+        val gate = maxOf(gateAbsMin, noiseFloor * gateRatio)
         return Live(cps, cps * 60, cv, onsetTimes.size, lastStrokeAmp,
-            noiseFloor, gateOpen = noiseFloor > 0 && lastStrokeAmp >= noiseFloor * 3.0)
+            noiseFloor, gate, lastRms, gateOpen = lastRms > gate)
     }
 
     /** Full-session metrics over all collected onsets/amps (shared with file mode). */
@@ -198,7 +250,6 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         return if (s.size % 2 == 1) s[m] else (s[m - 1] + s[m]) / 2
     }
 
-    // shared FFT (same as LunzhiAnalyzer)
     private fun fft(re: DoubleArray, im: DoubleArray) {
         val n = re.size
         var j = 0

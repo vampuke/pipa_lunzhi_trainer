@@ -24,8 +24,12 @@ import kotlin.math.sin
 class Metronome {
 
     interface Listener {
-        /** Called on the metronome's worker thread for every beat click. */
-        fun onClick(beatIndex: Long, sessionTimeSec: Double)
+        /**
+         * Called on the metronome's worker thread at every beat.
+         * [absoluteNanos] is System.nanoTime() at the click so callers can map
+         * it onto their own clock (e.g. the audio capture timeline).
+         */
+        fun onClick(beatIndex: Long, absoluteNanos: Long)
     }
 
     @Volatile private var bpm: Double = 80.0
@@ -54,16 +58,16 @@ class Metronome {
     }
 
     private fun run() {
-        // synthesize 100ms click buffer once (decaying 880Hz body + 1760Hz attack)
+        // synthesize a SHORT click (~28ms) so masking around it can be tight
         val sampleRate = 44100
-        val dur = 0.05
+        val dur = 0.028
         val n = (sampleRate * dur).toInt()
         val pcm = ShortArray(n)
         for (i in 0 until n) {
             val t = i.toDouble() / sampleRate
-            val env = exp(-t * 60.0)
-            val s = (sin(2 * Math.PI * 880.0 * t) * 0.7 + sin(2 * Math.PI * 1760.0 * t) * 0.3) * env
-            pcm[i] = (s * 28000.0).toInt().coerceIn(-32768, 32767).toShort()
+            val env = exp(-t * 120.0)
+            val s = (sin(2 * Math.PI * 1200.0 * t) * 0.6 + sin(2 * Math.PI * 2400.0 * t) * 0.4) * env
+            pcm[i] = (s * 26000.0).toInt().coerceIn(-32768, 32767).toShort()
         }
 
         val minBuf = AudioTrack.getMinBufferSize(
@@ -116,8 +120,9 @@ class Metronome {
                     at.play()
                 } catch (e: Throwable) { /* ignore transient device errors */ }
 
-                val tSec = (System.nanoTime() - startNs) / 1_000_000_000.0
-                listener?.onClick(beatIndex, tSec)
+                // report the scheduled beat time as an absolute timestamp so the
+                // caller can map it onto its own (audio) clock
+                listener?.onClick(beatIndex, System.nanoTime())
                 beatIndex++
                 nextBeatNs += intervalNs
                 // If we fell behind (system pause), catch up to current time.
