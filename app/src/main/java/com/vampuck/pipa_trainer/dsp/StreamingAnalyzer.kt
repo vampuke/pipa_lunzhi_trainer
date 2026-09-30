@@ -8,7 +8,7 @@ import kotlin.math.sqrt
  * Streaming lunzhi analyzer for live microphone mode.
  * Feed raw mono float samples via [push]; it maintains a running spectral-flux
  * onset detector and reports rolling metrics (recent strokes/sec, CV) plus the
- * instantaneous stroke loudness. Keeps ALL onset times so [finalize] can run
+ * instantaneous stroke loudness. Keeps ALL onset times so [metrics] can run
  * the same evaluation as file mode over the whole session.
  */
 class StreamingAnalyzer(private val sampleRate: Int) {
@@ -25,7 +25,7 @@ class StreamingAnalyzer(private val sampleRate: Int) {
 
     private var frameIndex = 0L
     private var lastPeakFrame = -1000L
-    private val minGapFrames = (0.073 * fps).toInt().coerceAtLeast(1)
+    private val minGapFrames = (0.040 * fps).toInt().coerceAtLeast(1)
 
     // recent flux for adaptive threshold (approx uniform filter over 0.12s)
     private val fluxHistory = ArrayDeque<Double>()
@@ -145,7 +145,7 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         fluxHistory.addLast(nf); fluxSum += nf
         if (fluxHistory.size > fluxWindowLen) fluxSum -= fluxHistory.removeFirst()
         val med = fluxSum / fluxHistory.size
-        val thr = med + 0.05
+        val thr = med * 1.2 + 0.02
 
         // gate threshold for the per-frame RMS:
         // accept frames whose RMS exceeds max(absolute_min, K * floor)
@@ -188,43 +188,9 @@ class StreamingAnalyzer(private val sampleRate: Int) {
             noiseFloor, gateOpen = noiseFloor > 0 && lastStrokeAmp >= noiseFloor * 3.0)
     }
 
-    /** Full-session summary over all collected onsets/amps. */
-    fun finalize(): Summary {
-        val times = onsetTimes.toDoubleArray()
-        val ioiAll = ArrayList<Double>()
-        for (j in 1 until times.size) ioiAll.add(times[j] - times[j - 1])
-        val ioi = ioiAll.filter { it in LunzhiAnalyzer.MIN_IOI..LunzhiAnalyzer.MAX_IOI }
-        val mean = if (ioi.isNotEmpty()) ioi.average() else 0.0
-        val cps = if (mean > 0) 1.0 / mean else 0.0
-        val med = median(ioi)
-        var sd = 0.0
-        if (ioi.isNotEmpty()) { for (d in ioi) sd += (d - mean) * (d - mean); sd = sqrt(sd / ioi.size) }
-        val cv = if (mean > 0) sd / mean else 0.0
-        val band = ioi.filter { it > med * 0.6 && it < med * 1.6 }
-        val bMean = if (band.isNotEmpty()) band.average() else 0.0
-        var bsd = 0.0
-        if (band.isNotEmpty()) { for (d in band) bsd += (d - bMean) * (d - bMean); bsd = sqrt(bsd / band.size) }
-        val modalCv = if (bMean > 0) bsd / bMean else 0.0
-        val (phase, profile) = LunzhiAnalyzer.fiveFold(strokeAmp.toDoubleArray())
-        val dur = totalSamples.toDouble() / sampleRate
-        return Summary(dur, times.size, cps, cps * 60, mean * 1000, med * 1000,
-            sd * 1000, cv, modalCv, phase, profile, times)
-    }
-
-    data class Summary(
-        val durationSec: Double,
-        val totalStrokes: Int,
-        val strokesPerSec: Double,
-        val strokesPerMin: Double,
-        val meanIoiMs: Double,
-        val medianIoiMs: Double,
-        val stdIoiMs: Double,
-        val cv: Double,
-        val modalCv: Double,
-        val bestPhase: Int,
-        val fingerProfile: DoubleArray,
-        val onsetTimes: DoubleArray
-    )
+    /** Full-session metrics over all collected onsets/amps (shared with file mode). */
+    fun metrics(): LunzhiAnalyzer.Metrics =
+        LunzhiAnalyzer.metrics(onsetTimes.toDoubleArray(), strokeAmp.toDoubleArray())
 
     private fun median(v: List<Double>): Double {
         if (v.isEmpty()) return 0.0

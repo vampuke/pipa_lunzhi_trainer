@@ -134,11 +134,8 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
         b.btnToggle.setText(R.string.btn_start)
         recordThread?.join(500)
         val a = analyzer ?: return
-        val s = a.finalize()
-        val rep = Evaluation.build(
-            s.strokesPerMin, s.strokesPerSec, s.cv, s.modalCv,
-            s.fingerProfile, s.totalStrokes, s.durationSec
-        )
+        val m = a.metrics()
+        val rep = Evaluation.build(m)
         val sb = StringBuilder()
         sb.append("【整段评估】\n")
         sb.append("综合 ${rep.score} 分 · ${rep.grade}\n")

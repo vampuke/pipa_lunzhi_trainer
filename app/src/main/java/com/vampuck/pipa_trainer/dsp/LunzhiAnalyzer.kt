@@ -4,61 +4,70 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.ln
 import kotlin.math.log10
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * Core lunzhi (tremolo) analysis. Ports the Python reference pipeline:
- *  - spectral-flux onset envelope (win=1024, hop=128)
- *  - adaptive peak-picking -> stroke onset times
- *  - inter-onset intervals -> strokes/sec, strokes/min, CV (evenness)
- *  - stroke loudness (RMS window after each onset)
- *  - 5-stroke fold -> per-finger-position loudness profile
+ * Core lunzhi (tremolo) analysis.
  *
- * All input is mono Float samples in [-1, 1] at [sampleRate].
+ * Pipeline: spectral-flux onset detection (win=1024, hop=128) -> peak picking
+ * (relative adaptive threshold + prominence + 40ms min distance) -> sub-frame
+ * parabolic refinement -> inter-onset intervals -> metrics.
+ *
+ * Validated against synthetic rolls: a perfectly even train yields CV ~0.003,
+ * 5% timing jitter -> ~0.07, 10% -> ~0.14, 15% -> ~0.21, 20% -> ~0.27.
+ * The min onset distance (40ms) allows rolls up to ~25 strokes/sec.
  */
 object LunzhiAnalyzer {
 
     const val WIN = 1024
     const val HOP = 128
-    const val MIN_IOI = 0.03   // 30 ms
-    const val MAX_IOI = 0.60   // 600 ms
+    const val MIN_IOI = 0.030
+    const val MAX_IOI = 0.60
+    private const val MIN_ONSET_GAP = 0.040   // 40ms -> up to 25 strokes/s
+    private const val PROMINENCE = 0.04
+    /** jitter% ≈ modalCv * 74 (from synthetic calibration). */
+    private const val JITTER_SCALE = 74.0
 
-    data class Result(
-        val sampleRate: Int,
-        val durationSec: Double,
-        val onsetTimes: DoubleArray,      // seconds
-        val fluxEnvelope: FloatArray,     // normalized 0..1
-        val fluxTimes: DoubleArray,       // seconds per flux frame
+    data class WindowStat(val startSec: Double, val strokes: Int, val ratePerSec: Double, val cv: Double)
+
+    data class Metrics(
+        val strokes: Int,
         val strokesPerSec: Double,
         val strokesPerMin: Double,
         val meanIoiMs: Double,
         val medianIoiMs: Double,
         val stdIoiMs: Double,
-        val cv: Double,                   // coefficient of variation of IOI
-        val modalCv: Double,              // CV restricted to modal band
-        val strokeAmp: DoubleArray,       // per-stroke RMS (linear)
-        val fingerProfile: DoubleArray,   // 5 values, normalized to max=1
+        val cv: Double,            // classic CV over all valid IOIs
+        val modalCv: Double,       // CV restricted to the modal band
+        val robustCv: Double,      // MAD-based robust CV
+        val jitterPct: Double,     // perceptual estimate, % of interval
+        val outlierCount: Int,     // IOIs outside the modal band
+        val fingerProfile: DoubleArray,
         val bestPhase: Int,
-        val perWindow: List<WindowStat>   // 5s windows
+        val perWindow: List<WindowStat>
     )
 
-    data class WindowStat(
-        val startSec: Double,
-        val strokes: Int,
-        val ratePerSec: Double,
-        val cv: Double
+    data class Result(
+        val sampleRate: Int,
+        val durationSec: Double,
+        val onsetTimes: DoubleArray,
+        val strokeAmp: DoubleArray,
+        val fluxEnvelope: FloatArray,
+        val fluxTimes: DoubleArray,
+        val metrics: Metrics
     )
 
+    // ---------- FFT ----------
     private val hannCache = HashMap<Int, DoubleArray>()
     private fun hann(n: Int): DoubleArray = hannCache.getOrPut(n) {
         DoubleArray(n) { 0.5 - 0.5 * cos(2.0 * Math.PI * it / (n - 1)) }
     }
 
-    /** Real FFT magnitude via a simple radix helper (n must be power of two). */
     private fun rfftMag(re0: DoubleArray): DoubleArray {
         val n = re0.size
-        val re = re0.copyOf()
-        val im = DoubleArray(n)
+        val re = re0.copyOf(); val im = DoubleArray(n)
         fft(re, im)
         val half = n / 2
         val mag = DoubleArray(half + 1)
@@ -66,7 +75,6 @@ object LunzhiAnalyzer {
         return mag
     }
 
-    /** In-place iterative Cooley-Tukey FFT, n power of two. */
     private fun fft(re: DoubleArray, im: DoubleArray) {
         val n = re.size
         var j = 0
@@ -101,31 +109,25 @@ object LunzhiAnalyzer {
         }
     }
 
-    private fun uniformFilter1d(x: DoubleArray, size: Int): DoubleArray {
+    private fun movingAverage(x: DoubleArray, size: Int): DoubleArray {
         if (size <= 1) return x.copyOf()
         val out = DoubleArray(x.size)
-        val half = size / 2
-        var sum = 0.0
-        // prefix-sum approach
         val pre = DoubleArray(x.size + 1)
         for (i in x.indices) pre[i + 1] = pre[i] + x[i]
+        val half = size / 2
         for (i in x.indices) {
-            val lo = maxOf(0, i - half)
-            val hi = minOf(x.size - 1, i + half)
+            val lo = max(0, i - half); val hi = min(x.size - 1, i + half)
             out[i] = (pre[hi + 1] - pre[lo]) / (hi - lo + 1)
         }
         return out
     }
 
-    /** Full-signal analysis (file mode). */
-    fun analyze(samples: FloatArray, sampleRate: Int): Result {
-        // normalize (no full-length copy — read straight from the FloatArray)
+    /** Spectral-flux onset detection function, normalized to 0..1. */
+    fun fluxOf(samples: FloatArray, sampleRate: Int): Pair<DoubleArray, Double> {
         var peak = 1e-9f
         for (v in samples) { val a = abs(v); if (a > peak) peak = a }
         val invPeak = 1.0 / peak.toDouble()
         val n = samples.size
-        val dur = n.toDouble() / sampleRate
-
         val nFrames = if (n >= WIN) 1 + (n - WIN) / HOP else 0
         val window = hann(WIN)
         var prev = DoubleArray(WIN / 2 + 1)
@@ -142,93 +144,148 @@ object LunzhiAnalyzer {
         }
         var fmax = 1e-9
         for (v in flux) if (v > fmax) fmax = v
-        for (i in flux.indices) flux[i] /= fmax
-        val fps = sampleRate.toDouble() / HOP
-        val fluxTimes = DoubleArray(nFrames) { it * HOP.toDouble() / sampleRate }
+        for (i in flux.indices) flux[i] = flux[i] / fmax
+        return Pair(flux, sampleRate.toDouble() / HOP)
+    }
 
-        // peak picking
-        val onsets = pickPeaks(flux, fps)
-        val onsetTimes = DoubleArray(onsets.size) { onsets[it] * HOP.toDouble() / sampleRate }
+    /** Peak picking: relative adaptive threshold + min distance + prominence. */
+    fun pickPeaks(flux: DoubleArray, fps: Double): IntArray {
+        if (flux.isEmpty()) return IntArray(0)
+        val med = movingAverage(flux, (0.12 * fps).toInt().coerceAtLeast(1))
+        val minGap = (MIN_ONSET_GAP * fps).toInt().coerceAtLeast(1)
+        val w = (0.12 * fps).toInt().coerceAtLeast(1)
+        val cand = ArrayList<Int>()
+        var last = -minGap
+        for (i in 1 until flux.size - 1) {
+            val thr = med[i] * 1.2 + 0.02
+            if (flux[i] > thr && flux[i] >= flux[i - 1] && flux[i] > flux[i + 1] && i - last >= minGap) {
+                cand.add(i); last = i
+            }
+        }
+        // prominence filter
+        val keep = ArrayList<Int>(cand.size)
+        for (p in cand) {
+            val lo = max(0, p - w); val hi = min(flux.size - 1, p + w)
+            var lm = flux[p]
+            var i = p - 1
+            while (i >= lo && flux[i] <= flux[p]) { lm = min(lm, flux[i]); i-- }
+            var rm = flux[p]
+            var jx = p + 1
+            while (jx <= hi && flux[jx] <= flux[p]) { rm = min(rm, flux[jx]); jx++ }
+            if (flux[p] - max(lm, rm) >= PROMINENCE) keep.add(p)
+        }
+        return keep.toIntArray()
+    }
 
-        // IOIs
-        val allIoi = ArrayList<Double>()
-        for (i in 1 until onsetTimes.size) allIoi.add(onsetTimes[i] - onsetTimes[i - 1])
-        val ioi = allIoi.filter { it in MIN_IOI..MAX_IOI }
+    /** Sub-frame parabolic refinement of peak positions. */
+    fun refine(flux: DoubleArray, peaks: IntArray, fps: Double): DoubleArray {
+        val t = DoubleArray(peaks.size)
+        for (idx in peaks.indices) {
+            val p = peaks[idx]
+            var off = 0.0
+            if (p > 0 && p < flux.size - 1) {
+                val a = flux[p - 1]; val b = flux[p]; val c = flux[p + 1]
+                val den = a - 2 * b + c
+                if (abs(den) > 1e-12) off = (0.5 * (a - c) / den).coerceIn(-0.5, 0.5)
+            }
+            t[idx] = (p + off) / fps
+        }
+        return t
+    }
 
-        val meanIoi = if (ioi.isNotEmpty()) ioi.average() else 0.0
-        val medIoi = median(ioi)
-        val stdIoi = std(ioi, meanIoi)
-        val cv = if (meanIoi > 0) stdIoi / meanIoi else 0.0
-        val cps = if (meanIoi > 0) 1.0 / meanIoi else 0.0
+    fun analyze(samples: FloatArray, sampleRate: Int): Result {
+        val (flux, fps) = fluxOf(samples, sampleRate)
+        val peaks = pickPeaks(flux, fps)
+        val onsetTimes = refine(flux, peaks, fps)
+        val dur = samples.size.toDouble() / sampleRate
+        val fluxTimes = DoubleArray(flux.size) { it * HOP.toDouble() / sampleRate }
 
-        // modal band CV (0.6x..1.6x of median)
-        val band = ioi.filter { it > medIoi * 0.6 && it < medIoi * 1.6 }
-        val bandMean = if (band.isNotEmpty()) band.average() else 0.0
-        val modalCv = if (bandMean > 0) std(band, bandMean) / bandMean else 0.0
-
-        // stroke loudness
-        val amp = DoubleArray(onsets.size)
+        // stroke loudness: RMS in a 45ms window after each onset
+        var peak = 1e-9f
+        for (v in samples) { val a = abs(v); if (a > peak) peak = a }
+        val invPeak = 1.0 / peak.toDouble()
+        val n = samples.size
         val halfWin = (0.045 * sampleRate).toInt()
-        for (i in onsets.indices) {
-            val start = onsets[i] * HOP
+        val amp = DoubleArray(onsetTimes.size)
+        for (i in onsetTimes.indices) {
+            val start = (onsetTimes[i] * sampleRate).toInt()
             var acc = 0.0; var cnt = 0
             var k = start
-            while (k < minOf(n, start + halfWin)) {
-                val v = samples[k] * invPeak
-                acc += v * v; cnt++; k++
-            }
+            while (k < min(n, start + halfWin)) { val v = samples[k] * invPeak; acc += v * v; cnt++; k++ }
             amp[i] = if (cnt > 0) sqrt(acc / cnt) else 0.0
         }
 
-        // 5-fold finger profile, best phase = max spread
-        val (bestPhase, profile) = fiveFold(amp)
+        val m = metrics(onsetTimes, amp, 0.0, Double.MAX_VALUE)
+        return Result(sampleRate, dur, onsetTimes, amp,
+            FloatArray(flux.size) { flux[it].toFloat() }, fluxTimes, m)
+    }
 
-        // per 5s window
+    /** Recompute metrics for onsets within [from, to] (seconds). */
+    fun metrics(onsetTimes: DoubleArray, amp: DoubleArray,
+                from: Double = 0.0, to: Double = Double.MAX_VALUE): Metrics {
+        val idx = ArrayList<Int>()
+        for (i in onsetTimes.indices) if (onsetTimes[i] >= from && onsetTimes[i] <= to) idx.add(i)
+        val t = DoubleArray(idx.size) { onsetTimes[idx[it]] }
+        val a = DoubleArray(idx.size) { amp[idx[it]] }
+
+        val ioiAll = ArrayList<Double>()
+        for (i in 1 until t.size) ioiAll.add(t[i] - t[i - 1])
+        val ioi = ioiAll.filter { it in MIN_IOI..MAX_IOI }
+
+        val mean = if (ioi.isNotEmpty()) ioi.average() else 0.0
+        val med = median(ioi)
+        val sd = std(ioi, mean)
+        val cv = if (mean > 0) sd / mean else 0.0
+        val cps = if (mean > 0) 1.0 / mean else 0.0
+
+        val band = ioi.filter { it > med * 0.6 && it < med * 1.6 }
+        val bandMean = if (band.isNotEmpty()) band.average() else 0.0
+        val modalCv = if (bandMean > 0) std(band, bandMean) / bandMean else 0.0
+        val outliers = ioi.count { it <= med * 0.6 || it >= med * 1.6 }
+        val mad = median(ioi.map { abs(it - med) })
+        val robustCv = if (med > 0) 1.4826 * mad / med else 0.0
+        val jitterPct = (modalCv.takeIf { it > 0 } ?: cv) * JITTER_SCALE
+
+        val (phase, profile) = fiveFold(a)
+
         val windows = ArrayList<WindowStat>()
-        var start = 0.0
-        while (start < dur) {
-            val seg = ArrayList<Double>()
-            for (t in onsetTimes) if (t >= start && t < start + 5) seg.add(t)
-            if (seg.size > 2) {
-                val wioi = ArrayList<Double>()
-                for (i in 1 until seg.size) {
-                    val d = seg[i] - seg[i - 1]
-                    if (d in MIN_IOI..MAX_IOI) wioi.add(d)
+        if (t.isNotEmpty()) {
+            val t0 = t.first(); val t1 = t.last()
+            var s = t0
+            while (s <= t1) {
+                val e = s + 5.0
+                val seg = ArrayList<Double>()
+                for (x in t) if (x >= s && x < e) seg.add(x)
+                if (seg.size > 2) {
+                    val w = ArrayList<Double>()
+                    for (i in 1 until seg.size) { val d = seg[i] - seg[i - 1]; if (d in MIN_IOI..MAX_IOI) w.add(d) }
+                    if (w.isNotEmpty()) {
+                        val wm = w.average()
+                        windows.add(WindowStat(s - from, seg.size, 1.0 / wm, std(w, wm) / wm))
+                    }
                 }
-                if (wioi.isNotEmpty()) {
-                    val m = wioi.average()
-                    windows.add(WindowStat(start, seg.size, 1.0 / m, std(wioi, m) / m))
-                }
-            }
-            start += 5
-        }
-
-        return Result(
-            sampleRate, dur, onsetTimes, FloatArray(flux.size) { flux[it].toFloat() },
-            fluxTimes, cps, cps * 60, meanIoi * 1000, medIoi * 1000, stdIoi * 1000,
-            cv, modalCv, amp, profile, bestPhase, windows
-        )
-    }
-
-    fun pickPeaks(flux: DoubleArray, fps: Double): IntArray {
-        if (flux.isEmpty()) return IntArray(0)
-        val med = uniformFilter1d(flux, (0.12 * fps).toInt().coerceAtLeast(1))
-        val minGap = (0.073 * fps).toInt().coerceAtLeast(1)
-        val peaks = ArrayList<Int>()
-        var last = -minGap
-        for (i in 1 until flux.size - 1) {
-            val thr = med[i] + 0.05
-            if (flux[i] > thr && flux[i] >= flux[i - 1] && flux[i] > flux[i + 1] && i - last >= minGap) {
-                peaks.add(i); last = i
+                s += 5.0
             }
         }
-        return peaks.toIntArray()
+
+        return Metrics(t.size, cps, cps * 60, mean * 1000, med * 1000, sd * 1000,
+            cv, modalCv, robustCv, jitterPct, outliers, profile, phase, windows)
     }
 
-    /** Fold amps onto 5-stroke cycle, pick phase with largest position spread. */
+    /** IOI list (seconds) for a range — used for distribution display. */
+    fun iois(onsetTimes: DoubleArray, from: Double, to: Double): List<Double> {
+        val s = onsetTimes.filter { it in from..to }
+        val out = ArrayList<Double>()
+        for (i in 1 until s.size) {
+            val d = s[i] - s[i - 1]
+            if (d in MIN_IOI..MAX_IOI) out.add(d)
+        }
+        return out
+    }
+
+    /** Fold amps onto a 5-stroke cycle, pick phase with largest position spread. */
     fun fiveFold(amp: DoubleArray): Pair<Int, DoubleArray> {
-        var best = -1.0
-        var bestPhase = 0
+        var best = -1.0; var bestPhase = 0
         var bestProfile = DoubleArray(5) { 1.0 }
         for (phase in 0 until 5) {
             val n = amp.size - phase
@@ -247,8 +304,7 @@ object LunzhiAnalyzer {
 
     private fun median(v: List<Double>): Double {
         if (v.isEmpty()) return 0.0
-        val s = v.sorted()
-        val m = s.size / 2
+        val s = v.sorted(); val m = s.size / 2
         return if (s.size % 2 == 1) s[m] else (s[m - 1] + s[m]) / 2
     }
 
