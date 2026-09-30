@@ -232,7 +232,7 @@ object LunzhiAnalyzer {
             if (cycles < 2) continue
             val posMean = DoubleArray(5)
             for (c in 0 until cycles) for (p in 0 until 5) posMean[p] += amp[phase + c * 5 + p]
-            for (p in 0 until 5) posMean[p] /= cycles
+            for (p in 0 until 5) posMean[p] = posMean[p] / cycles
             val spread = (posMean.maxOrNull() ?: 0.0) - (posMean.minOrNull() ?: 0.0)
             if (spread > best) { best = spread; bestPhase = phase; bestProfile = posMean }
         }
