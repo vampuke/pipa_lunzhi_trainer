@@ -33,7 +33,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         b = ActivityFileAnalysisBinding.inflate(layoutInflater)
         setContentView(b.root)
-        picker.launch(arrayOf("audio/*"))
+        picker.launch(arrayOf("audio/*", "video/*"))
     }
 
     private fun analyze(uri: Uri) {

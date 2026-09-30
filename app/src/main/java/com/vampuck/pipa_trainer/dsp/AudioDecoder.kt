@@ -30,7 +30,7 @@ object AudioDecoder {
             val mime = f.getString(MediaFormat.KEY_MIME) ?: ""
             if (mime.startsWith("audio/")) { trackIndex = i; format = f; break }
         }
-        require(trackIndex >= 0 && format != null) { "No audio track found" }
+        require(trackIndex >= 0 && format != null) { "No audio track found in this file" }
         extractor.selectTrack(trackIndex)
 
         val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)

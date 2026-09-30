@@ -2,7 +2,7 @@
     <string name="app_name">Pipa Lunzhi Trainer</string>
     <string name="title_home">Pipa Lunzhi Trainer</string>
     <string name="subtitle_home">Analyze your tremolo (lunzhi) practice</string>
-    <string name="btn_pick_file">Analyze an audio file</string>
+    <string name="btn_pick_file">Analyze an audio/video file</string>
     <string name="btn_live">Live microphone practice</string>
     <string name="btn_start">Start</string>
     <string name="btn_stop">Stop &amp; evaluate</string>
