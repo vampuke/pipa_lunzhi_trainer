@@ -60,21 +60,104 @@
             android:layout_marginTop="12dp" android:gravity="center"
             android:text="0 strokes" android:textSize="14sp" />
 
-        <!-- live loudness bar -->
         <ProgressBar android:id="@+id/ampBar"
             style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent" android:layout_height="24dp"
+            android:layout_width="match_parent" android:layout_height="20dp"
             android:layout_marginTop="24dp" android:max="100" android:progress="0" />
         <TextView
             android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_gravity="center" android:text="current stroke loudness"
+            android:layout_gravity="center"
+            android:text="@string/lbl_loudness"
             android:textSize="12sp" />
+
+        <TextView android:id="@+id/gateStatus"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:gravity="center"
+            android:textSize="12sp" />
+
+        <!-- 节拍器 -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            xmlns:app="http://schemas.android.com/apk/res-auto">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@color/white"
+                android:padding="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/metronome"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/pipa_primary_dark" />
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchMetro"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="10dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/metro_bpm"
+                        android:textSize="14sp" />
+
+                    <SeekBar
+                        android:id="@+id/seekBpm"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginHorizontal="8dp"
+                        android:max="220"
+                        android:progress="80" />
+
+                    <TextView android:id="@+id/valMetroBpm"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="80"
+                        android:textStyle="bold"
+                        android:textColor="@color/pipa_primary_dark"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/metro_note"
+                    android:textSize="11sp"
+                    android:textColor="@color/black" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnToggle"
             android:layout_width="match_parent"
             android:layout_height="60dp"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="20dp"
             android:text="@string/btn_start"
             android:textSize="16sp" />
 

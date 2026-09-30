@@ -34,8 +34,46 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     private var prevFlux = 0.0
     private var prevPrevFlux = 0.0
 
+    // --- noise gate ---
+    // Track the running minimum of per-frame RMS as an estimate of the
+    // background noise floor. Require an onset frame's RMS to be at least
+    // NOISE_GATE_RATIO * floor (or absolute FLOOR_MIN if floor is lower).
+    // The floor adapts every ~0.5s so quiet-room vs. noisy-room both work.
+    private var noiseFloor = 0.02       // conservative start
+    private val floorDecay = 0.992      // slow adaptation upward
+
+    /** When true, onsets are gated by the per-frame RMS noise floor. */
+    var noiseGateEnabled = true
+
+    /** Public read of the current noise floor (0..1). */
+    @Volatile var currentNoiseFloor: Double = noiseFloor
+        private set
+
     val onsetTimes = ArrayList<Double>()
     val strokeAmp = ArrayList<Double>()
+
+    /** Times (sec, from start) when the metronome clicked. Used to mask self-click onsets. */
+    private val clickTimes = ArrayList<Double>()
+    /** Window around each metronome click to ignore onsets (sec). */
+    private val clickMaskWindow = 0.10
+
+    /** Append a metronome click at session-relative time [tSec]. */
+    fun addMetronomeClick(tSec: Double) {
+        clickTimes.add(tSec)
+        // keep array bounded
+        if (clickTimes.size > 2000) clickTimes.subList(0, clickTimes.size - 2000).clear()
+    }
+
+    /** Returns true if [t] is within any recent metronome click mask. */
+    private fun isMetronomeMasked(t: Double): Boolean {
+        // scan only the last ~2 seconds of clicks (cheap)
+        var i = clickTimes.size - 1
+        while (i >= 0 && clickTimes[i] > t - 2.0) {
+            if (abs(clickTimes[i] - t) < clickMaskWindow) return true
+            i--
+        }
+        return false
+    }
 
     // for instantaneous loudness we track recent peak sample amplitude
     @Volatile var lastStrokeAmp: Double = 0.0
@@ -48,7 +86,9 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val strokesPerMin: Double,
         val cv: Double,
         val totalStrokes: Int,
-        val lastAmp: Double
+        val lastAmp: Double,
+        val noiseFloor: Double,
+        val gateOpen: Boolean
     )
 
     /** Push a block of mono float samples. Returns updated live metrics. */
@@ -87,6 +127,16 @@ class StreamingAnalyzer(private val sampleRate: Int) {
             if (d > 0) flux += d
             prevMag[k] = mag
         }
+        // per-frame RMS in time domain (background-energy proxy)
+        var rms = 0.0
+        for (k in 0 until win) { rms += ring[k] * ring[k] }
+        rms = sqrt(rms / win)
+
+        // update noise floor: slowly decay floor upward to track new ambient;
+        // quickly drop to current rms if it's lower than floor.
+        noiseFloor = maxOf(noiseFloor * floorDecay, rms.coerceAtMost(noiseFloor * 0.95 + rms * 0.05))
+        currentNoiseFloor = noiseFloor
+
         // normalize loosely by a running max to keep threshold ~ same scale as file mode
         runningMax = maxOf(runningMax * 0.9995, flux)
         val nf = if (runningMax > 1e-9) flux / runningMax else 0.0
@@ -97,14 +147,21 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val med = fluxSum / fluxHistory.size
         val thr = med + 0.05
 
+        // gate threshold for the per-frame RMS:
+        // accept frames whose RMS exceeds max(absolute_min, K * floor)
+        val gateOk = !noiseGateEnabled ||
+            rms > maxOf(0.02, noiseFloor * 3.0)
+
         // peak test on prevFlux (center of 3)
-        if (prevFlux > thr && prevFlux >= prevPrevFlux && prevFlux > nf &&
+        if (gateOk && prevFlux > thr && prevFlux >= prevPrevFlux && prevFlux > nf &&
             (frameIndex - 1) - lastPeakFrame >= minGapFrames) {
             val t = (frameIndex - 1) * hop.toDouble() / sampleRate
-            onsetTimes.add(t)
-            lastPeakFrame = frameIndex - 1
-            lastStrokeAmp = prevFlux
-            strokeAmp.add(prevFlux)
+            if (!isMetronomeMasked(t)) {
+                onsetTimes.add(t)
+                lastPeakFrame = frameIndex - 1
+                lastStrokeAmp = prevFlux
+                strokeAmp.add(prevFlux)
+            }
         }
         prevPrevFlux = prevFlux
         prevFlux = nf
@@ -127,7 +184,8 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         var sd = 0.0
         if (ioi.isNotEmpty()) { for (d in ioi) sd += (d - mean) * (d - mean); sd = sqrt(sd / ioi.size) }
         val cv = if (mean > 0) sd / mean else 0.0
-        return Live(cps, cps * 60, cv, onsetTimes.size, lastStrokeAmp)
+        return Live(cps, cps * 60, cv, onsetTimes.size, lastStrokeAmp,
+            noiseFloor, gateOpen = noiseFloor > 0 && lastStrokeAmp >= noiseFloor * 3.0)
     }
 
     /** Full-session summary over all collected onsets/amps. */

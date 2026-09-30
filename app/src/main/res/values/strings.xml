@@ -21,4 +21,11 @@
     <string name="chart_ioi">相邻音间隔随时间变化（毫秒，越平越匀）</string>
     <string name="chart_finger">轮内各指力度（五音折叠，%）</string>
     <string name="chart_window">分段稳定度（每5秒）</string>
+    <string name="metronome">节拍器</string>
+    <string name="metro_bpm">速度 (BPM)</string>
+    <string name="metro_note">提示：节拍器声会被算法自动剔除，不会被记为轮指击弦</string>
+    <string name="lbl_loudness">当前击弦力度</string>
+    <string name="gate_quiet">环境安静，未检测到信号</string>
+    <string name="gate_active">录音中 · 环境门已开启</string>
+    <string name="gate_floor_fmt">环境底噪 %.4f · 阈值 %.4f</string>
 </resources>

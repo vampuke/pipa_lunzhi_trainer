@@ -27,6 +27,21 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      # Decrypt keystore if all 4 signing secrets are present.
+      - name: Decode signing keystore
+        if: ${{ env.SIGNING_KEY != '' }}
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          echo "$SIGNING_KEY" | base64 -d > "$RUNNER_TEMP/keys/signing.keystore"
+          {
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/keys/signing.keystore"
+            echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}"
+            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}"
+            echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}"
+          } >> "$GITHUB_ENV"
+
       - name: Run unit tests (DSP validation)
         run: ./gradlew testDebugUnitTest --stacktrace
 
@@ -35,6 +50,16 @@ jobs:
 
       - name: Build release APK
         run: ./gradlew assembleRelease --stacktrace
+
+      - name: Verify release signing
+        if: ${{ env.KEYSTORE_PATH != '' }}
+        run: |
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          APKSIGNER=$(ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/"*/apksigner | head -1)
+          "$APKSIGNER" verify --print-certs "$APK" 2>&1 | tee /tmp/sig.txt
+          grep -qi "9e:6e:8c:53:5d:d6:21:85:2a:5e:82:54:eb:ed:c8:d1" /tmp/sig.txt && \
+            echo "OK: expected SHA-256 prefix matches" || \
+            (echo "FAIL: signature mismatch"; exit 1)
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
