@@ -1,6 +1,7 @@
 package com.vampuck.pipa_trainer.dsp
 
 import android.content.Context
+import android.media.AudioFormat
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -9,23 +10,24 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * Decodes the FIRST audio track of any file (audio OR video container, e.g. an
- * mp4's embedded AAC) to mono Float PCM, downsampled to ~22 kHz.
+ * Decodes the FIRST audio track of any file (audio OR video container) to mono
+ * Float PCM, downsampled to ~22 kHz.
  *
- * Memory-safe design:
- *  - uses a growing primitive FloatArray, NOT ArrayList<Float> (boxed floats
- *    cost ~16 bytes each and blow the heap on anything longer than a few sec).
- *  - downsamples on the fly to [TARGET_RATE] so we store ~half the samples.
- *  - hard cap of [MAX_SECONDS] with a truncation flag.
+ * Memory-safe: growing primitive FloatArray (no boxing) + on-the-fly box-filter
+ * downsampling + a hard duration cap.
+ *
+ * Correctness: follows the decoder's *output* format (rate / channels / PCM
+ * encoding) rather than trusting the container's input format — some decoders
+ * emit float PCM or a different sample rate, which would otherwise corrupt the
+ * time base (and the reported duration).
  */
 object AudioDecoder {
 
     private const val TARGET_RATE = 22050
-    private const val MAX_SECONDS = 30 * 60   // 30 minutes hard cap
+    private const val MAX_SECONDS = 30 * 60
 
     data class Pcm(val samples: FloatArray, val sampleRate: Int, val truncated: Boolean)
 
-    /** Minimal growable primitive float buffer (avoids boxing). */
     private class FloatList(initial: Int) {
         var arr = FloatArray(initial.coerceAtLeast(1024))
         var size = 0
@@ -34,6 +36,17 @@ object AudioDecoder {
             arr[size++] = v
         }
         fun toArray() = arr.copyOf(size)
+    }
+
+    /** Box-filter accumulator: emits one downsampled sample every [factor] inputs. */
+    private class Down(var factor: Int) {
+        private var acc = 0.0
+        private var count = 0
+        fun push(v: Double, out: FloatList): Boolean {
+            acc += v; count++
+            if (count >= factor) { out.add((acc / count).toFloat()); acc = 0.0; count = 0; return true }
+            return false
+        }
     }
 
     fun decode(context: Context, uri: Uri): Pcm {
@@ -52,29 +65,26 @@ object AudioDecoder {
         require(trackIndex >= 0 && format != null) { "该文件里没有音频轨" }
         extractor.selectTrack(trackIndex)
 
-        val srcRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE).coerceAtLeast(8000)
-        val channels = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT))
-            format.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1) else 1
+        val inRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE).coerceAtLeast(8000)
         val mime = format.getString(MediaFormat.KEY_MIME)!!
-
-        // integer downsample factor to land near TARGET_RATE
-        val factor = ((srcRate + TARGET_RATE / 2) / TARGET_RATE).coerceAtLeast(1)
-        val outRate = srcRate / factor
-        val maxOut = MAX_SECONDS * outRate
 
         val codec = MediaCodec.createDecoderByType(mime)
         codec.configure(format, null, null, 0)
         codec.start()
+
+        // output-format state (updated on INFO_OUTPUT_FORMAT_CHANGED)
+        var outRate = inRate
+        var channels = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT))
+            format.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1) else 1
+        var encoding = AudioFormat.ENCODING_PCM_16BIT
+        var maxOut = MAX_SECONDS * outRate
+        var down = Down(((outRate + TARGET_RATE / 2) / TARGET_RATE).coerceAtLeast(1))
 
         val out = FloatList(minOf(maxOut, outRate * 60))
         val info = MediaCodec.BufferInfo()
         var sawInputEOS = false
         var sawOutputEOS = false
         var truncated = false
-
-        // on-the-fly box-filter downsampler state
-        var acc = 0f
-        var accCount = 0
 
         loop@ while (!sawOutputEOS) {
             if (!sawInputEOS) {
@@ -83,8 +93,7 @@ object AudioDecoder {
                     val inBuf = codec.getInputBuffer(inIdx)!!
                     val size = extractor.readSampleData(inBuf, 0)
                     if (size < 0) {
-                        codec.queueInputBuffer(inIdx, 0, 0, 0,
-                            MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                        codec.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                         sawInputEOS = true
                     } else {
                         codec.queueInputBuffer(inIdx, 0, size, extractor.sampleTime, 0)
@@ -93,40 +102,61 @@ object AudioDecoder {
                 }
             }
             val outIdx = codec.dequeueOutputBuffer(info, 10_000)
-            if (outIdx >= 0) {
+            if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                val of = codec.outputFormat
+                if (of.containsKey(MediaFormat.KEY_SAMPLE_RATE))
+                    outRate = of.getInteger(MediaFormat.KEY_SAMPLE_RATE).coerceAtLeast(8000)
+                if (of.containsKey(MediaFormat.KEY_CHANNEL_COUNT))
+                    channels = of.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
+                if (of.containsKey(MediaFormat.KEY_PCM_ENCODING))
+                    encoding = of.getInteger(MediaFormat.KEY_PCM_ENCODING)
+                maxOut = MAX_SECONDS * outRate
+                down = Down(((outRate + TARGET_RATE / 2) / TARGET_RATE).coerceAtLeast(1))
+            } else if (outIdx >= 0) {
                 if (info.size > 0) {
-                    val outBuf = codec.getOutputBuffer(outIdx)!!
-                    outBuf.position(info.offset)
-                    outBuf.limit(info.offset + info.size)
-                    // feed samples through the downsampler
-                    outBuf.order(ByteOrder.LITTLE_ENDIAN)
-                    val sb = outBuf.asShortBuffer()
-                    val n = sb.remaining()
-                    var i = 0
-                    if (channels <= 1) {
-                        while (i < n) {
-                            acc += sb.get(i) / 32768f; accCount++
-                            if (accCount == factor) {
-                                out.add(acc / factor); acc = 0f; accCount = 0
-                                if (out.size >= maxOut) { truncated = true; codec.releaseOutputBuffer(outIdx, false); break@loop }
+                    val buf = codec.getOutputBuffer(outIdx)!!
+                    buf.position(info.offset)
+                    buf.limit(info.offset + info.size)
+                    buf.order(ByteOrder.LITTLE_ENDIAN)
+                    if (encoding == AudioFormat.ENCODING_PCM_FLOAT) {
+                        val fb = buf.asFloatBuffer()
+                        val n = fb.remaining()
+                        var i = 0
+                        if (channels <= 1) {
+                            while (i < n) {
+                                if (down.push(fb.get(i).toDouble(), out) && out.size >= maxOut) { truncated = true; break }
+                                i++
                             }
-                            i++
+                        } else {
+                            while (i + channels <= n) {
+                                var m = 0.0
+                                for (c in 0 until channels) m += fb.get(i + c)
+                                if (down.push(m / channels, out) && out.size >= maxOut) { truncated = true; break }
+                                i += channels
+                            }
                         }
                     } else {
-                        while (i + channels <= n) {
-                            var m = 0f
-                            for (c in 0 until channels) m += sb.get(i + c) / 32768f
-                            acc += m / channels; accCount++
-                            if (accCount == factor) {
-                                out.add(acc / factor); acc = 0f; accCount = 0
-                                if (out.size >= maxOut) { truncated = true; codec.releaseOutputBuffer(outIdx, false); break@loop }
+                        val sb = buf.asShortBuffer()
+                        val n = sb.remaining()
+                        var i = 0
+                        if (channels <= 1) {
+                            while (i < n) {
+                                if (down.push(sb.get(i) / 32768.0, out) && out.size >= maxOut) { truncated = true; break }
+                                i++
                             }
-                            i += channels
+                        } else {
+                            while (i + channels <= n) {
+                                var m = 0.0
+                                for (c in 0 until channels) m += sb.get(i + c) / 32768.0
+                                if (down.push(m / channels, out) && out.size >= maxOut) { truncated = true; break }
+                                i += channels
+                            }
                         }
                     }
                 }
                 codec.releaseOutputBuffer(outIdx, false)
                 if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) sawOutputEOS = true
+                if (truncated) { codec.releaseOutputBuffer(outIdx, false); break@loop }
             }
         }
         try { codec.stop() } catch (_: Throwable) {}

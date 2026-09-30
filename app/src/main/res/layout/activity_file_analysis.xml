@@ -23,18 +23,16 @@
             android:layout_marginTop="8dp" android:text="@string/btn_pick_file"
             android:textSize="14sp" />
 
-        <!-- 综合评分卡 -->
+        <!-- 综合评分卡（整段） -->
         <androidx.cardview.widget.CardView
             android:id="@+id/scoreCard"
             android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="10dp" app:cardCornerRadius="14dp"
             app:cardElevation="3dp" android:visibility="gone">
-
             <LinearLayout
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical" android:background="@color/pipa_primary"
                 android:padding="18dp">
-
                 <LinearLayout
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:orientation="horizontal" android:gravity="center_vertical">
@@ -55,6 +53,10 @@
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="6dp" android:textSize="13sp"
                     android:textColor="@color/white" />
+                <TextView android:id="@+id/durationNote"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" android:textSize="11sp"
+                    android:textColor="@color/white" android:visibility="gone" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -73,7 +75,7 @@
                 android:orientation="vertical" android:background="@color/white"
                 android:padding="14dp">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="总结" android:textStyle="bold" android:textSize="16sp"
+                    android:text="整段总结" android:textStyle="bold" android:textSize="16sp"
                     android:textColor="@color/pipa_primary_dark" />
                 <TextView android:id="@+id/summaryText"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -90,37 +92,7 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- 播放控制 -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/playCard"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" app:cardCornerRadius="12dp"
-            app:cardElevation="2dp" android:visibility="gone">
-            <LinearLayout
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:orientation="vertical" android:background="@color/white"
-                android:padding="12dp">
-                <LinearLayout
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:orientation="horizontal" android:gravity="center_vertical">
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnPlay"
-                        android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:minWidth="0dp" android:paddingHorizontal="18dp"
-                        android:text="▶ 播放" android:textSize="14sp" />
-                    <TextView android:id="@+id/tvTime"
-                        android:layout_width="0dp" android:layout_height="wrap_content"
-                        android:layout_weight="1" android:layout_marginStart="12dp"
-                        android:text="0:00 / 0:00" android:textSize="13sp"
-                        android:textColor="@color/black" />
-                </LinearLayout>
-                <SeekBar android:id="@+id/seekPlay"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:max="1000" android:progress="0" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- 分段分析 -->
+        <!-- 分段 + 播放（合并） -->
         <androidx.cardview.widget.CardView
             android:id="@+id/segCard"
             android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -129,24 +101,51 @@
             <LinearLayout
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical" android:background="@color/white"
-                android:padding="12dp">
+                android:padding="14dp">
+
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="分段分析" android:textStyle="bold" android:textSize="16sp"
                     android:textColor="@color/pipa_primary_dark" />
+
+                <!-- 播放（播放区间 = 所选分段） -->
+                <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPlay"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:minWidth="0dp" android:paddingHorizontal="18dp"
+                        android:text="▶ 播放" android:textSize="14sp" />
+                    <TextView android:id="@+id/tvTime"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:layout_marginStart="12dp"
+                        android:text="--:-- / --:--" android:textSize="13sp"
+                        android:textColor="@color/black" />
+                </LinearLayout>
+                <SeekBar android:id="@+id/seekPlay"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:max="1000" android:progress="0" />
+
                 <TextView android:id="@+id/tvSegRange"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp" android:textSize="13sp"
+                    android:layout_marginTop="6dp" android:textSize="13sp"
                     android:textColor="@color/black" android:text="起点 0.0s　终点 --s" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:textSize="11sp" android:textColor="@color/black" android:text="起点" />
                 <SeekBar android:id="@+id/seekSegStart"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:max="1000" android:progress="0" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:textSize="11sp" android:textColor="@color/black" android:text="终点" />
                 <SeekBar android:id="@+id/seekSegEnd"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:max="1000" android:progress="1000" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnSegment"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp" android:text="分析此段"
+                    android:layout_marginTop="4dp" android:text="分析此段并显示波形"
                     android:textSize="14sp" />
                 <TextView android:id="@+id/tvSegResult"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -155,21 +154,24 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        <TextView android:id="@+id/lblFlux"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:layout_marginTop="18dp" android:text="@string/chart_flux"
             android:textStyle="bold" />
         <com.github.mikephil.charting.charts.LineChart android:id="@+id/chartFlux"
             android:layout_width="match_parent" android:layout_height="200dp"
             android:layout_marginTop="4dp" />
 
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        <TextView android:id="@+id/lblIoi"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:layout_marginTop="16dp" android:text="@string/chart_ioi"
             android:textStyle="bold" />
         <com.github.mikephil.charting.charts.ScatterChart android:id="@+id/chartIoi"
-            android:layout_width="match_parent" android:layout_height="200dp"
+            android:layout_width="match_parent" android:layout_height="220dp"
             android:layout_marginTop="4dp" />
 
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        <TextView android:id="@+id/lblFinger"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:layout_marginTop="16dp" android:text="@string/chart_finger"
             android:textStyle="bold" />
         <com.github.mikephil.charting.charts.BarChart android:id="@+id/chartFinger"

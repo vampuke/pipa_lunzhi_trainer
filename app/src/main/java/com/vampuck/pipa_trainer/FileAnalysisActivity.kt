@@ -24,6 +24,7 @@ import com.vampuck.pipa_trainer.dsp.LunzhiAnalyzer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class FileAnalysisActivity : AppCompatActivity() {
@@ -32,10 +33,16 @@ class FileAnalysisActivity : AppCompatActivity() {
     private var lastResult: LunzhiAnalyzer.Result? = null
     private var currentUri: Uri? = null
 
+    // segment bounds in ANALYSIS seconds
+    private var segStart = 0.0
+    private var segEnd = 0.0
+
     private var player: MediaPlayer? = null
     private val handler = Handler(Looper.getMainLooper())
     private var userSeekingPlay = false
     private var playhead: LimitLine? = null
+    private var mediaDurMs = 0        // MediaPlayer's duration
+    private var decodedDurSec = 0.0   // analysis timeline duration
 
     private val picker = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -52,17 +59,16 @@ class FileAnalysisActivity : AppCompatActivity() {
         b = ActivityFileAnalysisBinding.inflate(layoutInflater)
         setContentView(b.root)
         b.btnPick.setOnClickListener { launchPicker() }
-        b.btnSegment.setOnClickListener { runSegmentAnalysis() }
+        b.btnSegment.setOnClickListener { applySegment() }
         b.btnPlay.setOnClickListener { togglePlay() }
         b.seekPlay.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                 if (!fromUser) return
                 userSeekingPlay = true
-                val mp = player ?: return
-                val dur = try { mp.duration } catch (_: Throwable) { -1 }
-                if (dur > 0) mp.seekTo((dur * p / 1000.0).toInt())
-                updateTimeText()
-                movePlayheadFromProgress(p)
+                val t = segStart + (segEnd - segStart) * p / 1000.0
+                seekMediaTo(t)
+                movePlayhead(t)
+                updateTimeText(t)
                 userSeekingPlay = false
             }
             override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -74,9 +80,14 @@ class FileAnalysisActivity : AppCompatActivity() {
     }
 
     private val segListener = object : SeekBar.OnSeekBarChangeListener {
-        override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) = updateSegRangeText()
+        override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+            if (fromUser) updateSegRangeText()
+        }
         override fun onStartTrackingTouch(sb: SeekBar?) {}
-        override fun onStopTrackingTouch(sb: SeekBar?) {}
+        override fun onStopTrackingTouch(sb: SeekBar?) {
+            // released a slider -> refresh range + charts for the new segment
+            applySegment()
+        }
     }
 
     private fun launchPicker() {
@@ -103,6 +114,7 @@ class FileAnalysisActivity : AppCompatActivity() {
 
     private fun render(res: LunzhiAnalyzer.Result) {
         lastResult = res
+        decodedDurSec = res.durationSec
         b.status.text = getString(R.string.analysis_done)
         val rep = Evaluation.build(res.metrics)
 
@@ -130,29 +142,82 @@ class FileAnalysisActivity : AppCompatActivity() {
         b.summaryText.text = rep.summary
         b.adviceText.text = rep.advice.mapIndexed { i, s -> "${i + 1}. $s" }.joinToString("\n")
 
-        setupSegControls(res.durationSec)
-        setupPlayback(res.durationSec)
-
+        b.segCard.visibility = View.VISIBLE
         b.tvSegResult.text = ""
-        drawFlux(res)
-        drawIoi(res)
-        drawFinger(res)
+        // default segment = whole file
+        segStart = 0.0; segEnd = res.durationSec
+        b.seekSegStart.progress = 0
+        b.seekSegEnd.progress = 1000
+        updateSegRangeText()
+
+        setupPlayback()
+        drawFlux(segStart, segEnd)
+        drawIoi(segStart, segEnd)
+        drawFinger(res.metrics)
+    }
+
+    // ---------------- segment ----------------
+    private fun segTimes(): Pair<Double, Double> {
+        val dur = lastResult?.durationSec ?: return 0.0 to 0.0
+        var s = dur * b.seekSegStart.progress / 1000.0
+        var e = dur * b.seekSegEnd.progress / 1000.0
+        if (e < s) { val t = s; s = e; e = t }
+        if (e - s < 0.5) e = (s + 0.5).coerceAtMost(dur)
+        return s to e
+    }
+
+    private fun updateSegRangeText() {
+        val (s, e) = segTimes()
+        b.tvSegRange.text = "起点 %.1fs　终点 %.1fs　（共 %.1fs）".format(s, e, (e - s).coerceAtLeast(0.0))
+    }
+
+    private fun applySegment() {
+        val res = lastResult ?: return
+        val (s, e) = segTimes()
+        segStart = s; segEnd = e
+        updateSegRangeText()
+
+        val m = LunzhiAnalyzer.metrics(res.onsetTimes, res.strokeAmp, s, e)
+        if (m.strokes < 4) {
+            b.tvSegResult.text = "该段只有 ${m.strokes} 击，样本太少，无法评估。请选更长的区间。"
+        } else {
+            val rep = Evaluation.build(m)
+            val sb = StringBuilder()
+            sb.append("该段：${m.strokes} 击 · ${m.strokesPerMin.roundToInt()} 音/分 · ")
+            sb.append("时值抖动 ≈ ${m.jitterPct.roundToInt()}%（±${m.stdIoiMs.roundToInt()}ms）\n")
+            sb.append("评级 ${rep.grade}（${rep.score} 分） · 主带 CV ${"%.3f".format(m.modalCv)} · 异常间隔 ${m.outlierCount} 处\n")
+            sb.append(rep.summary)
+            b.tvSegResult.text = sb.toString()
+        }
+        // charts follow the segment
+        drawFlux(s, e)
+        drawIoi(s, e)
+        drawFinger(m)
+        // rewind playback to the segment start
+        try { if (player?.isPlaying == true) { player?.pause(); b.btnPlay.text = "▶ 播放" } } catch (_: Throwable) {}
+        seekMediaTo(segStart)
+        movePlayhead(segStart)
+        updateTimeText(segStart)
     }
 
     // ---------------- playback ----------------
-    private fun setupPlayback(dur: Double) {
-        b.playCard.visibility = View.VISIBLE
+    private fun setupPlayback() {
         releasePlayer()
         val uri = currentUri ?: return
         try {
             val mp = MediaPlayer()
             b.btnPlay.isEnabled = false
-            b.tvTime.text = "加载中…"
             mp.setDataSource(this, uri)
             mp.setOnPreparedListener {
                 b.btnPlay.isEnabled = true
                 b.btnPlay.text = "▶ 播放"
-                updateTimeText()
+                mediaDurMs = try { it.duration } catch (_: Throwable) { 0 }
+                showDurationNote()
+                updateTimeText(segStart)
+            }
+            mp.setOnCompletionListener {
+                b.btnPlay.text = "▶ 播放"
+                handler.removeCallbacks(tick)
             }
             mp.prepareAsync()
             player = mp
@@ -162,12 +227,40 @@ class FileAnalysisActivity : AppCompatActivity() {
         }
     }
 
+    /** Warn if the player's duration disagrees with our decoded timeline. */
+    private fun showDurationNote() {
+        if (mediaDurMs <= 0 || decodedDurSec <= 0) return
+        val mediaSec = mediaDurMs / 1000.0
+        if (abs(mediaSec - decodedDurSec) > 0.15 * decodedDurSec) {
+            b.durationNote.visibility = View.VISIBLE
+            b.durationNote.text = "注意：播放器时长 %.0fs，解析时长 %.0fs，两者不一致；进度与波形按解析时间对齐。"
+                .format(mediaSec, decodedDurSec)
+        }
+    }
+
+    /** Analysis-time (s) -> media position (ms), tolerant of a duration mismatch. */
+    private fun analysisToMediaMs(t: Double): Int {
+        val ratio = if (decodedDurSec > 0 && mediaDurMs > 0) mediaDurMs / 1000.0 / decodedDurSec else 1.0
+        return (t * ratio * 1000).toInt().coerceAtLeast(0)
+    }
+
+    private fun mediaMsToAnalysis(ms: Int): Double {
+        val ratio = if (decodedDurSec > 0 && mediaDurMs > 0) mediaDurMs / 1000.0 / decodedDurSec else 1.0
+        return if (ratio > 0) ms / 1000.0 / ratio else 0.0
+    }
+
+    private fun seekMediaTo(tAnalysis: Double) {
+        try { player?.seekTo(analysisToMediaMs(tAnalysis)) } catch (_: Throwable) {}
+    }
+
     private fun togglePlay() {
         val mp = player ?: return
         try {
             if (mp.isPlaying) {
                 mp.pause(); b.btnPlay.text = "▶ 播放"; handler.removeCallbacks(tick)
             } else {
+                val cur = mediaMsToAnalysis(mp.currentPosition)
+                if (cur < segStart || cur >= segEnd) mp.seekTo(analysisToMediaMs(segStart))
                 mp.start(); b.btnPlay.text = "⏸ 暂停"; handler.post(tick)
             }
         } catch (_: Throwable) {}
@@ -178,42 +271,36 @@ class FileAnalysisActivity : AppCompatActivity() {
             val mp = player ?: return
             try {
                 if (mp.isPlaying && !userSeekingPlay) {
-                    val dur = mp.duration
-                    if (dur > 0) {
-                        val p = (mp.currentPosition * 1000.0 / dur).toInt().coerceIn(0, 1000)
-                        b.seekPlay.progress = p
-                        movePlayheadFromProgress(p)
-                    }
-                    updateTimeText()
+                    val t = mediaMsToAnalysis(mp.currentPosition)
+                    val len = (segEnd - segStart).coerceAtLeast(0.001)
+                    b.seekPlay.progress = ((t - segStart) / len * 1000).toInt().coerceIn(0, 1000)
+                    movePlayhead(t)
+                    updateTimeText(t)
+                    if (t >= segEnd) { mp.pause(); b.btnPlay.text = "▶ 播放" }
                 }
             } catch (_: Throwable) {}
             handler.postDelayed(this, 200)
         }
     }
 
-    private fun movePlayheadFromProgress(p: Int) {
-        val res = lastResult ?: return
-        val t = res.durationSec * p / 1000.0
+    private fun movePlayhead(tAnalysis: Double) {
         val axis = b.chartFlux.xAxis
         playhead?.let { axis.removeLimitLine(it) }
-        val ph = LimitLine(t.toFloat())
+        val ph = LimitLine(tAnalysis.toFloat())
         ph.lineColor = 0xCC2255CC.toInt(); ph.lineWidth = 2f
         axis.addLimitLine(ph)
         playhead = ph
         b.chartFlux.invalidate()
     }
 
-    private fun updateTimeText() {
-        val mp = player ?: return
-        try {
-            val dur = mp.duration
-            val cur = mp.currentPosition
-            b.tvTime.text = "${fmt(cur)} / ${fmt(dur)}"
-        } catch (_: Throwable) {}
+    private fun updateTimeText(tAnalysis: Double) {
+        val rel = (tAnalysis - segStart).coerceAtLeast(0.0)
+        val len = (segEnd - segStart).coerceAtLeast(0.0)
+        b.tvTime.text = "${fmt(rel)} / ${fmt(len)}"
     }
 
-    private fun fmt(ms: Int): String {
-        val s = ms / 1000
+    private fun fmt(sec: Double): String {
+        val s = sec.toInt()
         return "%d:%02d".format(s / 60, s % 60)
     }
 
@@ -234,88 +321,66 @@ class FileAnalysisActivity : AppCompatActivity() {
         handler.removeCallbacks(tick)
     }
 
-    // ---------------- segment ----------------
-    private fun setupSegControls(dur: Double) {
-        b.segCard.visibility = View.VISIBLE
-        b.seekSegStart.progress = 0
-        b.seekSegEnd.progress = 1000
-        b.tvSegResult.text = ""
-        updateSegRangeText()
-    }
-
-    private fun segTimes(): Pair<Double, Double> {
-        val res = lastResult ?: return 0.0 to 0.0
-        var s = res.durationSec * b.seekSegStart.progress / 1000.0
-        var e = res.durationSec * b.seekSegEnd.progress / 1000.0
-        if (e < s) { val t = s; s = e; e = t }
-        if (e - s < 0.5) e = (s + 0.5).coerceAtMost(res.durationSec)
-        return s to e
-    }
-
-    private fun updateSegRangeText() {
-        val (s, e) = segTimes()
-        b.tvSegRange.text = "起点 %.1fs　终点 %.1fs　（共 %.1fs）".format(s, e, (e - s).coerceAtLeast(0.0))
-    }
-
-    private fun runSegmentAnalysis() {
-        val res = lastResult ?: return
-        val (s, e) = segTimes()
-        val m = LunzhiAnalyzer.metrics(res.onsetTimes, res.strokeAmp, s, e)
-        val rep = Evaluation.build(m)
-        if (m.strokes < 4) {
-            b.tvSegResult.text = "该段只有 ${m.strokes} 击，样本太少，无法评估。请选更长的区间。"
-            return
-        }
-        val sb = StringBuilder()
-        sb.append("该段：${m.strokes} 击 · ${m.strokesPerMin.roundToInt()} 音/分 · ")
-        sb.append("时值抖动 ≈ ${m.jitterPct.roundToInt()}%（±${m.stdIoiMs.roundToInt()}ms）\n")
-        sb.append("评级 ${rep.grade}（${rep.score} 分） · 主带 CV ${"%.3f".format(m.modalCv)} · 异常间隔 ${m.outlierCount} 处\n")
-        sb.append(rep.summary)
-        b.tvSegResult.text = sb.toString()
-    }
-
     // ---------------- charts ----------------
-    private fun drawFlux(res: LunzhiAnalyzer.Result) {
+    private fun fluxAt(res: LunzhiAnalyzer.Result, t: Double): Float {
+        val fps = res.sampleRate.toDouble() / LunzhiAnalyzer.HOP
+        val i = (t * fps).roundToInt().coerceIn(0, res.fluxEnvelope.size - 1)
+        return res.fluxEnvelope[i]
+    }
+
+    private fun drawFlux(s: Double, e: Double) {
+        val res = lastResult ?: return
         val entries = ArrayList<Entry>()
-        val step = maxOf(1, res.fluxEnvelope.size / 2000)
+        val step = maxOf(1, res.fluxEnvelope.size / 4000)
         var i = 0
         while (i < res.fluxEnvelope.size) {
-            entries.add(Entry(res.fluxTimes[i].toFloat(), res.fluxEnvelope[i]))
+            val t = res.fluxTimes[i]
+            if (t in s..e) entries.add(Entry(t.toFloat(), res.fluxEnvelope[i]))
             i += step
         }
-        val ds = LineDataSet(entries, "波形").apply {
+        val line = LineDataSet(entries, "波形").apply {
             setDrawCircles(false); lineWidth = 1f
             color = 0xFF33BB66.toInt(); setDrawValues(false)
         }
+        // onset markers as a scatter dataset -> evenly spread, no stacking
+        val marks = ArrayList<Entry>()
+        for (t in res.onsetTimes) {
+            if (t >= s && t <= e) marks.add(Entry(t.toFloat(), fluxAt(res, t) * 1.04f))
+        }
+        val markSet = ScatterDataSet(marks, "击").apply {
+            color = 0xFF9933DD.toInt(); scatterShapeSize = 14f; setDrawValues(false)
+        }
         val chart = b.chartFlux
-        chart.data = LineData(ds)
+        chart.data = CombinedData().apply {
+            setData(LineData(line))
+            setData(ScatterData(markSet))
+        }
         chart.description.isEnabled = false
         chart.legend.isEnabled = false
         chart.axisRight.isEnabled = false
         chart.xAxis.setDrawGridLines(false)
         chart.xAxis.removeAllLimitLines()
-        val cap = minOf(res.onsetTimes.size, 400)
-        for (k in 0 until cap) {
-            val ll = LimitLine(res.onsetTimes[k].toFloat())
-            ll.lineColor = 0x44EE3333.toInt(); ll.lineWidth = 0.6f
-            chart.xAxis.addLimitLine(ll)
-        }
-        val ph = LimitLine(0f)
+        val ph = LimitLine(s.toFloat())
         ph.lineColor = 0xCC2255CC.toInt(); ph.lineWidth = 2f
         chart.xAxis.addLimitLine(ph)
         playhead = ph
+        b.lblFlux.text = "起音波形与检测到的每一击（%.1f–%.1fs）".format(s, e)
         chart.invalidate()
     }
 
-    private fun drawIoi(res: LunzhiAnalyzer.Result) {
+    private fun drawIoi(s: Double, e: Double) {
+        val res = lastResult ?: return
         val entries = ArrayList<Entry>()
         val onsets = res.onsetTimes
+        var maxY = 0.0
         for (k in 1 until onsets.size) {
             val d = onsets[k] - onsets[k - 1]
-            if (d in LunzhiAnalyzer.MIN_IOI..LunzhiAnalyzer.MAX_IOI) {
+            if (d in LunzhiAnalyzer.MIN_IOI..LunzhiAnalyzer.MAX_IOI && onsets[k] >= s && onsets[k] <= e) {
                 entries.add(Entry(onsets[k].toFloat(), (d * 1000).toFloat()))
+                if (d * 1000 > maxY) maxY = d * 1000
             }
         }
+        val m = LunzhiAnalyzer.metrics(onsets, res.strokeAmp, s, e)
         val ds = ScatterDataSet(entries, "间隔").apply {
             color = 0xFF2255CC.toInt(); scatterShapeSize = 8f; setDrawValues(false)
         }
@@ -325,19 +390,20 @@ class FileAnalysisActivity : AppCompatActivity() {
         chart.legend.isEnabled = false
         chart.axisRight.isEnabled = false
         chart.axisLeft.axisMinimum = 0f
-        chart.axisLeft.axisMaximum = 300f
-        val mean = LimitLine(res.metrics.meanIoiMs.toFloat(), "平均 ${res.metrics.meanIoiMs.roundToInt()}ms")
+        chart.axisLeft.axisMaximum = (maxY * 1.1).coerceAtLeast(50.0).toFloat()
+        val mean = LimitLine(m.meanIoiMs.toFloat(), "平均 ${m.meanIoiMs.roundToInt()}ms")
         mean.lineColor = 0xFFEE3333.toInt(); mean.lineWidth = 1.2f
         chart.axisLeft.removeAllLimitLines()
         chart.axisLeft.addLimitLine(mean)
+        b.lblIoi.text = "相邻音间隔随时间变化（%.1f–%.1fs，越平越匀）".format(s, e)
         chart.invalidate()
     }
 
-    private fun drawFinger(res: LunzhiAnalyzer.Result) {
+    private fun drawFinger(m: LunzhiAnalyzer.Metrics) {
         val names = arrayOf("食指", "中指", "名指", "小指", "挑")
         val entries = ArrayList<BarEntry>()
-        for (p in res.metrics.fingerProfile.indices) {
-            entries.add(BarEntry(p.toFloat(), (res.metrics.fingerProfile[p] * 100).toFloat()))
+        for (p in m.fingerProfile.indices) {
+            entries.add(BarEntry(p.toFloat(), (m.fingerProfile[p] * 100).toFloat()))
         }
         val ds = BarDataSet(entries, "力度%").apply { color = 0xFF8D3B2E.toInt() }
         val chart = b.chartFinger
@@ -351,6 +417,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         chart.xAxis.valueFormatter = object : ValueFormatter() {
             override fun getFormattedValue(value: Float): String = names.getOrElse(value.toInt()) { "" }
         }
+        b.lblFinger.text = "轮内各指力度（该段，五音折叠 %）"
         chart.invalidate()
     }
 }
