@@ -141,3 +141,4 @@ object FingerSymbols {
             canvas.drawLine(ox - len * 0.5f, cy + len, ox + len * 0.5f, cy - len, stroke)
         }
     }
+}
