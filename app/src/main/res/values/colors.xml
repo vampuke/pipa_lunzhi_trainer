@@ -1,27 +1,29 @@
 <resources>
     <color name="white">#FFFFFFFF</color>
-    <color name="black">#FF201A17</color>
+    <color name="black">#FF231A16</color>
 
     <!-- 品牌主色：琵琶红木 -->
-    <color name="pipa_primary">#FF8D3B2E</color>
+    <color name="pipa_primary">#FF8C3A2B</color>
     <color name="pipa_primary_dark">#FF5E271E</color>
-    <color name="pipa_accent">#FFD98C5F</color>
+    <!-- 点睛：丝弦金（替换原来的浅橙 accent） -->
+    <color name="pipa_accent">#FFC8973F</color>
+    <color name="pipa_accent_dark">#FF9A6E26</color>
 
-    <!-- Material 3 容器 / 表面 token（暖木色系） -->
-    <color name="primary_container">#FFF4DED4</color>
+    <!-- Material 3 容器 / 表面 token（暖木 + 宣纸米白） -->
+    <color name="primary_container">#FFF7DED4</color>
     <color name="on_primary_container">#FF3A1710</color>
-    <color name="accent_container">#FFF7E4D4</color>
+    <color name="accent_container">#FFF6E7CC</color>
     <color name="surface">#FFFFFBF8</color>
-    <color name="surface_variant">#FFF1E6DC</color>
-    <color name="outline">#FFE0D2C6</color>
-    <color name="text_primary">#FF201A17</color>
+    <color name="surface_variant">#FFF2E8DF</color>
+    <color name="outline">#FFE3D6CA</color>
+    <color name="text_primary">#FF231A16</color>
     <color name="text_secondary">#FF7A6A60</color>
 
-    <!-- 评价色 -->
-    <color name="good">#FF2E9E5B</color>
-    <color name="warn">#FFE0A32E</color>
-    <color name="bad">#FFD64545</color>
+    <!-- 评价色（已按 WCAG 调深，白字可读） -->
+    <color name="good">#FF1C7D45</color>
+    <color name="warn">#FF8A6400</color>
+    <color name="bad">#FFC62F2F</color>
     <color name="chart_line">#FF2255CC</color>
 
-    <color name="bg">#FFF7F2EC</color>
+    <color name="bg">#FFF6F1EA</color>
 </resources>

@@ -37,6 +37,13 @@
                 android:text="@string/subtitle_home"
                 android:textSize="14sp"
                 android:textColor="@color/white" />
+
+            <!-- 丝弦金点睛分隔线 -->
+            <View
+                android:layout_width="44dp"
+                android:layout_height="3dp"
+                android:layout_marginTop="18dp"
+                android:background="@color/pipa_accent" />
         </LinearLayout>
 
         <!-- 功能卡片列表 -->
