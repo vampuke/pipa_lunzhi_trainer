@@ -59,16 +59,20 @@ object FingerSymbols {
                 featherCross(canvas, cx, cy, u, stroke, backslashDir = false)
             }
 
-            "lun" -> flower(canvas, cx, cy, u, stroke, fill)       // 轮：放射星芒
-            "changlun" -> {                                        // 长轮：星芒 + 右点
-                flower(canvas, cx, cy, u, stroke, fill)
-                canvas.drawCircle(cx + u * 1.0f, cy, u * 0.16f, fill)
+            "lun" -> star(canvas, cx, cy, u, stroke, fill)         // 轮：放射星芒（直线星爆）
+            "changlun" -> {                                        // 长轮：星芒 + 右侧三条短横线(居中堆叠)
+                star(canvas, cx, cy, u, stroke, fill)
+                val lx0 = cx + u * 0.75f
+                val lx1 = lx0 + u * 0.6f
+                val gap = u * 0.26f
+                for (k in -1..1) {
+                    val ly = cy + k * gap
+                    canvas.drawLine(lx0, ly, lx1, ly, stroke)
+                }
             }
-            "banlun" -> flowerHalf(canvas, cx, cy, u, stroke, fill) // 半轮：半星芒
+            "banlun" -> starHalf(canvas, cx, cy, u, stroke, fill)  // 半轮：半星芒
 
-            "gun" -> { // 滚：/// 三条平行斜线
-                slash(-u * 0.42f); slash(0f); slash(u * 0.42f)
-            }
+            "gun" -> gun3(canvas, cx, cy, u, stroke)               // 滚：彡 三条平行斜撇
 
             "gou" -> { // 勾：横折带下钩「勹」
                 val p = Path()
@@ -103,34 +107,37 @@ object FingerSymbols {
         }
     }
 
-    /** 轮指「星芒」：多条短线从中心整圆放射（图中约 5 条），中心一点。 */
-    private fun flower(canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint, fill: Paint) {
-        val len = u * 0.52f
-        val n = 6
-        for (i in 0 until n) {
-            val a = Math.toRadians(360.0 * i / n)
-            canvas.drawLine(
-                cx, cy,
-                cx + (Math.cos(a) * len).toFloat(),
-                cy + (Math.sin(a) * len).toFloat(),
-                stroke
-            )
+    /** 轮指「星芒」：4 条直线交于中心，呈 X 状星爆（按图：上下左右斜向发散）。 */
+    private fun star(canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint, fill: Paint) {
+        val len = u * 0.5f
+        // 4 条：两条斜线构成 X，再加竖横使之像米字星爆（图中为 4~5 条交于中心的直线）
+        for (deg in intArrayOf(45, 135, 90, 0)) {
+            val a = Math.toRadians(deg.toDouble())
+            val dx = (Math.cos(a) * len).toFloat()
+            val dy = (Math.sin(a) * len).toFloat()
+            canvas.drawLine(cx - dx, cy - dy, cx + dx, cy + dy, stroke)
         }
         canvas.drawCircle(cx, cy, u * 0.1f, fill)
     }
 
-    /** 半轮：上半的 3 条放射。 */
-    private fun flowerHalf(canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint, fill: Paint) {
-        val len = u * 0.52f
-        for (deg in intArrayOf(180, 225, 270, 315, 360)) {
+    /** 半轮：只画 X 两条斜线的星爆（比全轮少）。 */
+    private fun starHalf(canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint, fill: Paint) {
+        val len = u * 0.5f
+        for (deg in intArrayOf(45, 135)) {
             val a = Math.toRadians(deg.toDouble())
-            canvas.drawLine(
-                cx, cy,
-                cx + (Math.cos(a) * len).toFloat(),
-                cy + (Math.sin(a) * len).toFloat(),
-                stroke
-            )
+            val dx = (Math.cos(a) * len).toFloat()
+            val dy = (Math.sin(a) * len).toFloat()
+            canvas.drawLine(cx - dx, cy - dy, cx + dx, cy + dy, stroke)
         }
-        canvas.drawCircle(cx, cy, u * 0.1f, fill)
+        canvas.drawCircle(cx, cy, u * 0.09f, fill)
     }
-}
+
+    /** 滚奏「彡」：三条平行、同向的斜撇（右上→左下），非放射。 */
+    private fun gun3(canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint) {
+        val len = u * 0.42f
+        // 三撇横向排开，各自是一小段「/」向斜撇
+        for (k in -1..1) {
+            val ox = cx + k * u * 0.3f
+            canvas.drawLine(ox - len * 0.5f, cy + len, ox + len * 0.5f, cy - len, stroke)
+        }
+    }
