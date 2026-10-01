@@ -98,7 +98,12 @@ class TunerActivity : AppCompatActivity() {
             Toast.makeText(this, "麦克风初始化失败", Toast.LENGTH_LONG).show(); return
         }
 
-        val t = Tuner(sampleRate)
+        // 设备不一定按请求的采样率交付（不少机器固定 48kHz）。若实际是 48000 而
+        // 我们按 44100 去算，偏差是 1200*log2(48/44.1) ≈ 147 音分——比半个音还多，
+        // 表现成「调音器坏了」。所以一律用 AudioRecord 回报的实际采样率。
+        val actualRate = recorder.sampleRate.takeIf { it > 0 } ?: sampleRate
+
+        val t = Tuner(actualRate)
         tuner = t
         lastLevel = 0.0
         listening = true
@@ -107,8 +112,11 @@ class TunerActivity : AppCompatActivity() {
         recorder.startRecording()
 
         recordThread = thread(name = "tuner-mic") {
-            val shortBuf = ShortArray(sampleRate / 10)
+            // 512 采样 ≈ 11.6ms：相邻两次分析窗重叠 75%，指针才稳；按 100ms 读时
+            // 相邻两窗完全不重叠，每次都像在量一段全新音频。
+            val shortBuf = ShortArray(512)
             val floatBuf = FloatArray(shortBuf.size)
+            var lastUi = 0L
             while (listening) {
                 val n = recorder.read(shortBuf, 0, shortBuf.size)
                 if (n > 0) {
@@ -121,11 +129,20 @@ class TunerActivity : AppCompatActivity() {
                     val rms = sqrt(acc / n)
                     lastLevel = if (lastLevel <= 0.0) rms else lastLevel * 0.7 + rms * 0.3
                     val reading = t.push(floatBuf, n)
-                    runOnUiThread { show(reading) }
+                    // 分析约 86 次/秒，但界面只需约 30 次/秒
+                    val now = System.currentTimeMillis()
+                    if (reading != null && now - lastUi >= UI_MIN_INTERVAL_MS) {
+                        lastUi = now
+                        runOnUiThread { show(reading) }
+                    }
                 }
             }
             recorder.stop(); recorder.release()
         }
+    }
+
+    private companion object {
+        const val UI_MIN_INTERVAL_MS = 33L
     }
 
     private fun stop() {

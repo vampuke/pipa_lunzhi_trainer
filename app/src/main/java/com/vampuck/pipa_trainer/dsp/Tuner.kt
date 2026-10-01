@@ -28,23 +28,34 @@ class Tuner(private val sampleRate: Int) {
         val string: Tuning.StringMatch
     )
 
-    /** 分析窗长。2048 在 44.1kHz 下约 46ms，110Hz 也含 5 个周期。 */
+    /**
+     * 分析窗长。2048 在 44.1kHz 下约 46ms，110Hz 也含 5 个周期。
+     * 注意：窗长决定精度，**刷新率由调用方每次 push 的长度决定**——按 512 采样
+     * 推送时约 86 次/秒、相邻两窗重叠 75%，指针才稳；按 100ms 推送时相邻两窗
+     * 完全不重叠，等于每次都在量一段全新的音频，指针必然跳。
+     */
     private val n = 2048
 
     /** 音域范围；超出这个范围的信号不当作乐音。 */
     private val minHz = 60.0
     private val maxHz = 1300.0
 
+    /**
+     * 周期选择：先在归一化差值函数上取「第一个低于绝对阈值的局部极小」，
+     * 再对**勉强合格**的谷做低八度修正（详见 analyze()）。
+     */
+
     private val buf = FloatArray(n)
     private var count = 0
 
-    /** 上一次输出的频率，用来抑制指针抖动。 */
-    private var smoothHz = 0.0
+    /** 近几次估计，用于抑制指针抖动。 */
+    private val recent = ArrayDeque<Double>()
+    private var outlierRun = 0
 
     /** 低于这个 RMS 视作没有拨弦。 */
     var minLevel = 0.004
 
-    /** 清晰度门限：YIN 归一化差值要低到这个程度才认。 */
+    /** 清晰度门限：YIN 归一化差值要低到这个程度才认（各参考实现取 0.80~0.90）。 */
     var minClarity = 0.72
 
     fun push(block: FloatArray, len: Int = block.size): Reading? {
@@ -67,7 +78,8 @@ class Tuner(private val sampleRate: Int) {
 
     fun reset() {
         count = 0
-        smoothHz = 0.0
+        recent.clear()
+        outlierRun = 0
     }
 
     private fun analyze(): Reading? {
@@ -110,24 +122,30 @@ class Tuner(private val sampleRate: Int) {
             cm[lag] = if (run > 0.0) d[lag] * lag / run else 1.0
         }
 
-        // 第一个低于阈值的局部极小（避免把 2 倍周期当基频 -> 低八度错）
+        // 第一步：噪声门限——最深的谷都不够深，就不是乐音。
         val threshold = 1.0 - minClarity
-        var bestLag = -1
+        var deepest = minLag
+        for (l in minLag..maxLag) if (cm[l] < cm[deepest]) deepest = l
+        if (cm[deepest] > threshold) return null
+
+        // 第二步：基频周期 = 谷值与最深谷**几乎一样深**的最短滞后。
+        //
+        // 为什么是这个判据（两种相反的错误都在实测里出现过）：
+        //  - 取「第一个低于绝对阈值的谷」会挑到 2 倍频：110Hz 且 2 次谐波主导时，
+        //    T/2 处会有一个浅谷（奇次谐波带来的失配不大），实测读成 220.7Hz。
+        //  - 取「最深的谷」则会掉八度：A3(220Hz) 的 T 与 2T 都是完美周期
+        //    （都是整数倍谐波），谁更深只由数值噪声决定，实测 A3/D3/E3 全掉一个八度。
+        // 「和最深谷一样深」同时排除这两类：伪谷（T/2）自带真实失配、谷明显不够深；
+        // 而 2T 虽然和 T 一样深，但 T 更短，取短的即得到真正的基频。
+        val cutoff = cm[deepest] + DEPTH_MARGIN
+        var bestLag = deepest
         var lag = minLag
         while (lag <= maxLag) {
-            if (cm[lag] < threshold) {
+            if (cm[lag] <= cutoff) {
                 while (lag + 1 <= maxLag && cm[lag + 1] < cm[lag]) lag++
-                bestLag = lag
-                break
+                if (cm[lag] <= cutoff) { bestLag = lag; break }
             }
             lag++
-        }
-        if (bestLag < 0) {
-            // 没有低于阈值：取全局最小，但仍要求足够清晰（否则就是噪声）
-            var bi = minLag
-            for (l in minLag..maxLag) if (cm[l] < cm[bi]) bi = l
-            if (cm[bi] > threshold) return null
-            bestLag = bi
         }
 
         val clarity = (1.0 - cm[bestLag]).coerceIn(0.0, 1.0)
@@ -142,17 +160,45 @@ class Tuner(private val sampleRate: Int) {
             if (abs(den) > 1e-12) refined += (0.5 * (a - c) / den).coerceIn(-0.5, 0.5)
         }
         if (refined <= 0.0) return null
-        var hz = sampleRate / refined
-        if (hz < minHz || hz > maxHz) return null
-
-        // 指针平滑：同一根弦内做轻度低通，换弦（差得远）时立刻跟随
-        smoothHz = if (smoothHz > 0.0 && abs(hz - smoothHz) < smoothHz * 0.06) {
-            smoothHz * 0.65 + hz * 0.35
-        } else {
-            hz
-        }
-        hz = smoothHz
+        val raw = sampleRate / refined
+        if (raw < minHz || raw > maxHz) return null
+        val hz = smooth(raw)
 
         return Reading(hz, clarity, level, Tuning.nearestNote(hz), Tuning.nearestString(hz))
+    }
+
+    /**
+     * 近 [SMOOTH_N] 次估计的滑动平均，带离群点抑制。
+     *
+     * 单帧坏值（拨弦瞬间、突发噪声）不应该让指针跳一下；但真正的换弦/换音
+     * 必须立刻跟上——连续 [MAX_OUTLIERS] 帧都偏离就清空历史重新开始。
+     */
+    private fun smooth(hz: Double): Double {
+        if (recent.isEmpty()) {
+            recent.addLast(hz)
+            return hz
+        }
+        val mean = recent.average()
+        if (abs(hz - mean) > mean * OUTLIER_REL) {
+            outlierRun++
+            if (outlierRun < MAX_OUTLIERS) return mean
+            recent.clear()
+            outlierRun = 0
+            recent.addLast(hz)
+            return hz
+        }
+        outlierRun = 0
+        recent.addLast(hz)
+        if (recent.size > SMOOTH_N) recent.removeFirst()
+        return recent.average()
+    }
+
+    private companion object {
+        const val SMOOTH_N = 5
+        const val OUTLIER_REL = 0.08
+        const val MAX_OUTLIERS = 3
+
+        /** 谷值与最深谷相差不超过这个绝对量时，认为「一样深」。 */
+        const val DEPTH_MARGIN = 0.02
     }
 }

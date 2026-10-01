@@ -115,6 +115,80 @@ class TunerTest {
         assertTrue("detected ${r.hz} Hz (${"%.1f".format(off)} cents off)", off < 10.0)
     }
 
+    /** 指定各次谐波幅度的合成音（index 0 = 基频）。 */
+    private fun harmonics(seconds: Double, hz: Double, gains: DoubleArray): FloatArray {
+        val n = (seconds * sr).toInt()
+        return FloatArray(n) { i ->
+            val t = i.toDouble() / sr
+            var v = 0.0
+            for (k in gains.indices) {
+                val f = hz * (k + 1)
+                if (f < sr / 2) v += gains[k] * sin(2 * PI * f * t)
+            }
+            (v * 0.25).toFloat()
+        }
+    }
+
+    /**
+     * 八度错的两个方向都要挡住：
+     *  - 2 次谐波主导时，归一化差值函数在 T/2 有个浅谷，取「第一个低于阈值的谷」
+     *    会读成 220Hz（+1206 音分）；
+     *  - 反过来取「最深的谷」会掉八度，因为 A3 的 T 与 2T 都是完美周期，
+     *    谁更深只由数值噪声决定（实测 A3/D3/E3 会整体低一个八度）。
+     * 现在的判据是「谷值与最深谷一样深的最短滞后」，两个方向都要能过。
+     */
+    @Test
+    fun doesNotPickTheSecondHarmonicAsTheFundamental() {
+        val r = feed(Tuner(sr), harmonics(1.0, 110.0, doubleArrayOf(0.1, 1.0, 0.3, 0.2, 0.1, 0.05)))
+        assertNotNull(r)
+        val off = centsOff(r!!.hz, 110.0)
+        assertTrue("detected ${r.hz} Hz (${"%.1f".format(off)} cents off) — an octave up", off < 20.0)
+    }
+
+    @Test
+    fun doesNotDropAnOctaveWhenTheFundamentalIsWeak() {
+        // A3/D3/E3 基频 -18dB：曾经被读成 A2/D2/E2
+        for (hz in doubleArrayOf(220.0, 146.83, 164.81)) {
+            val r = feed(Tuner(sr), harmonics(1.0, hz, doubleArrayOf(0.12, 1.0, 1.0, 1.0)))
+            assertNotNull(r)
+            val off = centsOff(r!!.hz, hz)
+            assertTrue("$hz Hz detected as ${r.hz} Hz (${"%.1f".format(off)} cents)", off < 20.0)
+        }
+    }
+
+    @Test
+    fun handlesAFundamentalThatIsCompletelyAbsent() {
+        // 2..6 次谐波都在、基频为 0：周期仍是 1/f0，应当读出 f0
+        val r = feed(Tuner(sr), harmonics(1.0, 110.0, doubleArrayOf(0.0, 1.0, 1.0, 1.0, 1.0, 1.0)))
+        assertNotNull(r)
+        assertTrue("detected ${r!!.hz} Hz", centsOff(r.hz, 110.0) < 20.0)
+    }
+
+    @Test
+    fun needleIsStableOnASteadyToneWithNoise() {
+        // 指针抖动：稳态音上的读数标准差应在 1 音分以内（512 hop 时窗重叠 75%）
+        val rnd = java.util.Random(3)
+        val n = (3.0 * sr).toInt()
+        val a = FloatArray(n) { i ->
+            val t = i.toDouble() / sr
+            (sin(2 * PI * 220.0 * t) * 0.25 + (rnd.nextDouble() - 0.5) * 0.02).toFloat()
+        }
+        val t = Tuner(sr)
+        val vals = ArrayList<Double>()
+        var off = 0
+        while (off + 512 <= a.size) {
+            val r = t.push(a.copyOfRange(off, off + 512), 512)
+            if (r != null) vals.add(r.hz)
+            off += 512
+        }
+        val tail = vals.drop(vals.size / 3)
+        assertTrue("too few readings: ${vals.size}", tail.size > 50)
+        val mean = tail.average()
+        val sd = sqrt(tail.map { (it - mean) * (it - mean) }.average())
+        val sdCents = abs(1200.0 * kotlin.math.ln((mean + sd) / mean) / kotlin.math.ln(2.0))
+        assertTrue("needle sd = ${"%.2f".format(sdCents)} cents", sdCents < 1.0)
+    }
+
     @Test
     fun pluckReadsAsTheRightString() {
         for (s in Tuning.PIPA_STANDARD) {

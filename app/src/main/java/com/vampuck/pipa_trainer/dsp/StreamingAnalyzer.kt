@@ -1,4 +1,4 @@
-package com.vampuck.pipa_trainer.dsp
+﻿package com.vampuck.pipa_trainer.dsp
 
 import kotlin.math.cos
 import kotlin.math.max
@@ -36,8 +36,19 @@ class StreamingAnalyzer(private val sampleRate: Int) {
 
     private var frameIndex = 0L
     private var lastPeakFrame = -100000L
-    private val minGapFrames = (0.040 * fps).toInt().coerceAtLeast(1)
 
+    /**
+     * 相邻起音最小距离。与 [LunzhiAnalyzer] 保持一致：原来是 40ms，正好卡在轮指
+     * 的物理上限(20-25 击/秒)上，会吞掉快轮的真实起音，还会截断 IOI 分布从而
+     * 同时扭曲速度与均匀度。参考实现取 20~30ms。
+     */
+    private val minGapFrames = (0.025 * fps).toInt().coerceAtLeast(1)
+
+    /**
+     * 自适应门限的均值窗。试过放宽到 0.20s（文献建议：0.12s 在 15~25 击/秒下只跨
+     * 1.8~3 击，均值被相邻击抬高、越快门越高），但实测代价更大：窗口越宽，突发噪声
+     * 处的局部均值越低、相对门限越松，安静房间误报从 13 涨到 27 击/30s。保持 0.12s。
+     */
     private val fluxWindowLen = (0.12 * fps).toInt().coerceAtLeast(1)
     private val fluxHistory = ArrayDeque<Double>()
     private var fluxSum = 0.0
@@ -214,6 +225,10 @@ class StreamingAnalyzer(private val sampleRate: Int) {
             if (d > 0) flux += d
             prevMag[k] = mag
         }
+        // 试过在这里改成对数压扩后再求差（librosa onset_strength 的 power_to_db 做法，
+        // 文献称之为「最便宜的显著改进」）。实测在本项目的阈值下大幅退化：压扩把噪声
+        // 底一起抬高，med*1.2+0.02 与 PROMINENCE 0.04 这两个为线性流量标定的常数不再
+        // 适用，噪声房里轮指从 ~90 击掉到 7 击。要采用必须整条链路重新标定，不是替换。
         val tone = Timbre.harmonicity(magBuf, sampleRate, win)
         var rms = 0.0
         for (k in 0 until win) rms += ring[k] * ring[k]

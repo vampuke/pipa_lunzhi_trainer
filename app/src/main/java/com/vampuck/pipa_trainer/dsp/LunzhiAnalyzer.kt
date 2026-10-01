@@ -25,7 +25,16 @@ object LunzhiAnalyzer {
     const val HOP = 128
     const val MIN_IOI = 0.030
     const val MAX_IOI = 0.60
-    private const val MIN_ONSET_GAP = 0.040   // 40ms -> up to 25 strokes/s
+    /**
+     * 相邻起音的最小距离。
+     *
+     * 原来取 40ms（对应 25 击/秒），正好卡在轮指的物理上限上——论文实测轮指最快
+     * 20Hz(50ms)。硬性 40ms 门有两个害处：超过 25 击/秒的真实起音被吞掉，而且它
+     * **截断 IOI 分布的快端**，于是同时扭曲「速度」和「均匀度 CV」，让本来不匀的
+     * 轮指看起来更匀。参考实现都取 20~30ms（aubio minioi 20ms、madmom combine
+     * 30ms、librosa wait 30ms），这里取 25ms。
+     */
+    private const val MIN_ONSET_GAP = 0.025
     private const val PROMINENCE = 0.04
     /**
      * Minimum [Timbre.harmonicity] for a peak to count as a plucked string.
@@ -156,6 +165,9 @@ object LunzhiAnalyzer {
             val off = i * HOP
             for (k in 0 until WIN) buf[k] = samples[off + k] * invPeak * window[k]
             val mag = rfftMag(buf)
+            // 线性幅度差分。试过与实时模式一起改成对数压扩（文献推荐的改进），
+            // 实测噪声房里轮指检出从 108 击掉到 81 击——压扩抬高了噪声底，
+            // 为线性流量标定的阈值不再适用，要采用需整条链路重新标定。
             var s = 0.0
             for (k in mag.indices) { val d = mag[k] - prev[k]; if (d > 0) s += d }
             flux[i] = s
@@ -177,6 +189,9 @@ object LunzhiAnalyzer {
      */
     fun pickPeaks(flux: DoubleArray, tone: DoubleArray?, fps: Double, minTone: Double): IntArray {
         if (flux.isEmpty()) return IntArray(0)
+        // 均值窗保持 0.12s。试过放宽到 0.20s（文献建议：0.12s 在 15~25 击/秒下
+        // 只跨 1.8~3 击，均值被相邻击抬高、越快门越高），但实测代价更大：窗口越宽，
+        // 突发噪声处的局部均值越低、相对门限越松，安静房间误报从 13 涨到 27 击/30s。
         val med = movingAverage(flux, (0.12 * fps).toInt().coerceAtLeast(1))
         val minGap = (MIN_ONSET_GAP * fps).toInt().coerceAtLeast(1)
         val w = (0.12 * fps).toInt().coerceAtLeast(1)
