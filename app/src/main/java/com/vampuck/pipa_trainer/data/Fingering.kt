@@ -15,26 +15,28 @@ data class Fingering(val code: String, val symbol: String, val name: String)
 object Fingerings {
     const val NONE = ""
 
-    // 右手主要指法
-    val TAN     = Fingering("tan", "丶", "弹")       // 食指向外弹
-    val TIAO    = Fingering("tiao", "㇀", "挑")      // 拇指向里挑
-    val LUN     = Fingering("lun", "彡", "轮")       // 五指轮（三斜线）
-    val BANLUN  = Fingering("banlun", "彳", "半轮")  // 半轮（两斜线）
+    // 右手主要指法（符号依通行记谱：弹=反斜、挑=正斜、轮=小花放射状）
+    val TAN     = Fingering("tan", "\\", "弹")       // 食指向外弹，记号「\」
+    val TIAO    = Fingering("tiao", "/", "挑")       // 拇指向里挑，记号「/」
+    val LUN     = Fingering("lun", "✱", "轮")       // 五指轮：五根线放射如小花
+    val CHANGLUN = Fingering("changlun", "✱·", "长轮") // 长轮：小花后加点
+    val BANLUN  = Fingering("banlun", "⅄", "半轮")  // 半轮：放射线较少
     val SAO     = Fingering("sao", "∨", "扫")        // 四弦一起向下
     val FU      = Fingering("fu", "∧", "拂")         // 四弦一起向上
-    val GOU     = Fingering("gou", "𠃌", "勾")       // 拇指勾弦
-    val MO      = Fingering("mo", "一", "抹")        // 食指向里抹
+    val GOU     = Fingering("gou", "勾", "勾")       // 拇指勾弦
+    val MO      = Fingering("mo", "抹", "抹")        // 食指向里抹
     val FAN     = Fingering("fan", "○", "泛")        // 泛音
 
     /** 调色板顺序（编辑器用）。首项为「无」。 */
     val PALETTE: List<Fingering> = listOf(
         Fingering(NONE, "—", "无"),
-        TAN, TIAO, LUN, BANLUN, SAO, FU, GOU, MO, FAN
+        TAN, TIAO, LUN, CHANGLUN, BANLUN, SAO, FU, GOU, MO, FAN
     )
 
     fun byCode(code: String): Fingering? =
         PALETTE.firstOrNull { it.code == code }
 
-    /** 该指法是否应连带画轮指斜线（轮/半轮本身即由 drawFinger 画斜线）。 */
-    fun isTremolo(code: String): Boolean = code == LUN.code || code == BANLUN.code
+    /** 该指法是否属轮类（轮/长轮/半轮）。 */
+    fun isTremolo(code: String): Boolean =
+        code == LUN.code || code == CHANGLUN.code || code == BANLUN.code
 }

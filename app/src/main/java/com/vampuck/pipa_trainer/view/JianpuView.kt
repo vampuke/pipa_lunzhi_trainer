@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
@@ -110,6 +111,8 @@ class JianpuView @JvmOverloads constructor(
         val rowH = dp(62f)                 // 行高（含上方点/轮指 + 下方时值线）
         val numBaselineOffset = dp(8f)     // 数字基线相对中心
         val usableW = width - padL - padR
+        // 容差：只要再放得下大半个 cell 就不换行，避免宽屏右侧留一大段空白
+        val wrapSlack = cell * 0.5f
 
         var x = padL
         var rowTop = dp(10f)
@@ -131,8 +134,8 @@ class JianpuView @JvmOverloads constructor(
                 cy = rowTop + rowH / 2
                 beatInBar = 0.0
             }
-            // 行末换行
-            if (x + cell > padL + usableW) {
+            // 行末换行：留 wrapSlack 容差，宽屏尽量用满整行再换
+            if (x + cell > padL + usableW + wrapSlack) {
                 rowTop += rowH
                 x = padL
                 cy = rowTop + rowH / 2
@@ -264,33 +267,33 @@ class JianpuView @JvmOverloads constructor(
         }
     }
 
-    /** 用几何图形画琵琶指法符号，中心 x=cx，纵向中心 y=cy。各机型一致。 */
+    /**
+     * 用几何图形画琵琶指法符号，中心 x=cx，纵向中心 y=cy。各机型一致。
+     * 依通行琵琶记谱：弹=反斜线「\」，挑=正斜线「/」，轮=草书「卢」(近似螺旋)，
+     * 半轮=「卢」加短撇，扫=向下∨，拂=向上∧，勾/抹用字，泛=空心圆圈。
+     */
     private fun drawFinger(canvas: Canvas, code: String, cx: Float, cy: Float, color: Int) {
         trPaint.color = color
-        trPaint.strokeWidth = dp(1.4f)
-        dotPaint.color = color
-        val w = dp(4.5f)   // 半宽
+        trPaint.strokeWidth = dp(1.5f)
+        fgPaint.color = color
+        val w = dp(4.5f)
         when (code) {
-            "tan" -> { // 弹：实心小点
-                canvas.drawCircle(cx, cy, dp(2.2f), dotPaint)
+            "tan" -> { // 弹：反斜线「\」(左上→右下)
+                canvas.drawLine(cx - w, cy - dp(4f), cx + w, cy + dp(4f), trPaint)
             }
-            "tiao" -> { // 挑：向上小弧钩（用两段短线近似 ⌐）
-                canvas.drawLine(cx - w, cy + dp(2f), cx - w, cy - dp(2f), trPaint)
-                canvas.drawLine(cx - w, cy - dp(2f), cx + w, cy - dp(2f), trPaint)
+            "tiao" -> { // 挑：正斜线「/」(左下→右上)
+                canvas.drawLine(cx - w, cy + dp(4f), cx + w, cy - dp(4f), trPaint)
             }
-            "lun" -> { // 轮：三条斜线
-                var sx = cx - dp(7f)
-                repeat(3) {
-                    canvas.drawLine(sx, cy + dp(3f), sx + dp(4f), cy - dp(3f), trPaint)
-                    sx += dp(5f)
-                }
+            "lun" -> { // 轮：五根线从一点放射，形如小花
+                drawFlower(canvas, cx, cy, 5, color)
             }
-            "banlun" -> { // 半轮：两条斜线
-                var sx = cx - dp(4.5f)
-                repeat(2) {
-                    canvas.drawLine(sx, cy + dp(3f), sx + dp(4f), cy - dp(3f), trPaint)
-                    sx += dp(5f)
-                }
+            "changlun" -> { // 长轮：小花后加一点
+                drawFlower(canvas, cx, cy, 5, color)
+                dotPaint.color = color
+                canvas.drawCircle(cx + dp(7f), cy + dp(2f), dp(1.6f), dotPaint)
+            }
+            "banlun" -> { // 半轮：三根线的半朵花
+                drawFlower(canvas, cx, cy, 3, color)
             }
             "sao" -> { // 扫：向下的 ∨
                 canvas.drawLine(cx - w, cy - dp(3f), cx, cy + dp(3f), trPaint)
@@ -300,19 +303,51 @@ class JianpuView @JvmOverloads constructor(
                 canvas.drawLine(cx - w, cy + dp(3f), cx, cy - dp(3f), trPaint)
                 canvas.drawLine(cx, cy - dp(3f), cx + w, cy + dp(3f), trPaint)
             }
-            "gou" -> { // 勾：竖线带左下钩
-                canvas.drawLine(cx + dp(1f), cy - dp(3f), cx + dp(1f), cy + dp(3f), trPaint)
-                canvas.drawLine(cx + dp(1f), cy + dp(3f), cx - dp(3f), cy + dp(3f), trPaint)
+            "gou" -> { // 勾：用「勹」近似——竖折带钩
+                val p = Path()
+                p.moveTo(cx - dp(3f), cy - dp(4f))
+                p.lineTo(cx + dp(3f), cy - dp(4f))
+                p.quadTo(cx + dp(5f), cy, cx, cy + dp(4f))
+                strokePath(canvas, p, color)
             }
-            "mo" -> { // 抹：短横线
+            "mo" -> { // 抹：短横线（食指向里）
                 canvas.drawLine(cx - w, cy, cx + w, cy, trPaint)
             }
             "fan" -> { // 泛：空心小圆
-                val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    this.color = color; style = Paint.Style.STROKE; strokeWidth = dp(1.2f)
-                }
-                canvas.drawCircle(cx, cy, dp(3f), p)
+                strokeCircle(canvas, cx, cy, dp(3f), color)
             }
+        }
+    }
+
+    private val pathPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeWidth = dp(1.5f)
+        strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+    }
+
+    private fun strokePath(canvas: Canvas, p: Path, color: Int) {
+        pathPaint.color = color
+        canvas.drawPath(p, pathPaint)
+    }
+
+    private fun strokeCircle(canvas: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
+        pathPaint.color = color
+        canvas.drawCircle(cx, cy, r, pathPaint)
+    }
+
+    /** 轮指「小花」：n 根短线从中心向上/两侧放射，模拟谱面轮指记号。 */
+    private fun drawFlower(canvas: Canvas, cx: Float, cy: Float, n: Int, color: Int) {
+        trPaint.color = color
+        trPaint.strokeWidth = dp(1.3f)
+        val len = dp(5f)
+        // n 根线均匀分布在 -70°..+70°（朝上张开的扇形），形似小花
+        val startDeg = -70.0
+        val endDeg = 70.0
+        val step = if (n > 1) (endDeg - startDeg) / (n - 1) else 0.0
+        for (i in 0 until n) {
+            val a = Math.toRadians(startDeg + step * i)
+            val ex = cx + (Math.sin(a) * len).toFloat()
+            val ey = cy - (Math.cos(a) * len).toFloat()
+            canvas.drawLine(cx, cy + dp(2f), ex, ey, trPaint)
         }
     }
 }
