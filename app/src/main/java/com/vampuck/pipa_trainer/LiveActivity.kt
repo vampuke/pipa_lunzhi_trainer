@@ -126,9 +126,9 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
     }
 
     /** Called from the metronome worker thread — map onto the ANALYZER's clock. */
-    override fun onClick(beatIndex: Long, absoluteNanos: Long) {
+    override fun onClick(beatIndex: Long, audibleNanos: Long) {
         val an = analyzer ?: return
-        // [absoluteNanos] is System.nanoTime() at the estimated audible moment.
+        // [audibleNanos] is System.nanoTime() at the estimated audible moment.
         // Convert it into the analyzer's sample clock (t = 0 at the first captured
         // sample) instead of the wall clock: the wall-clock origin is captured
         // *before* AudioRecord starts, so it omits the mic start-up latency and the
@@ -136,7 +136,7 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
         // 12 ms pre-mask) shoved every click past the mask, so clicks were counted
         // as strokes — inflating BPM / stroke count. Mapping through the analyzer's
         // own time cancels both latencies and keeps the mask centred on the click.
-        val t = an.currentTimeSec() + (absoluteNanos - System.nanoTime()) / 1_000_000_000.0
+        val t = an.currentTimeSec() + (audibleNanos - System.nanoTime()) / 1_000_000_000.0
         if (t > 0) an.addMetronomeClick(t)
     }
 
