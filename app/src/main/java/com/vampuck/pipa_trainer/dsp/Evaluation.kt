@@ -7,7 +7,11 @@ import kotlin.math.roundToInt
  * 换算：jitter% ≈ modalCv × 74，直接读成「时值抖动约百分之几」。
  *
  * 注意：速度**不参与评分**——轮指快慢都是正常练习状态，只作参考显示。
- * 综合分只由「均匀度（权重 72%）」和「手指力度均衡（权重 28%）」决定。
+ * 综合分只由「均匀度（权重 72%）」和「轮内各位力度均衡（权重 28%）」决定。
+ *
+ * 力度剖面按「第1击…第5击」报告，第1击 = 本段检测到的第一击。麦克风无法知道
+ * 哪一击是哪一个手指，任何「食指/小指」的绝对命名都是猜测（fiveFold 原先按
+ * 最大离散度选相位，实测五个相位的离散度只差不到 3%，等于随机命名）。
  */
 object Evaluation {
 
@@ -51,19 +55,20 @@ object Evaluation {
         val speedText = "${m.strokesPerMin.roundToInt()} 音/分"
         val speedSub = "约 ${"%.1f".format(cps)} 音/秒 · ${"%.1f".format(cps / 5)} 轮/秒"
 
-        // 手指力度
+        // 轮内各位力度（第1击 = 本段第一击）
         var fingerGrade = "—"; var fingerLevel = 3
         var fingerValue = "数据不足"; var fingerSub = ""
         var weakestPos = -1; var fingerRatio = 1.0
-        if (m.fingerProfile.size == 5 && m.strokes >= 10) {
-            val strongest = m.fingerProfile.indices.maxByOrNull { m.fingerProfile[it] } ?: 0
-            val weakest = m.fingerProfile.indices.minByOrNull { m.fingerProfile[it] } ?: 0
+        if (m.positionProfile.size == 5 && m.strokes >= 10) {
+            val strongest = m.positionProfile.indices.maxByOrNull { m.positionProfile[it] } ?: 0
+            val weakest = m.positionProfile.indices.minByOrNull { m.positionProfile[it] } ?: 0
             weakestPos = weakest
-            fingerRatio = if (m.fingerProfile[weakest] > 0)
-                m.fingerProfile[strongest] / m.fingerProfile[weakest] else 1.0
-            val pct = m.fingerProfile.map { (it * 100).roundToInt() }
-            fingerValue = "最弱 ${fingerName(weakest)} ${pct[weakest]}%"
-            fingerSub = fingerNames().indices.joinToString("  ") { "${fingerName(it)}${pct[it]}%" }
+            fingerRatio = if (m.positionProfile[weakest] > 0)
+                m.positionProfile[strongest] / m.positionProfile[weakest] else 1.0
+            val pct = m.positionProfile.map { (it * 100).roundToInt() }
+            fingerValue = "最弱 ${positionName(weakest)} ${pct[weakest]}%"
+            fingerSub = "以本段第1击为第1位 · " +
+                positionNames().indices.joinToString("  ") { "${positionName(it)}${pct[it]}%" }
             when {
                 fingerRatio < 1.2 -> { fingerGrade = "均衡"; fingerLevel = 0 }
                 fingerRatio < 1.5 -> { fingerGrade = "略偏"; fingerLevel = 1 }
@@ -71,7 +76,7 @@ object Evaluation {
             }
         }
 
-        // 综合分：只看均匀度与手指均衡（速度不计分）
+        // 综合分：只看均匀度与轮内五位力度均衡（速度不计分）
         val fingerScore = when (fingerLevel) { 0 -> 90; 1 -> 70; 2 -> 50; else -> null }
         val score = if (fingerScore != null)
             (evenScore * 0.72 + fingerScore * 0.28).roundToInt()
@@ -89,7 +94,7 @@ object Evaluation {
             Dimension("速度（参考）", speedText, speedSub, "参考", 3),
             Dimension("均匀度", "≈ ${jitter.roundToInt()}% 抖动",
                 "主带 CV ${"%.3f".format(effCv)} · 全段 ${"%.3f".format(m.cv)}", evenGrade, evenLevel),
-            Dimension("手指力度", fingerValue, fingerSub, fingerGrade, fingerLevel)
+            Dimension("轮内各位力度", fingerValue, fingerSub, fingerGrade, fingerLevel)
         )
 
         val sb = StringBuilder()
@@ -98,9 +103,10 @@ object Evaluation {
         sb.append(evennessComment(effCv, jitter)).append(" ")
         if (weakestPos >= 0) {
             if (fingerRatio < 1.2) {
-                sb.append("各指力度差异不大，主要问题是击与击之间的随机忽轻忽重，而非某指固定偏弱。")
+                sb.append("轮内五位力度差异不大，主要问题是击与击之间的随机忽轻忽重，而非某一位固定偏弱。")
             } else {
-                sb.append("${fingerName(weakestPos)}力度明显偏轻（最强/最弱约 ${"%.2f".format(fingerRatio)} 倍），多为名指、小指托底不足。")
+                sb.append("第${weakestPos + 1}击力度明显偏轻（最强/最弱约 ${"%.2f".format(fingerRatio)} 倍）；")
+                sb.append("若你按拇指起轮，这一位多半落在名指/小指上。")
             }
         } else if (m.strokes < 10) {
             sb.append("击数太少，不足以给出可靠评估。")
@@ -114,7 +120,7 @@ object Evaluation {
 
         val advice = ArrayList<String>()
         if (effCv > 0.17) advice.add("放慢到能保持均匀的档位，用节拍器把每一击咬在同一时值上。")
-        if (fingerRatio >= 1.5) advice.add("单独强化${fingerName(weakestPos)}的发力，慢速轮指让各指音量趋同。")
+        if (fingerRatio >= 1.5) advice.add("单独强化第${weakestPos + 1}击的发力，慢速轮指让轮内五位音量趋同。")
         if (m.perWindow.size >= 2) {
             val first = m.perWindow.first().cv; val last = m.perWindow.last().cv
             if (last > first * 1.3) advice.add("越到后段越乱，注意耐力与收尾段控制。")
@@ -124,8 +130,8 @@ object Evaluation {
         return Report(score, grade, level, headline, dimensions, sb.toString(), advice)
     }
 
-    private fun fingerNames() = listOf("食指", "中指", "名指", "小指", "挑(大指)")
-    private fun fingerName(i: Int) = fingerNames().getOrElse(i) { "第${i + 1}指" }
+    private fun positionNames() = listOf("第1击", "第2击", "第3击", "第4击", "第5击")
+    private fun positionName(i: Int) = positionNames().getOrElse(i) { "第${i + 1}击" }
 
     private fun evennessComment(cv: Double, jitter: Double): String = when {
         cv <= 0.10 -> "颗粒非常均匀，接近专业水准。"

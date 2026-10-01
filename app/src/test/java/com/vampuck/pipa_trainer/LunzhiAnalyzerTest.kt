@@ -84,9 +84,10 @@ class LunzhiAnalyzerTest {
 
     @Test
     fun fiveFoldPicksWeakPosition() {
-        // amps where position 5 (index 4) is consistently weak
+        // amps where position 5 (index 4) is consistently weak; positions are
+        // counted from the first stroke, so index 4 is 第5击
         val amps = DoubleArray(50) { i -> if (i % 5 == 4) 0.5 else 1.0 }
-        val (_, profile) = LunzhiAnalyzer.fiveFold(amps)
+        val profile = LunzhiAnalyzer.fiveFold(amps)
         val weakest = profile.indices.minByOrNull { profile[it] }
         assertEquals(4, weakest)
         assertTrue(profile[4] < 0.7)

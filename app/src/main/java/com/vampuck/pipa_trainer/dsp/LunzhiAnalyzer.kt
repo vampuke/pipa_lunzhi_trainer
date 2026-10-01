@@ -27,6 +27,12 @@ object LunzhiAnalyzer {
     const val MAX_IOI = 0.60
     private const val MIN_ONSET_GAP = 0.040   // 40ms -> up to 25 strokes/s
     private const val PROMINENCE = 0.04
+    /**
+     * Minimum [Timbre.harmonicity] for a peak to count as a plucked string.
+     * Measured over synthetic pipa rolls (>= 0.60), an idle noisy room
+     * (<= 0.61, median 0.54) and metronome clicks (<= 0.70, median 0.52).
+     */
+    const val TONE_MIN = 0.58
     /** jitter% ≈ modalCv * 74 (from synthetic calibration). */
     private const val JITTER_SCALE = 74.0
 
@@ -44,8 +50,7 @@ object LunzhiAnalyzer {
         val robustCv: Double,      // MAD-based robust CV
         val jitterPct: Double,     // perceptual estimate, % of interval
         val outlierCount: Int,     // IOIs outside the modal band
-        val fingerProfile: DoubleArray,
-        val bestPhase: Int,
+        val positionProfile: DoubleArray,
         val perWindow: List<WindowStat>
     )
 
@@ -122,8 +127,11 @@ object LunzhiAnalyzer {
         return out
     }
 
+    /** Spectral flux plus the per-frame timbre score used to reject non-plucks. */
+    data class OnsetFn(val flux: DoubleArray, val fps: Double, val tone: DoubleArray)
+
     /** Spectral-flux onset detection function, normalized to 0..1. */
-    fun fluxOf(samples: FloatArray, sampleRate: Int): Pair<DoubleArray, Double> {
+    fun onsetFunction(samples: FloatArray, sampleRate: Int): OnsetFn {
         var peak = 1e-9f
         for (v in samples) { val a = abs(v); if (a > peak) peak = a }
         val invPeak = 1.0 / peak.toDouble()
@@ -132,6 +140,7 @@ object LunzhiAnalyzer {
         val window = hann(WIN)
         var prev = DoubleArray(WIN / 2 + 1)
         val flux = DoubleArray(nFrames)
+        val tone = DoubleArray(nFrames)
         val buf = DoubleArray(WIN)
         for (i in 0 until nFrames) {
             val off = i * HOP
@@ -140,16 +149,23 @@ object LunzhiAnalyzer {
             var s = 0.0
             for (k in mag.indices) { val d = mag[k] - prev[k]; if (d > 0) s += d }
             flux[i] = s
+            tone[i] = Timbre.harmonicity(mag, sampleRate, WIN)
             prev = mag
         }
         var fmax = 1e-9
         for (v in flux) if (v > fmax) fmax = v
         for (i in flux.indices) flux[i] = flux[i] / fmax
-        return Pair(flux, sampleRate.toDouble() / HOP)
+        return OnsetFn(flux, sampleRate.toDouble() / HOP, tone)
     }
 
-    /** Peak picking: relative adaptive threshold + min distance + prominence. */
-    fun pickPeaks(flux: DoubleArray, fps: Double): IntArray {
+    /**
+     * Peak picking: relative adaptive threshold + min distance + prominence.
+     *
+     * @param tone per-frame [Timbre.harmonicity], or null to skip the timbre test
+     * @param minTone onsets below this are not a plucked string (room noise,
+     *                metronome clicks) and are dropped
+     */
+    fun pickPeaks(flux: DoubleArray, tone: DoubleArray?, fps: Double, minTone: Double): IntArray {
         if (flux.isEmpty()) return IntArray(0)
         val med = movingAverage(flux, (0.12 * fps).toInt().coerceAtLeast(1))
         val minGap = (MIN_ONSET_GAP * fps).toInt().coerceAtLeast(1)
@@ -174,7 +190,28 @@ object LunzhiAnalyzer {
             while (jx <= hi && flux[jx] <= flux[p]) { rm = min(rm, flux[jx]); jx++ }
             if (flux[p] - max(lm, rm) >= PROMINENCE) keep.add(p)
         }
-        return keep.toIntArray()
+        if (tone == null || minTone <= 0.0) return keep.toIntArray()
+        val span = (0.030 * fps).toInt().coerceAtLeast(2)
+        val out = ArrayList<Int>(keep.size)
+        for (p in keep) {
+            if (medianAfter(tone, p, span, flux.size) >= minTone) out.add(p)
+        }
+        return out.toIntArray()
+    }
+
+    /**
+     * Median timbre score over the ~30 ms *after* [p]. A single frame is
+     * dominated by the attack transient, which is broadband; just after it the
+     * string is ringing and the harmonic series is clear.
+     */
+    private fun medianAfter(tone: DoubleArray, p: Int, span: Int, n: Int): Double {
+        val lo = p + 1
+        val hi = min(p + span, n - 1)
+        if (hi < lo) return tone[p]
+        val buf = DoubleArray(hi - lo + 1)
+        for (i in lo..hi) buf[i - lo] = tone[i]
+        buf.sort()
+        return buf[buf.size / 2]
     }
 
     /** Sub-frame parabolic refinement of peak positions. */
@@ -194,8 +231,10 @@ object LunzhiAnalyzer {
     }
 
     fun analyze(samples: FloatArray, sampleRate: Int, durationOverrideSec: Double = 0.0): Result {
-        val (flux, fps) = fluxOf(samples, sampleRate)
-        val peaks = pickPeaks(flux, fps)
+        val fn = onsetFunction(samples, sampleRate)
+        val flux = fn.flux
+        val fps = fn.fps
+        val peaks = pickPeaks(flux, fn.tone, fps, TONE_MIN)
         val rawOnsets = refine(flux, peaks, fps)
         val decodedDur = samples.size.toDouble() / sampleRate
         val scale = if (durationOverrideSec > 0 && decodedDur > 0) durationOverrideSec / decodedDur else 1.0
@@ -249,7 +288,7 @@ object LunzhiAnalyzer {
         val robustCv = if (med > 0) 1.4826 * mad / med else 0.0
         val jitterPct = (modalCv.takeIf { it > 0 } ?: cv) * JITTER_SCALE
 
-        val (phase, profile) = fiveFold(a)
+        val profile = fiveFold(a)
 
         val windows = ArrayList<WindowStat>()
         if (t.isNotEmpty()) {
@@ -272,7 +311,7 @@ object LunzhiAnalyzer {
         }
 
         return Metrics(t.size, cps, cps * 60, mean * 1000, med * 1000, sd * 1000,
-            cv, modalCv, robustCv, jitterPct, outliers, profile, phase, windows)
+            cv, modalCv, robustCv, jitterPct, outliers, profile, windows)
     }
 
     /** IOI list (seconds) for a range — used for distribution display. */
@@ -286,23 +325,30 @@ object LunzhiAnalyzer {
         return out
     }
 
-    /** Fold amps onto a 5-stroke cycle, pick phase with largest position spread. */
-    fun fiveFold(amp: DoubleArray): Pair<Int, DoubleArray> {
-        var best = -1.0; var bestPhase = 0
-        var bestProfile = DoubleArray(5) { 1.0 }
-        for (phase in 0 until 5) {
-            val n = amp.size - phase
-            val cycles = n / 5
-            if (cycles < 2) continue
-            val posMean = DoubleArray(5)
-            for (c in 0 until cycles) for (p in 0 until 5) posMean[p] += amp[phase + c * 5 + p]
-            for (p in 0 until 5) posMean[p] = posMean[p] / cycles
-            val spread = (posMean.maxOrNull() ?: 0.0) - (posMean.minOrNull() ?: 0.0)
-            if (spread > best) { best = spread; bestPhase = phase; bestProfile = posMean }
+    /**
+     * Fold strokes onto a 5-stroke cycle.
+     *
+     * The phase is **always 0**: the cycle starts at the first detected stroke.
+     * Searching for the phase with the largest position spread looks principled
+     * but is degenerate — for a periodic signal every phase gives the same
+     * cyclic profile, so the spread differs by <3% between candidates and the
+     * winner is decided by measurement noise. That made the reported "weakest
+     * finger" arbitrary and, on a synthetic file with a known weak position, it
+     * named the strongest position as the weakest. Positions are now reported as
+     * 第1击..第5击 counted from the segment's first stroke, which is a claim the
+     * data can actually support.
+     */
+    fun fiveFold(amp: DoubleArray): DoubleArray {
+        val profile = DoubleArray(5)
+        val count = IntArray(5)
+        for (i in amp.indices) {
+            val p = i % 5
+            profile[p] += amp[i]
+            count[p]++
         }
-        val mx = bestProfile.maxOrNull() ?: 1.0
-        val norm = if (mx > 0) DoubleArray(5) { bestProfile[it] / mx } else bestProfile
-        return Pair(bestPhase, norm)
+        for (p in 0 until 5) if (count[p] > 0) profile[p] = profile[p] / count[p]
+        val mx = profile.maxOrNull() ?: 1.0
+        return if (mx > 0) DoubleArray(5) { profile[it] / mx } else profile
     }
 
     private fun median(v: List<Double>): Double {

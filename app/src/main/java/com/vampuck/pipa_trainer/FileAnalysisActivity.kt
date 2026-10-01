@@ -404,10 +404,10 @@ class FileAnalysisActivity : AppCompatActivity() {
     }
 
     private fun drawFinger(m: LunzhiAnalyzer.Metrics) {
-        val names = arrayOf("食指", "中指", "名指", "小指", "挑")
+        val names = arrayOf("第1击", "第2击", "第3击", "第4击", "第5击")
         val entries = ArrayList<BarEntry>()
-        for (p in m.fingerProfile.indices) {
-            entries.add(BarEntry(p.toFloat(), (m.fingerProfile[p] * 100).toFloat()))
+        for (p in m.positionProfile.indices) {
+            entries.add(BarEntry(p.toFloat(), (m.positionProfile[p] * 100).toFloat()))
         }
         val ds = BarDataSet(entries, "力度%").apply { color = 0xFF8D3B2E.toInt() }
         val chart = b.chartFinger
@@ -421,7 +421,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         chart.xAxis.valueFormatter = object : ValueFormatter() {
             override fun getFormattedValue(value: Float): String = names.getOrElse(value.toInt()) { "" }
         }
-        b.lblFinger.text = "轮内各指力度（该段，五音折叠 %）"
+        b.lblFinger.text = "轮内各位力度（该段，以第1击为第1位 %）"
         chart.invalidate()
     }
 }

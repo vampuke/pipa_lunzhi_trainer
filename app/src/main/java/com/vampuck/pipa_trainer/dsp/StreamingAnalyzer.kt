@@ -46,10 +46,13 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     // ---- look-ahead ring so prominence can be evaluated like file mode ----
     private val PROMINENCE = 0.04
     private val W = (0.12 * fps).toInt().coerceAtLeast(3)
+    private val toneSpanFrames = (0.030 * fps).toLong().coerceAtLeast(2L)
     private val ringLen = 2 * W + 3
     private val nfRing = DoubleArray(ringLen)
     private val medRing = DoubleArray(ringLen)
     private val rmsRing = DoubleArray(ringLen)
+    private val toneRing = DoubleArray(ringLen)
+    private val magBuf = DoubleArray(win / 2 + 1)
     private fun slot(f: Long): Int = (((f % ringLen) + ringLen) % ringLen).toInt()
 
     // ---- noise floor ----
@@ -57,6 +60,27 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     private var floorInitSum = 0.0
     private var floorInitCount = 0
     private var floorReady = false
+
+    /**
+     * Short-term background level: the median frame RMS over the last ~1 s.
+     *
+     * It is **not** used as a gate reference (that would reference the gate to
+     * the ringing strings during playing, and it measured ~50% of the strokes
+     * lost). It exists only to re-calibrate [noiseFloor] while the room is idle,
+     * so a room that gets louder after start-up cannot leave the gate open
+     * forever. See [updateFloor].
+     */
+    private val bgWinFrames = (1.0 * fps).toInt().coerceAtLeast(8)
+    private val bgBuf = DoubleArray(bgWinFrames)
+    private var bgPos = 0
+    private var bgFill = 0
+    private var bgTick = 0
+    private var bgScratch = DoubleArray(0)
+    private val bgUpdateEvery = 4
+    private val bgPercentile = 0.50
+
+    @Volatile var recentFloor = 0.0
+        private set
 
     @Volatile var noiseFloor = 0.004
         private set
@@ -70,16 +94,37 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     private var gateRatio = 3.0
     private var gateAbsMin = 0.004
 
+    /**
+     * A pipa at arm's length is 20-60 dB above the room, i.e. 10-1000x in RMS.
+     * So if the short-term background is still within [idleXFloor] of the floor,
+     * nothing is being played and a floor that sits that far below the room is
+     * simply stale and may be pulled up.
+     */
+    private val idleXFloor = 6.0
+    private val floorTrackRate = 0.004
+
+    /**
+     * Minimum [Timbre.harmonicity] for an onset to count as a plucked string.
+     * Measured at detector-selected onsets: pipa rolls score >= 0.60, an idle
+     * noisy room <= 0.61 (median 0.54), metronome clicks mostly <= 0.54. The
+     * presets sit around that boundary — 灵敏 is for a quiet room where the
+     * level gate already handles the noise.
+     */
+    var minTone = 0.58
+
     fun setSensitivity(level: Int) {
         when (level) {
-            0 -> { gateRatio = 6.0; gateAbsMin = 0.015 }
-            2 -> { gateRatio = 1.8; gateAbsMin = 0.0015 }
-            else -> { gateRatio = 3.0; gateAbsMin = 0.004 }
+            0 -> { gateRatio = 6.0; gateAbsMin = 0.015; minTone = 0.66 }
+            2 -> { gateRatio = 1.8; gateAbsMin = 0.0015; minTone = 0.54 }
+            else -> { gateRatio = 3.0; gateAbsMin = 0.004; minTone = 0.58 }
         }
     }
 
     val onsetTimes = ArrayList<Double>()
     val strokeAmp = ArrayList<Double>()
+
+    /** [Timbre.harmonicity] measured at each accepted onset (diagnostics). */
+    val onsetTone = ArrayList<Double>()
 
     // ---- metronome masking ----
     private val clickTimes = ArrayList<Double>()
@@ -157,10 +202,12 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val half = win / 2
         for (k in 0..half) {
             val mag = sqrt(re[k] * re[k] + im[k] * im[k])
+            magBuf[k] = mag
             val d = mag - prevMag[k]
             if (d > 0) flux += d
             prevMag[k] = mag
         }
+        val tone = Timbre.harmonicity(magBuf, sampleRate, win)
         var rms = 0.0
         for (k in 0 until win) rms += ring[k] * ring[k]
         rms = sqrt(rms / win)
@@ -186,6 +233,7 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         nfRing[slot(f)] = nf
         medRing[slot(f)] = med
         rmsRing[slot(f)] = rms
+        toneRing[slot(f)] = tone
 
         // confirm the frame W back (we now have the look-ahead it needs)
         val c = f - W
@@ -196,6 +244,9 @@ class StreamingAnalyzer(private val sampleRate: Int) {
 
     /** File-mode-equivalent peak test for frame [c], with [latest] = newest frame. */
     private fun confirmPeak(c: Long, latest: Long) {
+        // Until the room has been measured the gate still sits at its start-up
+        // default and would let the room itself straight through.
+        if (!floorReady) return
         val cv = nfRing[slot(c)]
         if (cv <= 0.0) return
         // local maximum
@@ -212,19 +263,54 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         // min distance
         if (c - lastPeakFrame < minGapFrames) return
         // energy gate at the peak (use the louder of this frame and the previous)
-        val g = maxOf(gateAbsMin, noiseFloor * gateRatio)
+        val g = gateValue()
         currentGate = g
         if (noiseGateEnabled && max(rmsRing[slot(c)], rmsRing[slot(c - 1)]) <= g) return
         // metronome mask
         if (isMetronomeMasked(frameTime(c))) return
+        // timbre: a plucked string, not room noise and not a metronome click
+        val tone = onsetTone(c, latest)
+        if (minTone > 0.0 && tone < minTone) return
 
         onsetTimes.add(frameTime(c))
         strokeAmp.add(cv)
+        onsetTone.add(tone)
         lastStrokeAmp = cv
         lastPeakFrame = c
     }
 
+    /**
+     * Median [Timbre.harmonicity] over the ~30 ms *after* the peak.
+     *
+     * A single frame is a poor estimator: it is dominated by the attack
+     * transient (broadband, so it looks like noise) and by whichever bin the
+     * pitch search happened to latch onto. Just after the attack the string is
+     * ringing, so the harmonic series is clear. The median (not the max) keeps
+     * noise from drifting upwards simply by having more chances to look tonal.
+     */
+    private fun onsetTone(c: Long, latest: Long): Double {
+        val lo = c + 1
+        val hi = min(c + toneSpanFrames, latest)
+        if (hi < lo) return toneRing[slot(c)]
+        val n = (hi - lo + 1).toInt()
+        val buf = DoubleArray(n)
+        for (i in 0 until n) buf[i] = toneRing[slot(lo + i)]
+        buf.sort()
+        return buf[n / 2]
+    }
+
+    /**
+     * The single gate used both for detection and for the on-screen readout.
+     *
+     * Deliberately referenced to the long-term [noiseFloor] (the room), never to
+     * the recent level: during a roll the strings ring through the whole gap
+     * between strokes, so a gate referenced to the recent background sits at the
+     * ringing level and swallows about half the strokes.
+     */
+    private fun gateValue(): Double = maxOf(gateAbsMin, noiseFloor * gateRatio)
+
     private fun updateFloor(rms: Double) {
+        updateBackground(rms)
         if (!floorReady) {
             floorInitSum += rms; floorInitCount++
             if (floorInitCount >= floorInitFrames) {
@@ -233,12 +319,35 @@ class StreamingAnalyzer(private val sampleRate: Int) {
             }
             return
         }
+        // Falling is always safe: it can only make the detector more sensitive.
         if (rms < noiseFloor) {
             noiseFloor = noiseFloor * 0.7 + rms * 0.3
-        } else if (rms < noiseFloor * 1.5) {
-            noiseFloor *= 1.0005
         }
-        if (noiseFloor < 1e-4) noiseFloor = 1e-4
+        // Rising is only safe while the room is idle. The original code crept up
+        // by 0.05%/frame and only while `rms < floor*1.5`, which is unmeasurably
+        // slow: on the test device the floor froze at 0.0093 while the room went
+        // to 0.025-0.049, leaving the gate open and firing ~5 false strokes/s
+        // into pure silence. Re-calibrate towards the short-term background
+        // whenever that background is still far below "something is playing".
+        if (recentFloor > 0.0 && recentFloor <= noiseFloor * idleXFloor) {
+            noiseFloor += (recentFloor - noiseFloor) * floorTrackRate
+        }
+        noiseFloor = noiseFloor.coerceIn(1e-4, 0.2)
+    }
+
+    /** Median frame RMS over the last ~1 s — the idle-room reference level. */
+    private fun updateBackground(rms: Double) {
+        bgBuf[bgPos] = rms
+        bgPos++
+        if (bgPos == bgWinFrames) bgPos = 0
+        if (bgFill < bgWinFrames) bgFill++
+        bgTick++
+        if (bgTick % bgUpdateEvery != 0 || bgFill < 8) return
+        if (bgScratch.size != bgFill) bgScratch = DoubleArray(bgFill)
+        System.arraycopy(bgBuf, 0, bgScratch, 0, bgFill)
+        bgScratch.sort()
+        val idx = ((bgFill - 1) * bgPercentile).toInt().coerceIn(0, bgFill - 1)
+        recentFloor = bgScratch[idx]
     }
 
     private fun live(): Live {
@@ -256,7 +365,7 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val band = ioi.filter { it > med * 0.6 && it < med * 1.6 }
         val bandMean = if (band.isNotEmpty()) band.average() else 0.0
         val modalCv = if (bandMean > 0) std(band, bandMean) / bandMean else 0.0
-        val gate = maxOf(gateAbsMin, noiseFloor * gateRatio)
+        val gate = gateValue()
         return Live(cps, cps * 60, cv, modalCv, modalCv * 74.0, onsetTimes.size,
             lastStrokeAmp, noiseFloor, gate, lastRms, gateOpen = lastRms > gate)
     }
