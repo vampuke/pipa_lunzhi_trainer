@@ -76,8 +76,7 @@ class StreamingAnalyzerNoiseTest {
     fun idleRoomProducesNoFalseStrokes() {
         val an = StreamingAnalyzer(sr)
         pushInBlocks(an, noiseAtRms(26.0, 0.0347, 7, 0.9f))
-        assertEquals("idle room must stay silent", 0, an.onsetTimes.size)
-    }
+        assertEquals("idle room must stay silent", 0, an.onsetTimes.size)    }
 
     @Test
     fun risingRoomLevelDoesNotFloodDetections() {
@@ -122,5 +121,66 @@ class StreamingAnalyzerNoiseTest {
         val first = an.onsetTimes.count { it in 1.5..7.5 }
         val second = an.onsetTimes.count { it > 7.5 }
         assertTrue("first=$first second=$second", second >= first - 4)
+    }
+
+    // ---------------- 开头的房间测量窗 ----------------
+    //
+    // 上面所有用例都先喂 1.5s 安静房间，所以一直没暴露这条路径：**房间测量窗里
+    // 混进演奏声**。用户按下「开始」后立刻弹，均值型底噪会把演奏电平当成房间，
+    // 门限被抬到 3x 演奏电平后永久关闭。实测（修复前，同一份合成轮指只改起始
+    // 时间）：长余韵轮指从 0.3s 起弹检出 0/92，挪到 2.0s 后 91/92。
+
+    /** 与上面 addRoll 不同：余韵很长（tau=150ms），相邻击会重叠。 */
+    private fun addLongRingRoll(base: FloatArray, fromSec: Double, intervalSec: Double): Pair<FloatArray, Int> {
+        var t = fromSec
+        var n = 0
+        val tau = 0.150
+        while (t < base.size.toDouble() / sr - 0.3) {
+            val start = (t * sr).toInt()
+            val len = Math.min((1.0 * sr).toInt(), base.size - start)
+            for (k in 0 until len) {
+                val tt = k.toDouble() / sr
+                var v = 0.0
+                for (h in 1..6) v += (1.0 / h) * sin(2 * PI * 220.0 * h * tt)
+                val atk = if (tt < 0.002) tt / 0.002 else 1.0
+                base[start + k] += (v * atk * exp(-tt / tau) * 0.18).toFloat()
+            }
+            t += intervalSec
+            n++
+        }
+        return base to n
+    }
+
+    @Test
+    fun rollStartingInsideTheCalibrationWindowIsStillDetected() {
+        // 0.3s 房间 + 立刻开始的长余韵轮指：这是真实使用最典型的时序
+        val an = StreamingAnalyzer(sr)
+        val sig = noiseAtRms(12.0, 0.004, 51, 0.9f)
+        val (withRoll, truth) = addLongRingRoll(sig, 0.3, 0.125)
+        pushInBlocks(an, withRoll)
+        assertTrue("truth=$truth detected=${an.onsetTimes.size}",
+            an.onsetTimes.size >= (truth * 0.85).toInt())
+    }
+
+    @Test
+    fun longRingRollAfterTheCalibrationWindowIsDetected() {
+        val an = StreamingAnalyzer(sr)
+        val sig = noiseAtRms(12.0, 0.004, 52, 0.9f)
+        val (withRoll, truth) = addLongRingRoll(sig, 2.0, 0.100)
+        pushInBlocks(an, withRoll)
+        assertTrue("truth=$truth detected=${an.onsetTimes.size}",
+            an.onsetTimes.size >= (truth * 0.9).toInt())
+    }
+
+    @Test
+    fun fastRollIsNotTruncatedByTheMinimumOnsetGap() {
+        // 25ms 门限：20 击/秒(50ms) 必须全数检出。原来的 40ms 门正好卡在物理上限上，
+        // 会吞掉快轮起音并截断 IOI 分布（同时扭曲速度与均匀度）。
+        val an = StreamingAnalyzer(sr)
+        val sig = noiseAtRms(12.0, 0.004, 53, 0.9f)
+        val (withRoll, truth) = addLongRingRoll(sig, 1.5, 0.050)
+        pushInBlocks(an, withRoll)
+        assertTrue("20/s: truth=$truth detected=${an.onsetTimes.size}",
+            an.onsetTimes.size >= (truth * 0.85).toInt())
     }
 }

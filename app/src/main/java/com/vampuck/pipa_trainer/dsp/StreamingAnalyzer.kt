@@ -67,8 +67,15 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     private fun slot(f: Long): Int = (((f % ringLen) + ringLen) % ringLen).toInt()
 
     // ---- noise floor ----
+    /**
+     * 开头的房间测量窗。取值用**低百分位**而不是均值——用户按下「开始」后往往立刻
+     * 就弹，均值会把演奏电平当成房间。实测（同一份合成轮指、只改起始时间）：
+     * 轮指从 0.3s 开始（窗内）时，长余韵轮指检出 0/92；挪到 2.0s（窗外）后
+     * 检出 91/92。根因就是门限被抬到 3x 演奏电平后永久关闭。
+     */
     private val floorInitFrames = (1.2 * fps).toInt().coerceAtLeast(1)
-    private var floorInitSum = 0.0
+    private val floorProvisionalFrames = (0.5 * fps).toInt().coerceAtLeast(1)
+    private val floorInitBuf = DoubleArray(floorInitFrames)
     private var floorInitCount = 0
     private var floorReady = false
 
@@ -112,6 +119,9 @@ class StreamingAnalyzer(private val sampleRate: Int) {
      * simply stale and may be pulled up.
      */
     private val idleXFloor = 6.0
+
+    /** 房间测量窗取的百分位：低百分位避开「按下开始就开始弹」的污染。 */
+    private val FLOOR_INIT_PCT = 0.10
     private val floorTrackRate = 0.004
 
     /**
@@ -333,10 +343,16 @@ class StreamingAnalyzer(private val sampleRate: Int) {
 
     private fun updateFloor(rms: Double) {
         updateBackground(rms)
-        if (!floorReady) {
-            floorInitSum += rms; floorInitCount++
-            if (floorInitCount >= floorInitFrames) {
-                noiseFloor = (floorInitSum / floorInitCount).coerceIn(1e-4, 0.2)
+        if (floorInitCount < floorInitFrames) {
+            floorInitBuf[floorInitCount++] = rms
+            // 两段式：先采到 0.5s 就给出一个可用的房间估计、让检测尽早开始，采满
+            // 1.2s 再用整窗精修一次。否则用户按下开始就弹，前 1.2 秒的击数全丢。
+            if (floorInitCount == floorProvisionalFrames || floorInitCount == floorInitFrames) {
+                val n = floorInitCount
+                val s = floorInitBuf.copyOf(n)
+                s.sort()
+                noiseFloor = s[(n * FLOOR_INIT_PCT).toInt().coerceIn(0, n - 1)]
+                    .coerceIn(1e-4, 0.2)
                 floorReady = true
             }
             return

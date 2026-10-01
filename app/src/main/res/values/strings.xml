@@ -6,7 +6,7 @@
     <string name="btn_live">麦克风实时练习</string>
     <string name="btn_start">开始</string>
     <string name="btn_stop">结束并评估</string>
-    <string name="live_hint">开始后弹奏轮指，指标会实时更新；点「结束并评估」查看整段评价。</string>
+    <string name="live_hint">开始后弹奏轮指，指标会实时更新；点「结束并评估」查看整段评价。\n开头约半秒用于测量环境底噪，这期间的击数不计；先按「开始」再起手更准。</string>
     <string name="metric_bpm">速度（音/分）</string>
     <string name="metric_cps">速度（音/秒）</string>
     <string name="metric_cv">均匀度</string>
