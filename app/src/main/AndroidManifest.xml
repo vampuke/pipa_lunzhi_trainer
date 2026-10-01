@@ -34,6 +34,7 @@
         <activity android:name=".PlayAlongActivity" android:exported="false" />
         <activity android:name=".PiecePlayerActivity" android:exported="false" />
         <activity android:name=".ImportActivity" android:exported="false" />
+        <activity android:name=".ScoreEditorActivity" android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

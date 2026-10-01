@@ -35,9 +35,13 @@ object PracticePieces {
     /** 曲目 id -> 简谱。先查内置，再查用户导入的。 */
     fun scoreFor(id: String): JScore? = when (id) {
         "lunzhi_etude" -> Scores.LUNZHI_ETUDE
+        "two_tigers" -> Scores.TWO_TIGERS
+        "little_star" -> Scores.LITTLE_STAR
         "jasmine" -> Scores.JASMINE
         "fengyang" -> Scores.FENGYANG
         "xiaobaicai" -> Scores.XIAOBAICAI
+        "yimeng" -> Scores.YIMENG
+        "yangguan" -> Scores.YANGGUAN
         else -> Scores.IMPORTED[id]
     }
 
@@ -52,6 +56,36 @@ object PracticePieces {
     val imported = ArrayList<PracticePiece>()
 
     val builtin: List<PracticePiece> = listOf(
+
+        PracticePiece(
+            id = "two_tigers",
+            title = "两只老虎",
+            composerOrStyle = "传统童谣 · 公有领域",
+            refBpm = 80,
+            difficulty = "入门",
+            blurb = "最简单的入门曲，级进为主、音域窄，用来熟悉弹挑交替和看谱跟练。",
+            sections = listOf(
+                PieceSection("第一句", 4),
+                PieceSection("第二句", 4),
+                PieceSection("第三句", 4),
+                PieceSection("第四句", 4),
+            )
+        ),
+
+        PracticePiece(
+            id = "little_star",
+            title = "小星星",
+            composerOrStyle = "传统童谣 · 公有领域",
+            refBpm = 76,
+            difficulty = "入门",
+            blurb = "人人会唱的童谣，节奏规整，适合第一次看简谱跟练、练稳定弹挑。",
+            sections = listOf(
+                PieceSection("第一句", 4),
+                PieceSection("第二句", 4),
+                PieceSection("第三句", 4),
+                PieceSection("第四句", 4),
+            )
+        ),
 
         PracticePiece(
             id = "chunjiang",
@@ -198,6 +232,33 @@ object PracticePieces {
                 PieceSection("慢速 · 求稳求匀", 60),
                 PieceSection("中速 · 保持颗粒", 60),
                 PieceSection("提速 · 稳住匀速", 60),
+            )
+        ),
+
+        PracticePiece(
+            id = "yimeng",
+            title = "沂蒙山小调",
+            composerOrStyle = "山东民歌 · 公有领域",
+            refBpm = 66,
+            difficulty = "进阶",
+            blurb = "3/4 拍山东小调，旋律起伏较大，带连音与长轮，练乐句呼吸与轮指。",
+            sections = listOf(
+                PieceSection("上句", 9),
+                PieceSection("下句", 9),
+            )
+        ),
+
+        PracticePiece(
+            id = "yangguan",
+            title = "阳关三叠",
+            composerOrStyle = "唐·王维词 · 古琴曲（公有领域）",
+            refBpm = 56,
+            difficulty = "高级",
+            blurb = "千年古曲主题，节奏多变、含扫拂与泛音记号，考验指法切换与情绪表达。",
+            sections = listOf(
+                PieceSection("起", 8),
+                PieceSection("承", 8),
+                PieceSection("转合", 12),
             )
         ),
     )

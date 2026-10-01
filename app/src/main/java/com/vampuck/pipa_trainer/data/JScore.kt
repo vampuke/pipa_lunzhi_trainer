@@ -108,19 +108,19 @@ object Scores {
             JSectionData(
                 "第一句",
                 listOf(
-                    m(3, 1.0, fg = "弹"), m(3, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"), m(6, 1.0, fg = "挑"),
-                    m(1, 2.0, oct = 1, fg = "弹"), m(1, 1.0, oct = 1, fg = "挑"), m(6, 1.0, fg = "弹"),
-                    m(5, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"), m(6, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"),
-                    m(3, 4.0, fg = "轮"),
+                    m(3, 1.0, fg = "tan"), m(3, 1.0, fg = "tiao"), m(5, 1.0, fg = "tan"), m(6, 1.0, fg = "tiao"),
+                    m(1, 2.0, oct = 1, fg = "tan"), m(1, 1.0, oct = 1, fg = "tiao"), m(6, 1.0, fg = "tan"),
+                    m(5, 1.0, fg = "tiao"), m(5, 1.0, fg = "tan"), m(6, 1.0, fg = "tiao"), m(5, 1.0, fg = "tan"),
+                    m(3, 4.0, fg = "lun"),
                 )
             ),
             JSectionData(
                 "第二句",
                 listOf(
-                    m(3, 1.0, fg = "弹"), m(3, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"), m(6, 1.0, fg = "挑"),
-                    m(1, 2.0, oct = 1, fg = "弹"), m(1, 1.0, oct = 1, fg = "挑"), m(6, 1.0, fg = "弹"),
-                    m(5, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"), m(6, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"),
-                    m(3, 4.0, fg = "轮"),
+                    m(3, 1.0, fg = "tan"), m(3, 1.0, fg = "tiao"), m(5, 1.0, fg = "tan"), m(6, 1.0, fg = "tiao"),
+                    m(1, 2.0, oct = 1, fg = "tan"), m(1, 1.0, oct = 1, fg = "tiao"), m(6, 1.0, fg = "tan"),
+                    m(5, 1.0, fg = "tiao"), m(5, 1.0, fg = "tan"), m(6, 1.0, fg = "tiao"), m(5, 1.0, fg = "tan"),
+                    m(3, 4.0, fg = "lun"),
                 )
             ),
             JSectionData(
@@ -207,4 +207,95 @@ object Scores {
 
     /** 导入的曲目（运行期由用户 JSON 录入时填充）。 */
     val IMPORTED = HashMap<String, JScore>()
+
+    // ===== 更多公有领域曲目（难度梯度） =====
+
+    /** 两只老虎（Frère Jacques，传统童谣，公有领域）。1=C 4/4。入门。 */
+    val TWO_TIGERS = JScore(
+        key = "1=C  4/4",
+        beatsPerBar = 4,
+        sections = listOf(
+            JSectionData("第一句", listOf(
+                m(1, 1.0, fg = "tan"), m(2, 1.0, fg = "tiao"), m(3, 1.0, fg = "tan"), m(1, 1.0, fg = "tiao"),
+                m(1, 1.0, fg = "tan"), m(2, 1.0, fg = "tiao"), m(3, 1.0, fg = "tan"), m(1, 1.0, fg = "tiao"),
+            )),
+            JSectionData("第二句", listOf(
+                m(3, 1.0, fg = "tan"), m(4, 1.0, fg = "tiao"), m(5, 2.0, fg = "tan"),
+                m(3, 1.0, fg = "tan"), m(4, 1.0, fg = "tiao"), m(5, 2.0, fg = "tan"),
+            )),
+            JSectionData("第三句", listOf(
+                m(5, 0.5, fg = "tan"), m(6, 0.5, fg = "tiao"), m(5, 0.5, fg = "tan"), m(4, 0.5, fg = "tiao"),
+                m(3, 1.0, fg = "tan"), m(1, 1.0, fg = "tiao"),
+                m(5, 0.5, fg = "tan"), m(6, 0.5, fg = "tiao"), m(5, 0.5, fg = "tan"), m(4, 0.5, fg = "tiao"),
+                m(3, 1.0, fg = "tan"), m(1, 1.0, fg = "tiao"),
+            )),
+            JSectionData("第四句", listOf(
+                m(1, 1.0, fg = "tan"), m(5, 1.0, oct = -1, fg = "tiao"), m(1, 2.0, fg = "lun"),
+                m(1, 1.0, fg = "tan"), m(5, 1.0, oct = -1, fg = "tiao"), m(1, 2.0, fg = "lun"),
+            )),
+        )
+    )
+
+    /** 小星星（Twinkle Twinkle，传统/莫扎特主题，公有领域）。1=C 4/4。入门。 */
+    val LITTLE_STAR = JScore(
+        key = "1=C  4/4",
+        beatsPerBar = 4,
+        sections = listOf(
+            JSectionData("第一句", listOf(
+                m(1, 1.0, fg = "tan"), m(1, 1.0, fg = "tiao"), m(5, 1.0, fg = "tan"), m(5, 1.0, fg = "tiao"),
+                m(6, 1.0, fg = "tan"), m(6, 1.0, fg = "tiao"), m(5, 2.0, fg = "lun"),
+            )),
+            JSectionData("第二句", listOf(
+                m(4, 1.0, fg = "tan"), m(4, 1.0, fg = "tiao"), m(3, 1.0, fg = "tan"), m(3, 1.0, fg = "tiao"),
+                m(2, 1.0, fg = "tan"), m(2, 1.0, fg = "tiao"), m(1, 2.0, fg = "lun"),
+            )),
+            JSectionData("第三句", listOf(
+                m(5, 1.0, fg = "tan"), m(5, 1.0, fg = "tiao"), m(4, 1.0, fg = "tan"), m(4, 1.0, fg = "tiao"),
+                m(3, 1.0, fg = "tan"), m(3, 1.0, fg = "tiao"), m(2, 2.0, fg = "lun"),
+            )),
+            JSectionData("第四句", listOf(
+                m(5, 1.0, fg = "tan"), m(5, 1.0, fg = "tiao"), m(4, 1.0, fg = "tan"), m(4, 1.0, fg = "tiao"),
+                m(3, 1.0, fg = "tan"), m(3, 1.0, fg = "tiao"), m(2, 2.0, fg = "lun"),
+            )),
+        )
+    )
+
+    /** 沂蒙山小调（山东民歌，传统小调，公有领域）。1=G 3/4。进阶（含连音与长轮）。 */
+    val YIMENG = JScore(
+        key = "1=G  3/4",
+        beatsPerBar = 3,
+        sections = listOf(
+            JSectionData("上句", listOf(
+                m(5, 1.0, fg = "tan"), m(6, 0.5, fg = "tiao"), m(5, 0.5, fg = "tan"), m(3, 1.0, fg = "lun"),
+                m(5, 1.0, fg = "tan"), m(6, 1.0, fg = "tiao"), m(1, 1.0, oct = 1, fg = "lun"),
+                m(6, 1.0, fg = "tan"), m(5, 2.0, fg = "lun"),
+            )),
+            JSectionData("下句", listOf(
+                m(3, 1.0, fg = "tan"), m(2, 0.5, fg = "tiao"), m(3, 0.5, fg = "tan"), m(5, 1.0, fg = "lun"),
+                m(2, 1.0, fg = "tan"), m(1, 1.0, fg = "tiao"), m(6, 1.0, oct = -1, fg = "lun"),
+                m(1, 3.0, fg = "lun"),
+            )),
+        )
+    )
+
+    /** 阳关三叠（唐·王维诗，古琴曲，谱传古代，公有领域）主题句。1=F 4/4。高级。 */
+    val YANGGUAN = JScore(
+        key = "1=F  4/4",
+        beatsPerBar = 4,
+        sections = listOf(
+            JSectionData("起", listOf(
+                m(3, 1.0, fg = "tan"), m(5, 0.5, fg = "tiao"), m(6, 0.5, fg = "tan"), m(5, 1.0, fg = "lun"), m(3, 1.0, fg = "mo"),
+                m(2, 1.5, fg = "tan"), m(1, 0.5, fg = "tiao"), m(2, 1.0, fg = "lun"), m(3, 1.0, fg = "tan"),
+            )),
+            JSectionData("承", listOf(
+                m(5, 1.0, fg = "tan"), m(6, 1.0, fg = "tiao"), m(1, 1.0, oct = 1, fg = "lun"), m(6, 1.0, fg = "mo"),
+                m(5, 2.0, fg = "lun"), m(3, 1.0, fg = "tan"), m(2, 1.0, fg = "tiao"),
+            )),
+            JSectionData("转合", listOf(
+                m(1, 1.0, fg = "tan"), m(2, 0.5, fg = "tiao"), m(3, 0.5, fg = "tan"), m(5, 1.0, fg = "lun"), m(6, 1.0, fg = "sao"),
+                m(5, 1.5, fg = "lun"), m(3, 0.5, fg = "tan"), m(2, 1.0, fg = "tiao"), m(1, 1.0, fg = "lun"),
+                m(1, 4.0, fg = "fan"),
+            )),
+        )
+    )
 }

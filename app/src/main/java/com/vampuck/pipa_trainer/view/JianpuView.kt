@@ -218,22 +218,10 @@ class JianpuView @JvmOverloads constructor(
 
         if (note.isRest) return
 
-        // 轮指标记：数字上方三条小斜线
-        if (note.tremolo) {
-            trPaint.color = if (active) colAccent else colSecondary
-            val ty = g.cy - dp(24f)
-            var sx = g.cx - dp(8f)
-            repeat(3) {
-                canvas.drawLine(sx, ty + dp(5f), sx + dp(5f), ty, trPaint)
-                sx += dp(5.5f)
-            }
-        }
-
         // 八度点
         dotPaint.color = color
         val radius = dp(1.8f)
         if (note.octave > 0) {
-            // 高八度：上方
             val baseY = g.cy - dp(16f)
             for (k in 0 until note.octave) {
                 canvas.drawCircle(g.cx, baseY - k * dp(5f), radius, dotPaint)
@@ -245,18 +233,17 @@ class JianpuView @JvmOverloads constructor(
             }
         }
 
-        // 琵琶指法标记：画在最上方（高于轮指斜线与高八度点），不遮数字
-        if (note.finger.isNotEmpty()) {
-            fgPaint.color = if (active) colPrimary else colSecondary
-            // 行顶留出的区域内靠上放置
-            val fy = g.lineTop + dp(11f)
-            canvas.drawText(note.finger, g.cx, fy, fgPaint)
+        // 琵琶指法符号：画在数字上方（行顶留出的区域），用几何图形绘制，不依赖字体。
+        // 兼容老数据：若无 finger 但 tremolo=true，按「轮」画。
+        val fg = note.finger.ifEmpty { if (note.tremolo) "lun" else "" }
+        if (fg.isNotEmpty()) {
+            val fc = if (active) colPrimary else colSecondary
+            drawFinger(canvas, fg, g.cx, g.lineTop + dp(12f), fc)
         }
 
         // 时值
         linePaint.color = color
         if (note.dur <= 0.5 + 1e-6) {
-            // 下划线：八分 1 条，十六分 2 条
             val underlines = if (note.dur <= 0.25 + 1e-6) 2 else 1
             var uy = g.cy + dp(6f)
             repeat(underlines) {
@@ -264,7 +251,6 @@ class JianpuView @JvmOverloads constructor(
                 uy += dp(4f)
             }
         } else if (note.dur >= 2.0) {
-            // 增时线：数字右侧画 (dur-1) 条「—」
             val dashes = when {
                 note.dur >= 4.0 -> 3
                 note.dur >= 3.0 -> 2
@@ -274,6 +260,58 @@ class JianpuView @JvmOverloads constructor(
             repeat(dashes) {
                 canvas.drawLine(dx + dp(6f), g.cy - dp(6f), dx + dp(28f), g.cy - dp(6f), linePaint)
                 dx += dp(34f)
+            }
+        }
+    }
+
+    /** 用几何图形画琵琶指法符号，中心 x=cx，纵向中心 y=cy。各机型一致。 */
+    private fun drawFinger(canvas: Canvas, code: String, cx: Float, cy: Float, color: Int) {
+        trPaint.color = color
+        trPaint.strokeWidth = dp(1.4f)
+        dotPaint.color = color
+        val w = dp(4.5f)   // 半宽
+        when (code) {
+            "tan" -> { // 弹：实心小点
+                canvas.drawCircle(cx, cy, dp(2.2f), dotPaint)
+            }
+            "tiao" -> { // 挑：向上小弧钩（用两段短线近似 ⌐）
+                canvas.drawLine(cx - w, cy + dp(2f), cx - w, cy - dp(2f), trPaint)
+                canvas.drawLine(cx - w, cy - dp(2f), cx + w, cy - dp(2f), trPaint)
+            }
+            "lun" -> { // 轮：三条斜线
+                var sx = cx - dp(7f)
+                repeat(3) {
+                    canvas.drawLine(sx, cy + dp(3f), sx + dp(4f), cy - dp(3f), trPaint)
+                    sx += dp(5f)
+                }
+            }
+            "banlun" -> { // 半轮：两条斜线
+                var sx = cx - dp(4.5f)
+                repeat(2) {
+                    canvas.drawLine(sx, cy + dp(3f), sx + dp(4f), cy - dp(3f), trPaint)
+                    sx += dp(5f)
+                }
+            }
+            "sao" -> { // 扫：向下的 ∨
+                canvas.drawLine(cx - w, cy - dp(3f), cx, cy + dp(3f), trPaint)
+                canvas.drawLine(cx, cy + dp(3f), cx + w, cy - dp(3f), trPaint)
+            }
+            "fu" -> { // 拂：向上的 ∧
+                canvas.drawLine(cx - w, cy + dp(3f), cx, cy - dp(3f), trPaint)
+                canvas.drawLine(cx, cy - dp(3f), cx + w, cy + dp(3f), trPaint)
+            }
+            "gou" -> { // 勾：竖线带左下钩
+                canvas.drawLine(cx + dp(1f), cy - dp(3f), cx + dp(1f), cy + dp(3f), trPaint)
+                canvas.drawLine(cx + dp(1f), cy + dp(3f), cx - dp(3f), cy + dp(3f), trPaint)
+            }
+            "mo" -> { // 抹：短横线
+                canvas.drawLine(cx - w, cy, cx + w, cy, trPaint)
+            }
+            "fan" -> { // 泛：空心小圆
+                val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.color = color; style = Paint.Style.STROKE; strokeWidth = dp(1.2f)
+                }
+                canvas.drawCircle(cx, cy, dp(3f), p)
             }
         }
     }

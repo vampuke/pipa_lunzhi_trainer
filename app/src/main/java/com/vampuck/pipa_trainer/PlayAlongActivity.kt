@@ -21,6 +21,9 @@ class PlayAlongActivity : AppCompatActivity() {
         b.btnImport.setOnClickListener {
             startActivity(Intent(this, ImportActivity::class.java))
         }
+        b.btnEditor.setOnClickListener {
+            startActivity(Intent(this, ScoreEditorActivity::class.java))
+        }
     }
 
     override fun onResume() {

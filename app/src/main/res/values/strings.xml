@@ -123,4 +123,33 @@
     <string name="import_fail">导入失败：%1$s</string>
     <string name="import_copyright">版权提示：请仅导入你自己拥有或自行录入的谱子作个人练习之用。请勿导入他人享有版权的乐谱并传播。</string>
     <string name="play_imported_tag">自录</string>
+
+    <!-- 交互式简谱编辑器 -->
+    <string name="editor_title">简谱编辑器</string>
+    <string name="editor_entry">编辑简谱（可视化录入）</string>
+    <string name="editor_preview">预览</string>
+    <string name="editor_degree">音级（点选，再「添加音符」）</string>
+    <string name="editor_octave">八度</string>
+    <string name="editor_duration">时值</string>
+    <string name="editor_dur_hint">16=十六分 8=八分 4=四分 2=二分 2.=附点二分 1=全音符</string>
+    <string name="editor_fingering">指法</string>
+    <string name="editor_bpb">每小节拍数</string>
+    <string name="editor_add">添加音符</string>
+    <string name="editor_rest">休止符</string>
+    <string name="editor_backspace">删除上一个</string>
+    <string name="editor_clear">清空</string>
+    <string name="editor_clear_confirm">确定清空所有已录入的音符？</string>
+    <string name="editor_meta">曲目信息</string>
+    <string name="editor_count">已录入 %1$d 个音符 · 共 %2$s 拍</string>
+    <string name="editor_hint_title">曲名（必填）</string>
+    <string name="editor_hint_key">调号，如 1=D</string>
+    <string name="editor_hint_bpm">参考速度，如 72</string>
+    <string name="editor_hint_section">段落名，如 第一句</string>
+    <string name="editor_hint_diff">难度，如 入门</string>
+    <string name="editor_hint_blurb">一句话简介（可选）</string>
+    <string name="editor_save">保存为可跟练曲目</string>
+    <string name="editor_need_title">请先填写曲名</string>
+    <string name="editor_need_notes">请先添加至少一个音符</string>
+    <string name="editor_self_made">自录简谱</string>
+    <string name="editor_saved">已保存《%1$s》，可在列表里找到并跟练</string>
 </resources>
