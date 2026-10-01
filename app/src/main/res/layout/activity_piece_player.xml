@@ -12,139 +12,32 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- 曲名 + 当前段落大卡 -->
-        <com.google.android.material.card.MaterialCardView
-            style="@style/App.Card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardElevation="2dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:paddingTop="22dp"
-                android:paddingBottom="24dp"
-                android:paddingHorizontal="18dp">
-
-                <TextView
-                    android:id="@+id/playTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="曲名"
-                    android:textSize="22sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/pipa_primary_dark" />
-
-                <!-- 当前段落名 -->
-                <TextView
-                    android:id="@+id/curSection"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:text="—"
-                    android:textSize="30sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/pipa_primary" />
-
-                <!-- 段落序号 / 总数 -->
-                <TextView
-                    android:id="@+id/sectionIndex"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="第 0 / 0 段"
-                    android:textSize="13sp"
-                    android:textColor="@color/text_secondary" />
-
-                <!-- 大计时 -->
-                <TextView
-                    android:id="@+id/clock"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:text="00:00 / 00:00"
-                    android:textSize="18sp"
-                    android:textColor="@color/text_primary" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- 整体进度条 -->
+        <!-- 曲名 -->
         <TextView
-            style="@style/App.SectionLabel"
+            android:id="@+id/playTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:text="@string/play_overall" />
-
-        <com.google.android.material.progressindicator.LinearProgressIndicator
-            android:id="@+id/overallBar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            app:trackCornerRadius="6dp"
-            app:trackThickness="10dp"
-            app:indicatorColor="@color/pipa_accent"
-            app:trackColor="@color/surface_variant"
-            android:max="1000"
-            android:progress="0" />
-
-        <!-- 当前段落进度 -->
-        <TextView
-            style="@style/App.SectionLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/play_section_progress" />
-
-        <com.google.android.material.progressindicator.LinearProgressIndicator
-            android:id="@+id/sectionBar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            app:trackCornerRadius="6dp"
-            app:trackThickness="8dp"
-            app:indicatorColor="@color/pipa_primary"
-            app:trackColor="@color/surface_variant"
-            android:max="1000"
-            android:progress="0" />
-
-        <!-- 下一段提示 -->
-        <TextView
-            android:id="@+id/nextSection"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/play_next_none"
-            android:textSize="13sp"
-            android:textColor="@color/text_secondary" />
-
-        <!-- 简谱滚动谱（有谱的曲目才显示） -->
-        <TextView
-            android:id="@+id/scoreLabel"
-            style="@style/App.SectionLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:text="@string/play_score"
-            android:visibility="gone" />
+            android:text="曲名"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="@color/pipa_primary_dark" />
 
         <TextView
             android:id="@+id/scoreKey"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:textSize="12sp"
+            android:layout_marginTop="4dp"
+            android:textSize="13sp"
             android:textColor="@color/text_secondary"
             android:visibility="gone" />
 
+        <!-- 简谱滚动谱 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/scoreCard"
             style="@style/App.Card"
             android:layout_width="match_parent"
-            android:layout_height="240dp"
-            android:layout_marginTop="8dp"
+            android:layout_height="300dp"
+            android:layout_marginTop="14dp"
             android:visibility="gone">
 
             <FrameLayout
@@ -156,7 +49,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:scrollbars="vertical"
-                    android:padding="4dp">
+                    android:padding="6dp">
 
                     <com.vampuck.pipa_trainer.view.JianpuView
                         android:id="@+id/jianpu"
@@ -276,27 +169,12 @@
             android:layout_marginTop="4dp"
             android:text="@string/play_click_on" />
 
-        <!-- 段落清单 -->
-        <TextView
-            style="@style/App.SectionLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/play_sections" />
-
-        <LinearLayout
-            android:id="@+id/sectionList"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="8dp" />
-
         <!-- 开始 / 暂停 / 重置 -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnStart"
             android:layout_width="match_parent"
             android:layout_height="64dp"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="16dp"
             android:text="@string/btn_start"
             android:textSize="18sp" />
 

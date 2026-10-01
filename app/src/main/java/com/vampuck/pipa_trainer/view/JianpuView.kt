@@ -185,14 +185,23 @@ class JianpuView @JvmOverloads constructor(
             canvas.drawLine(bx, bcy - dp(14f), bx, bcy + dp(14f), barPaint)
         }
 
+        // 整小节高亮：按行把当前小节的字块合并成一条连续底，而非每个音符一个框
+        if (highlightBar >= 0) {
+            hlPaint.color = colHl
+            // 同一小节可能跨行，按 (rowTop) 分组，每行画一条连续圆角底
+            val barGlyphs = glyphs.filter { it.barIndex == highlightBar }
+            val byRow = barGlyphs.groupBy { it.lineTop }
+            for ((_, rowGlyphs) in byRow) {
+                val left = rowGlyphs.minOf { it.cellLeft } - dp(3f)
+                val right = rowGlyphs.maxOf { it.cellRight } + dp(3f)
+                val cy = rowGlyphs.first().cy
+                val r = RectF(left, cy - dp(28f), right, cy + dp(22f))
+                canvas.drawRoundRect(r, dp(8f), dp(8f), hlPaint)
+            }
+        }
+
         for (g in glyphs) {
             val active = g.barIndex == highlightBar
-            // 高亮底
-            if (active) {
-                hlPaint.color = colHl
-                val r = RectF(g.cellLeft - dp(2f), g.cy - dp(26f), g.cellRight + dp(2f), g.cy + dp(20f))
-                canvas.drawRoundRect(r, dp(6f), dp(6f), hlPaint)
-            }
             drawGlyph(canvas, g, active)
         }
     }
