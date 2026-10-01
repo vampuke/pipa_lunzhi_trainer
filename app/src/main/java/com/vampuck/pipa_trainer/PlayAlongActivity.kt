@@ -19,7 +19,9 @@ class PlayAlongActivity : AppCompatActivity() {
         setContentView(b.root)
 
         val inflater = LayoutInflater.from(this)
-        for (p in PracticePieces.ALL) {
+        // 只展示带简谱的曲目（无谱的先隐藏）
+        val shown = PracticePieces.ALL.filter { PracticePieces.scoreFor(it.id) != null }
+        for (p in shown) {
             val card = ItemPieceBinding.inflate(inflater, b.pieceList, false)
             card.pieceTitle.text = p.title
             card.pieceDiff.text = p.difficulty

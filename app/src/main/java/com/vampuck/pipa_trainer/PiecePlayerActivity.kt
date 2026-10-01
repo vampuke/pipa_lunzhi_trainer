@@ -130,14 +130,54 @@ class PiecePlayerActivity : AppCompatActivity() {
 
     private fun start() {
         if (elapsedBeats >= piece.totalBeats) elapsedBeats = 0.0
+        // 放大曲谱区域（有谱时），再倒数三秒开始
+        if (score != null) {
+            enlargeScore(true)
+            runCountdown(3) { beginRun() }
+        } else {
+            beginRun()
+        }
+    }
+
+    private var countdownJob: kotlinx.coroutines.Job? = null
+
+    private fun runCountdown(from: Int, onDone: () -> Unit) {
+        b.btnStart.isEnabled = false
+        b.countdown.visibility = View.VISIBLE
+        countdownJob?.cancel()
+        countdownJob = lifecycleScope.launch {
+            for (n in from downTo 1) {
+                b.countdown.text = n.toString()
+                b.countdown.scaleX = 1.4f; b.countdown.scaleY = 1.4f
+                b.countdown.animate().scaleX(1f).scaleY(1f).setDuration(400)
+                    .setInterpolator(DecelerateInterpolator()).start()
+                delay(1000)
+            }
+            b.countdown.visibility = View.GONE
+            b.btnStart.isEnabled = true
+            onDone()
+        }
+    }
+
+    private fun beginRun() {
         running = true
         lastTickMs = SystemClock.elapsedRealtime()
         b.btnStart.setText(R.string.play_pause)
         if (clickOn) startClick()
     }
 
+    /** 放大/还原曲谱卡片高度，让跟练时谱面更大。 */
+    private fun enlargeScore(big: Boolean) {
+        val lp = b.scoreCard.layoutParams
+        lp.height = (resources.displayMetrics.density * (if (big) 420f else 240f)).toInt()
+        b.scoreCard.layoutParams = lp
+    }
+
     private fun pause() {
         running = false
+        countdownJob?.cancel()
+        b.countdown.visibility = View.GONE
+        b.btnStart.isEnabled = true
         b.btnStart.setText(R.string.btn_start)
         metronome.stop()
         resetDots()
@@ -145,7 +185,11 @@ class PiecePlayerActivity : AppCompatActivity() {
 
     private fun reset() {
         running = false
+        countdownJob?.cancel()
+        b.countdown.visibility = View.GONE
+        b.btnStart.isEnabled = true
         elapsedBeats = 0.0
+        enlargeScore(false)
         b.btnStart.setText(R.string.btn_start)
         metronome.stop()
         resetDots()
@@ -285,14 +329,13 @@ class PiecePlayerActivity : AppCompatActivity() {
         }
     }
 
-    /** 让当前高亮音符所在行滚动到可视区中部。 */
+    /** 让当前高亮音符所在行滚动到可视区「中间靠上」(约 33%) 处。 */
     private fun autoScrollToCurrent() {
         b.jianpu.post {
             val top = b.jianpu.currentTop
-            val bottom = b.jianpu.currentBottom
             if (top < 0) return@post
             val viewH = b.scoreScroll.height
-            val target = (top - (viewH - (bottom - top)) / 2f).toInt().coerceAtLeast(0)
+            val target = (top - viewH * 0.30f).toInt().coerceAtLeast(0)
             b.scoreScroll.smoothScrollTo(0, target)
         }
     }

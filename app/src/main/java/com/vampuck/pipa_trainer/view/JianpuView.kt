@@ -55,7 +55,12 @@ class JianpuView @JvmOverloads constructor(
     private var sectionNames: List<String> = emptyList()
 
     var highlightIndex: Int = -1
-        set(value) { field = value; invalidate() }
+        set(value) { field = value; updateCurrentBounds(); invalidate() }
+
+    private fun updateCurrentBounds() {
+        currentTop = -1f; currentBottom = -1f
+        for (g in glyphs) if (g.index == highlightIndex) { currentTop = g.lineTop; currentBottom = g.lineBottom }
+    }
 
     /** 当前高亮音符的纵向范围（px），布局完成后有效；-1 表示未知。 */
     var currentTop: Float = -1f; private set
@@ -157,8 +162,7 @@ class JianpuView @JvmOverloads constructor(
             }
         }
         contentHeight = (rowTop + rowH + dp(16f))
-        currentTop = -1f; currentBottom = -1f
-        for (g in glyphs) if (g.index == highlightIndex) { currentTop = g.lineTop; currentBottom = g.lineBottom }
+        updateCurrentBounds()
         onLayoutReady?.invoke()
     }
 

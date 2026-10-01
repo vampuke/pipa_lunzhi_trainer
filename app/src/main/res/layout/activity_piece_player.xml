@@ -143,22 +143,40 @@
             android:id="@+id/scoreCard"
             style="@style/App.Card"
             android:layout_width="match_parent"
-            android:layout_height="220dp"
+            android:layout_height="240dp"
             android:layout_marginTop="8dp"
             android:visibility="gone">
 
-            <ScrollView
-                android:id="@+id/scoreScroll"
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scrollbars="vertical"
-                android:padding="4dp">
+                android:layout_height="match_parent">
 
-                <com.vampuck.pipa_trainer.view.JianpuView
-                    android:id="@+id/jianpu"
+                <ScrollView
+                    android:id="@+id/scoreScroll"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-            </ScrollView>
+                    android:layout_height="match_parent"
+                    android:scrollbars="vertical"
+                    android:padding="4dp">
+
+                    <com.vampuck.pipa_trainer.view.JianpuView
+                        android:id="@+id/jianpu"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </ScrollView>
+
+                <!-- 开始前的倒数覆盖层 -->
+                <TextView
+                    android:id="@+id/countdown"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:background="#F2FFFBF8"
+                    android:text="3"
+                    android:textSize="96sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/pipa_primary"
+                    android:visibility="gone" />
+            </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
 
         <!-- 节拍指示灯（四拍）+ BPM -->
