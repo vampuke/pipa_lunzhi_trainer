@@ -108,5 +108,7 @@
     <string name="play_again">再来一遍</string>
     <string name="play_click_on">节拍器声：开</string>
     <string name="play_click_off">节拍器声：关</string>
+    <string name="play_score">简谱（跟练高亮当前音符）</string>
+    <string name="play_has_score">含简谱</string>
     <string name="play_disclaimer">提示：进度按你设定的速度匀速推进，用来帮你把握段落节奏与整体结构；真实演奏的快慢处理可自行伸缩。配合「实时练习」可同时检查你的轮指均匀度。</string>
 </resources>

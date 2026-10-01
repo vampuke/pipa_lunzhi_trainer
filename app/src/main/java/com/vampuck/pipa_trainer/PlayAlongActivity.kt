@@ -27,9 +27,9 @@ class PlayAlongActivity : AppCompatActivity() {
             card.pieceBlurb.text = p.blurb
             val mins = p.totalSeconds(p.refBpm) / 60
             val secs = p.totalSeconds(p.refBpm) % 60
-            card.pieceMeta.text = getString(
-                R.string.play_piece_meta, p.refBpm, p.sections.size, mins, secs
-            )
+            val meta = getString(R.string.play_piece_meta, p.refBpm, p.sections.size, mins, secs)
+            card.pieceMeta.text = if (PracticePieces.scoreFor(p.id) != null)
+                "$meta · ${getString(R.string.play_has_score)}" else meta
             card.root.setOnClickListener {
                 startActivity(
                     Intent(this, PiecePlayerActivity::class.java)

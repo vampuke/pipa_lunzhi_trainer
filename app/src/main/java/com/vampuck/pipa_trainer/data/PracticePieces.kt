@@ -32,6 +32,12 @@ data class PracticePiece(
 
 object PracticePieces {
 
+    /** 曲目 id -> 简谱（有谱才有，目前仅轮指练习曲）。 */
+    fun scoreFor(id: String): JScore? = when (id) {
+        "lunzhi_etude" -> Scores.LUNZHI_ETUDE
+        else -> null
+    }
+
     val ALL: List<PracticePiece> = listOf(
 
         PracticePiece(

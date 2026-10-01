@@ -120,6 +120,47 @@
             android:textSize="13sp"
             android:textColor="@color/text_secondary" />
 
+        <!-- 简谱滚动谱（有谱的曲目才显示） -->
+        <TextView
+            android:id="@+id/scoreLabel"
+            style="@style/App.SectionLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="@string/play_score"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/scoreKey"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/scoreCard"
+            style="@style/App.Card"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <ScrollView
+                android:id="@+id/scoreScroll"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scrollbars="vertical"
+                android:padding="4dp">
+
+                <com.vampuck.pipa_trainer.view.JianpuView
+                    android:id="@+id/jianpu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </ScrollView>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- 节拍指示灯（四拍）+ BPM -->
         <LinearLayout
             android:layout_width="match_parent"

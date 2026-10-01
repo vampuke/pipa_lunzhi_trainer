@@ -11,6 +11,7 @@ import android.widget.SeekBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.vampuck.pipa_trainer.audio.Metronome
+import com.vampuck.pipa_trainer.data.JScore
 import com.vampuck.pipa_trainer.data.PracticePiece
 import com.vampuck.pipa_trainer.data.PracticePieces
 import com.vampuck.pipa_trainer.databinding.ActivityPiecePlayerBinding
@@ -53,6 +54,11 @@ class PiecePlayerActivity : AppCompatActivity() {
     private var accentColor = 0
     private var primaryColor = 0
 
+    // 简谱（有谱才非空）：按拍数定位的音符起始拍，用于高亮当前音符
+    private var score: JScore? = null
+    private var noteStartBeats: DoubleArray = DoubleArray(0)
+    private var lastHlIndex = -1
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityPiecePlayerBinding.inflate(layoutInflater)
@@ -80,6 +86,7 @@ class PiecePlayerActivity : AppCompatActivity() {
         dots = listOf(b.dot0, b.dot1, b.dot2, b.dot3)
         resetDots()
         buildSectionList()
+        setupScore()
 
         b.seekBpm.max = MAX_BPM - MIN_BPM
         b.seekBpm.progress = bpm - MIN_BPM
@@ -207,6 +214,8 @@ class PiecePlayerActivity : AppCompatActivity() {
         b.overallBar.progress = ((done / total) * 1000).toInt()
         b.sectionBar.progress = ((secDone / secBeats) * 1000).toInt()
 
+        updateScoreHighlight(done / total)
+
         // 下一段
         if (idx < piece.sections.lastIndex) {
             b.nextSection.text = getString(R.string.play_next, piece.sections[idx + 1].name)
@@ -236,6 +245,56 @@ class PiecePlayerActivity : AppCompatActivity() {
             rows.add(row)
         }
         sectionRows = rows
+    }
+
+    // ---------------- 简谱 ----------------
+
+    private fun setupScore() {
+        val sc = PracticePieces.scoreFor(piece.id)
+        score = sc
+        if (sc == null) return
+
+        // 计算每个音符的起始拍（flatNotes 顺序）
+        val notes = sc.flatNotes
+        noteStartBeats = DoubleArray(notes.size)
+        var acc = 0.0
+        for (i in notes.indices) { noteStartBeats[i] = acc; acc += notes[i].dur }
+
+        b.scoreLabel.visibility = View.VISIBLE
+        b.scoreKey.visibility = View.VISIBLE
+        b.scoreCard.visibility = View.VISIBLE
+        b.scoreKey.text = sc.key
+        b.jianpu.setScore(sc, sc.sections.map { it.name })
+    }
+
+    /**
+     * 简谱的时间轴可能和「段落结构进度」不同（段落 beats 是粗估，简谱是精确拍数）。
+     * 有谱时，用简谱总拍数把 elapsedBeats 的完成比例映射到谱内拍，定位当前音符。
+     */
+    private fun updateScoreHighlight(doneRatio: Double) {
+        val sc = score ?: return
+        if (noteStartBeats.isEmpty()) return
+        val scoreBeat = doneRatio.coerceIn(0.0, 1.0) * sc.totalBeats
+        // 最后一个 start <= scoreBeat 的音符
+        var idx = noteStartBeats.indexOfLast { it <= scoreBeat + 1e-6 }
+        if (idx < 0) idx = 0
+        if (idx != lastHlIndex) {
+            lastHlIndex = idx
+            b.jianpu.highlightIndex = idx
+            autoScrollToCurrent()
+        }
+    }
+
+    /** 让当前高亮音符所在行滚动到可视区中部。 */
+    private fun autoScrollToCurrent() {
+        b.jianpu.post {
+            val top = b.jianpu.currentTop
+            val bottom = b.jianpu.currentBottom
+            if (top < 0) return@post
+            val viewH = b.scoreScroll.height
+            val target = (top - (viewH - (bottom - top)) / 2f).toInt().coerceAtLeast(0)
+            b.scoreScroll.smoothScrollTo(0, target)
+        }
     }
 
     // ---------------- 节拍灯 ----------------
