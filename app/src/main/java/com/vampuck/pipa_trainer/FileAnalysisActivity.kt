@@ -328,9 +328,13 @@ class FileAnalysisActivity : AppCompatActivity() {
 
     // ---------------- charts ----------------
     private fun fluxAt(res: LunzhiAnalyzer.Result, t: Double): Float {
-        val fps = res.sampleRate.toDouble() / LunzhiAnalyzer.HOP
-        val i = (t * fps).roundToInt().coerceIn(0, res.fluxEnvelope.size - 1)
-        return res.fluxEnvelope[i]
+        val fe = res.fluxEnvelope
+        if (fe.isEmpty()) return 0f
+        // fluxTimes may have been rescaled to the container duration, so derive
+        // the per-frame step from the array itself rather than assuming sampleRate.
+        val dt = if (res.fluxTimes.size > 1) res.fluxTimes[1] - res.fluxTimes[0] else 0.0
+        val i = if (dt > 0) (t / dt).roundToInt() else 0
+        return fe[i.coerceIn(0, fe.size - 1)]
     }
 
     private fun drawFlux(s: Double, e: Double) {
@@ -350,8 +354,10 @@ class FileAnalysisActivity : AppCompatActivity() {
         // onset markers as a second dataset with an invisible line -> dots spread
         // naturally across the whole range (no stacking like limit lines did)
         val marks = ArrayList<Entry>()
-        for (t in res.onsetTimes) {
-            if (t >= s && t <= e) marks.add(Entry(t.toFloat(), fluxAt(res, t) * 1.04f))
+        val inRange = res.onsetTimes.filter { it >= s && it <= e }
+        val mStep = maxOf(1, inRange.size / 2000)   // keep the chart light on long files
+        for (k in inRange.indices step mStep) {
+            marks.add(Entry(inRange[k].toFloat(), fluxAt(res, inRange[k]) * 1.04f))
         }
         val markSet = LineDataSet(marks, "击").apply {
             color = 0x00000000

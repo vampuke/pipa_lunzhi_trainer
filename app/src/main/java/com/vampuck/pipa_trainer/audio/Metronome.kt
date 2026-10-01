@@ -34,8 +34,8 @@ class Metronome {
     @Volatile private var bpm: Double = 80.0
     @Volatile private var running = false
     private var worker: Thread? = null
-    private var track: AudioTrack? = null
-    var listener: Listener? = null
+    @Volatile private var track: AudioTrack? = null
+    @Volatile var listener: Listener? = null
 
     fun setBpm(newBpm: Double) { bpm = newBpm.coerceIn(20.0, 240.0) }
 
@@ -51,9 +51,9 @@ class Metronome {
         running = false
         worker?.interrupt()
         worker = null
+        // Only *stop* here to unblock a pending write(). The worker thread owns
+        // the release, so the same AudioTrack is never released twice.
         try { track?.stop() } catch (_: Throwable) {}
-        try { track?.release() } catch (_: Throwable) {}
-        track = null
     }
 
     /** ~14ms high-frequency click: short enough that masking can be tight. */
@@ -150,6 +150,6 @@ class Metronome {
         }
         try { at.stop() } catch (_: Throwable) {}
         try { at.release() } catch (_: Throwable) {}
-        track = null
+        if (track === at) track = null
     }
 }

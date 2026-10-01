@@ -127,9 +127,11 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     val onsetTone = ArrayList<Double>()
 
     // ---- metronome masking ----
+    // Written from the metronome thread, read from the audio thread every frame.
+    private val clickLock = Any()
     private val clickTimes = ArrayList<Double>()
-    var clickMaskBefore = 0.012
-    var clickMaskAfter = 0.038
+    @Volatile var clickMaskBefore = 0.012
+    @Volatile var clickMaskAfter = 0.038
 
     /** Scale the mask with the beat so it can never eat most of a fast beat. */
     fun setMetronomeBeat(periodSec: Double) {
@@ -138,21 +140,25 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     }
 
     fun addMetronomeClick(tSec: Double) {
-        clickTimes.add(tSec)
-        if (clickTimes.size > 4000) clickTimes.subList(0, clickTimes.size - 4000).clear()
+        synchronized(clickLock) {
+            clickTimes.add(tSec)
+            if (clickTimes.size > 4000) clickTimes.subList(0, clickTimes.size - 4000).clear()
+        }
     }
 
-    fun clearMetronomeClicks() { clickTimes.clear() }
+    fun clearMetronomeClicks() { synchronized(clickLock) { clickTimes.clear() } }
 
     private fun isMetronomeMasked(t: Double): Boolean {
-        if (clickTimes.isEmpty()) return false
-        var i = clickTimes.size - 1
-        while (i >= 0 && clickTimes[i] > t - 2.0) {
-            val d = t - clickTimes[i]
-            if (d > -clickMaskBefore && d < clickMaskAfter) return true
-            i--
+        return synchronized(clickLock) {
+            if (clickTimes.isEmpty()) return@synchronized false
+            var i = clickTimes.size - 1
+            while (i >= 0 && clickTimes[i] > t - 2.0) {
+                val d = t - clickTimes[i]
+                if (d > -clickMaskBefore && d < clickMaskAfter) return@synchronized true
+                i--
+            }
+            false
         }
-        return false
     }
 
     @Volatile var lastStrokeAmp: Double = 0.0
@@ -163,9 +169,10 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     data class Live(
         val strokesPerSec: Double,
         val strokesPerMin: Double,
-        val cv: Double,          // classic CV over the rolling window
-        val modalCv: Double,     // modal CV (same definition as the final report)
-        val jitterPct: Double,   // modalCv * 74
+        val cv: Double,           // classic CV over the rolling window
+        val modalCv: Double,      // modal-band CV (excludes missed strokes)
+        val cvRoll: Double,       // roll CV (keeps missed strokes) — the scoring basis
+        val jitterPct: Double,    // cvRoll * 74, same definition as the final report
         val totalStrokes: Int,
         val lastAmp: Double,
         val noiseFloor: Double,
@@ -365,9 +372,15 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val band = ioi.filter { it > med * 0.6 && it < med * 1.6 }
         val bandMean = if (band.isNotEmpty()) band.average() else 0.0
         val modalCv = if (bandMean > 0) std(band, bandMean) / bandMean else 0.0
+        // Same roll rule as LunzhiAnalyzer.metrics so the live readout and the
+        // final report quote the identical quantity (cvRoll keeps missed-stroke
+        // intervals; modalCv hides them and would read far lower).
+        val roll = if (med > 0) ioi.filter { it >= med * 0.55 && it <= med * 2.6 } else ioi
+        val rollMean = if (roll.isNotEmpty()) roll.average() else 0.0
+        val cvRoll = if (rollMean > 0) std(roll, rollMean) / rollMean else 0.0
         val gate = gateValue()
-        return Live(cps, cps * 60, cv, modalCv, modalCv * 74.0, onsetTimes.size,
-            lastStrokeAmp, noiseFloor, gate, lastRms, gateOpen = lastRms > gate)
+        return Live(cps, cps * 60, cv, modalCv, cvRoll, cvRoll * LunzhiAnalyzer.JITTER_SCALE,
+            onsetTimes.size, lastStrokeAmp, noiseFloor, gate, lastRms, gateOpen = lastRms > gate)
     }
 
     fun metrics(): LunzhiAnalyzer.Metrics =

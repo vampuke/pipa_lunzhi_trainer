@@ -24,7 +24,7 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
     private val sampleRate = 44100
     @Volatile private var recording = false
     private var recordThread: Thread? = null
-    private var analyzer: StreamingAnalyzer? = null
+    @Volatile private var analyzer: StreamingAnalyzer? = null
     private val metronome = Metronome()
 
     /** nanoTime captured just before capture starts — the audio clock origin. */
@@ -137,7 +137,7 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun updateLive(live: StreamingAnalyzer.Live) {
         b.valBpm.text = if (live.strokesPerMin > 0) live.strokesPerMin.roundToInt().toString() else "--"
-        b.valCv.text = if (live.modalCv > 0) "≈${live.jitterPct.roundToInt()}%" else "--"
+        b.valCv.text = if (live.cvRoll > 0) "≈${live.jitterPct.roundToInt()}%" else "--"
         b.valStrokes.text = "${live.totalStrokes} 击　·　全段CV ${"%.2f".format(live.cv)}"
         b.ampBar.progress = (live.rms / maxOf(live.gate * 4, 0.05) * 100)
             .roundToInt().coerceIn(0, 100)
