@@ -40,6 +40,7 @@ class JianpuView @JvmOverloads constructor(
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = dp(1.6f) }
     private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = dp(1.2f) }
     private val trPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = dp(1.4f) }
+    private val fgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = dp(11f); textAlign = Paint.Align.CENTER }
     private val hlPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = dp(13f); isFakeBoldText = true }
 
@@ -242,6 +243,14 @@ class JianpuView @JvmOverloads constructor(
             for (k in 0 until -note.octave) {
                 canvas.drawCircle(g.cx, baseY + k * dp(5f), radius, dotPaint)
             }
+        }
+
+        // 琵琶指法标记：画在最上方（高于轮指斜线与高八度点），不遮数字
+        if (note.finger.isNotEmpty()) {
+            fgPaint.color = if (active) colPrimary else colSecondary
+            // 行顶留出的区域内靠上放置
+            val fy = g.lineTop + dp(11f)
+            canvas.drawText(note.finger, g.cx, fy, fgPaint)
         }
 
         // 时值

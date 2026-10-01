@@ -8,12 +8,15 @@ package com.vampuck.pipa_trainer.data
  * dur:    时值（以四分音符=1 拍为单位）。0.25=十六分，0.5=八分，1=四分，
  *         2=二分，4=全音符。
  * tremolo: 是否轮指（简谱中记为音符上方的 "彡" / 三斜线）。
+ * finger:  琵琶指法标记（显示在音符上方的小字），如 弹/挑/抹/勾/扫/拂/带/泛 等；
+ *          空串=无。轮指优先用 tremolo 画斜线，finger 仍可叠加其他记号。
  */
 data class JNote(
     val degree: Int,
     val octave: Int = 0,
     val dur: Double = 1.0,
-    val tremolo: Boolean = false
+    val tremolo: Boolean = false,
+    val finger: String = ""
 ) {
     val isRest: Boolean get() = degree == 0
 }
@@ -49,12 +52,12 @@ data class JScore(
 /** 预设简谱库。目前含轮指练习曲（整谱）；名曲谱待录入。 */
 object Scores {
 
-    private fun n(d: Int, dur: Double, oct: Int = 0, tr: Boolean = true) =
-        JNote(d, oct, dur, tr)
+    private fun n(d: Int, dur: Double, oct: Int = 0, tr: Boolean = true, fg: String = "") =
+        JNote(d, oct, dur, tr, fg)
 
     /** 普通音（非轮指），用于民歌旋律。 */
-    private fun m(d: Int, dur: Double, oct: Int = 0) =
-        JNote(d, oct, dur, false)
+    private fun m(d: Int, dur: Double, oct: Int = 0, fg: String = "") =
+        JNote(d, oct, dur, false, fg)
 
     /** 轮指基础练习：慢→中→快三段，1=D，4/4。全程轮指。 */
     val LUNZHI_ETUDE = JScore(
@@ -105,19 +108,19 @@ object Scores {
             JSectionData(
                 "第一句",
                 listOf(
-                    m(3, 1.0), m(3, 1.0), m(5, 1.0), m(6, 1.0),
-                    m(1, 2.0, oct = 1), m(1, 1.0, oct = 1), m(6, 1.0),
-                    m(5, 1.0), m(5, 1.0), m(6, 1.0), m(5, 1.0),
-                    m(3, 4.0),
+                    m(3, 1.0, fg = "弹"), m(3, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"), m(6, 1.0, fg = "挑"),
+                    m(1, 2.0, oct = 1, fg = "弹"), m(1, 1.0, oct = 1, fg = "挑"), m(6, 1.0, fg = "弹"),
+                    m(5, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"), m(6, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"),
+                    m(3, 4.0, fg = "轮"),
                 )
             ),
             JSectionData(
                 "第二句",
                 listOf(
-                    m(3, 1.0), m(3, 1.0), m(5, 1.0), m(6, 1.0),
-                    m(1, 2.0, oct = 1), m(1, 1.0, oct = 1), m(6, 1.0),
-                    m(5, 1.0), m(5, 1.0), m(6, 1.0), m(5, 1.0),
-                    m(3, 4.0),
+                    m(3, 1.0, fg = "弹"), m(3, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"), m(6, 1.0, fg = "挑"),
+                    m(1, 2.0, oct = 1, fg = "弹"), m(1, 1.0, oct = 1, fg = "挑"), m(6, 1.0, fg = "弹"),
+                    m(5, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"), m(6, 1.0, fg = "挑"), m(5, 1.0, fg = "弹"),
+                    m(3, 4.0, fg = "轮"),
                 )
             ),
             JSectionData(
