@@ -63,15 +63,16 @@ object FingerSymbols {
                 featherCross(canvas, cx, cy, u, stroke, backslashDir = false)
             }
 
-            "lun" -> star6(canvas, cx, cy, u, stroke, fill)        // 轮：6 条放射线交中心（图中为「六」形）
-            "changlun" -> {                                        // 长轮：6 线星芒 + 右侧三条水平居中短横
-                star6(canvas, cx, cy, u, stroke, fill)
-                val lx0 = cx + u * 0.78f
-                val lx1 = lx0 + u * 0.62f
-                val gap = u * 0.26f
-                for (k in -1..1) {
-                    val ly = cy + k * gap
-                    canvas.drawLine(lx0, ly, lx1, ly, stroke)
+            "lun" -> star5(canvas, cx, cy, u, stroke)             // 轮：5 条放射线，中心空（不相连）
+            "changlun" -> {                                        // 长轮：5 线星芒 + 右侧三条「一字排开」短横
+                star5(canvas, cx, cy, u, stroke)
+                val y = cy
+                val seg = u * 0.26f
+                val gap = u * 0.16f
+                var sx = cx + u * 0.72f
+                for (k in 0 until 3) {
+                    canvas.drawLine(sx, y, sx + seg, y, stroke)
+                    sx += seg + gap
                 }
             }
             "banlun" -> starHalf(canvas, cx, cy, u, stroke, fill)  // 半轮：半星芒
@@ -115,16 +116,20 @@ object FingerSymbols {
         }
     }
 
-    /** 轮指「六线星芒」：6 条等长直线交于中心，呈六向放射（图中「六」形）。 */
-    private fun star6(canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint, fill: Paint) {
-        val len = u * 0.52f
-        for (i in 0 until 6) {
-            val a = Math.toRadians(360.0 * i / 6)
-            val ex = cx + (Math.cos(a) * len).toFloat()
-            val ey = cy + (Math.sin(a) * len).toFloat()
-            canvas.drawLine(cx, cy, ex, ey, stroke)
+    /** 轮指「五线放射」：5 条短线呈放射，中心留空（线不交于一点）。 */
+    private fun star5(canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint) {
+        val inner = u * 0.16f   // 内端离中心，保证中间空
+        val outer = u * 0.56f
+        // 5 条均布，整体略偏上张开（像一朵小花）
+        val base = -90.0        // 从正上方开始
+        for (i in 0 until 5) {
+            val a = Math.toRadians(base + 360.0 * i / 5)
+            val sx = cx + (Math.cos(a) * inner).toFloat()
+            val sy = cy + (Math.sin(a) * inner).toFloat()
+            val ex = cx + (Math.cos(a) * outer).toFloat()
+            val ey = cy + (Math.sin(a) * outer).toFloat()
+            canvas.drawLine(sx, sy, ex, ey, stroke)
         }
-        canvas.drawCircle(cx, cy, u * 0.1f, fill)
     }
 
     /** 半轮：只画 X 两条斜线的星爆（比全轮少）。 */
