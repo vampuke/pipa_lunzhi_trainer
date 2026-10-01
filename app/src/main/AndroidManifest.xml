@@ -27,5 +27,6 @@
         <activity android:name=".FileAnalysisActivity" android:exported="false" />
         <activity android:name=".LiveActivity" android:exported="false" />
         <activity android:name=".TunerActivity" android:exported="false" />
+        <activity android:name=".MetronomeActivity" android:exported="false" />
     </application>
 </manifest>

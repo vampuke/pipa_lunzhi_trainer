@@ -17,27 +17,61 @@ import kotlin.math.sin
  * AudioTrack: every beat is placed at an exact sample index, so the hardware
  * clock guarantees even spacing (jitter <= 1 sample).
  *
- * [Listener.onClick] is invoked when a beat is *scheduled*, with the estimated
- * wall-clock time at which it will be audible.
+ * It supports:
+ *  - [setSubdivision]: 1 = 四分音符整拍，2 = 八分音符分拍（每拍中间多一记弱音）。
+ *  - [setAccentFirst]: true = 每小节(4 拍)第一拍用重音、其余三拍相同；
+ *                      false = 四拍完全相同。
+ *
+ * Three timbres are mixed: an *accent* (brighter/louder downbeat), a *normal*
+ * beat (identical to the original single click, so existing callers are
+ * unchanged when accent/subdivision are left at their defaults), and a soft
+ * *sub* tick for off-beats.
+ *
+ * [Listener.onClick] is invoked for every audible click (main beat or
+ * subdivision) with the estimated wall-clock time at which it will be audible —
+ * callers that mask metronome bleed need all of them, not just downbeats.
+ * [onBeat] is an optional UI callback that reports which beat of the bar fired.
  */
 class Metronome {
 
     interface Listener {
         /**
-         * @param beatIndex   0-based beat counter
+         * @param beatIndex   0-based counter over every audible click
          * @param audibleNanos System.nanoTime()-based estimate of when the click
          *                     reaches the speaker (scheduled time + output latency)
          */
         fun onClick(beatIndex: Long, audibleNanos: Long)
     }
 
+    /**
+     * Optional UI beat callback, invoked from the worker thread for every click.
+     * @param beatInBar 0-based index of the main beat within the 4-beat bar
+     * @param accent    this click is the accented downbeat
+     * @param sub       this click is an off-beat subdivision ("and"), not a main beat
+     */
+    @Volatile var onBeat: ((beatInBar: Int, accent: Boolean, sub: Boolean) -> Unit)? = null
+
     @Volatile private var bpm: Double = 80.0
+
+    /** 每拍细分数：1 = 四分音符整拍，2 = 八分音符分拍。 */
+    @Volatile private var subdivision: Int = 1
+
+    /** 是否强调每小节第一拍；false = 四拍完全相同。 */
+    @Volatile private var accentFirst: Boolean = false
+
+    /** 每小节拍数，固定 4（四声）。 */
+    private val beatsPerBar: Int = 4
+
     @Volatile private var running = false
     private var worker: Thread? = null
     @Volatile private var track: AudioTrack? = null
     @Volatile var listener: Listener? = null
 
+    val isRunning: Boolean get() = running
+
     fun setBpm(newBpm: Double) { bpm = newBpm.coerceIn(20.0, 240.0) }
+    fun setSubdivision(n: Int) { subdivision = n.coerceIn(1, 4) }
+    fun setAccentFirst(on: Boolean) { accentFirst = on }
 
     @Synchronized
     fun start() {
@@ -56,23 +90,43 @@ class Metronome {
         try { track?.stop() } catch (_: Throwable) {}
     }
 
-    /** ~14ms high-frequency click: short enough that masking can be tight. */
-    private fun makeClick(sr: Int): ShortArray {
-        val dur = 0.014
+    /**
+     * One short decaying click.
+     *
+     * @param dur   length in seconds (short enough that masking can stay tight)
+     * @param f1    primary partial, @param f2 upper partial
+     * @param decay exponential envelope rate (larger = snappier)
+     * @param amp   peak amplitude 0..1
+     */
+    private fun makeClick(
+        sr: Int, dur: Double, f1: Double, f2: Double, decay: Double, amp: Double
+    ): ShortArray {
         val n = (sr * dur).toInt()
         val pcm = ShortArray(n)
         for (i in 0 until n) {
             val t = i.toDouble() / sr
-            val env = exp(-t * 220.0)
-            val s = (sin(2 * Math.PI * 3200.0 * t) * 0.75 + sin(2 * Math.PI * 6400.0 * t) * 0.25) * env
-            pcm[i] = (s * 24000.0).toInt().coerceIn(-32768, 32767).toShort()
+            val env = exp(-t * decay)
+            val s = (sin(2 * Math.PI * f1 * t) * 0.75 + sin(2 * Math.PI * f2 * t) * 0.25) * env
+            pcm[i] = (s * amp * 32000.0).toInt().coerceIn(-32768, 32767).toShort()
         }
         return pcm
     }
 
+    /** A scheduled click: absolute sample index + which timbre to play. */
+    private class Evt(val sample: Long, val type: Int, val beatInBar: Int)
+
     private fun run() {
         val sr = 44100
-        val click = makeClick(sr)
+
+        // normal: identical to the original single click (3200/6400, ~0.75 peak)
+        // so callers that leave accent/subdivision at defaults sound unchanged.
+        val normal = makeClick(sr, 0.014, 3200.0, 6400.0, 220.0, 0.75)
+        // accent: higher + louder "ding" so the downbeat is unmistakable.
+        val accent = makeClick(sr, 0.016, 4000.0, 8000.0, 180.0, 0.95)
+        // sub: soft low "and" tick, clearly weaker than a main beat.
+        val sub = makeClick(sr, 0.011, 1800.0, 3600.0, 260.0, 0.38)
+        val clicks = arrayOf(accent, normal, sub)   // index == Evt.type
+
         val block = 1024
 
         val minBuf = AudioTrack.getMinBufferSize(
@@ -107,21 +161,36 @@ class Metronome {
         )
 
         val buf = ShortArray(block)
-        val scheduled = ArrayList<Long>()   // absolute sample indices awaiting playback
-        var pos = 0L                        // absolute index of the next sample to write
-        var nextBeat = 0L
-        var beatIndex = 0L
+        val scheduled = ArrayList<Evt>()   // clicks awaiting playback
+        var pos = 0L                       // absolute index of the next sample to write
+        var nextBeat = 0L                  // sample index of the next MAIN beat
+        var beatIndex = 0L                 // main-beat counter (for bar position)
+        var clickIndex = 0L                // audible-click counter (for the Listener)
         val startNs = System.nanoTime()
 
         try {
             while (running && !Thread.currentThread().isInterrupted) {
                 val beatSamples = (sr * 60.0 / bpm).toLong().coerceAtLeast(1)
+                val subdiv = subdivision.coerceAtLeast(1)
+                val subSamples = (beatSamples / subdiv).coerceAtLeast(1)
+                val accentOn = accentFirst
 
-                // schedule every beat that starts within this block
+                // Schedule every MAIN beat that starts within this block, plus its
+                // off-beat subdivisions (which fall before the next main beat).
                 while (nextBeat < pos + block) {
-                    scheduled.add(nextBeat)
-                    val audible = startNs + nextBeat * 1_000_000_000L / sr + latencyNs
-                    listener?.onClick(beatIndex, audible)
+                    val beatInBar = (beatIndex % beatsPerBar).toInt()
+                    val mainType = if (accentOn && beatInBar == 0) 0 else 1   // accent : normal
+                    scheduleClick(scheduled, nextBeat, mainType, beatInBar,
+                        startNs, sr, latencyNs, clickIndex, false)
+                    clickIndex++
+
+                    for (k in 1 until subdiv) {
+                        val sSample = nextBeat + k.toLong() * subSamples
+                        scheduleClick(scheduled, sSample, 2, beatInBar,
+                            startNs, sr, latencyNs, clickIndex, true)
+                        clickIndex++
+                    }
+
                     beatIndex++
                     nextBeat += beatSamples
                 }
@@ -129,16 +198,17 @@ class Metronome {
                 Arrays.fill(buf, 0.toShort())
                 val it = scheduled.iterator()
                 while (it.hasNext()) {
-                    val b = it.next()
-                    val off = (b - pos).toInt()
-                    for (k in click.indices) {
+                    val e = it.next()
+                    val wave = clicks[e.type]
+                    val off = (e.sample - pos).toInt()
+                    for (k in wave.indices) {
                         val i = off + k
                         if (i in 0 until block) {
-                            val v = buf[i] + click[k]
+                            val v = buf[i] + wave[k]
                             buf[i] = v.coerceIn(-32768, 32767).toShort()
                         }
                     }
-                    if (b + click.size <= pos + block) it.remove()
+                    if (e.sample + wave.size <= pos + block) it.remove()
                 }
 
                 val written = at.write(buf, 0, block)   // blocks when the buffer is full
@@ -151,5 +221,15 @@ class Metronome {
         try { at.stop() } catch (_: Throwable) {}
         try { at.release() } catch (_: Throwable) {}
         if (track === at) track = null
+    }
+
+    private fun scheduleClick(
+        scheduled: ArrayList<Evt>, sample: Long, type: Int, beatInBar: Int,
+        startNs: Long, sr: Int, latencyNs: Long, clickIndex: Long, isSub: Boolean
+    ) {
+        scheduled.add(Evt(sample, type, beatInBar))
+        val audible = startNs + sample * 1_000_000_000L / sr + latencyNs
+        listener?.onClick(clickIndex, audible)
+        onBeat?.invoke(beatInBar, type == 0, isSub)
     }
 }

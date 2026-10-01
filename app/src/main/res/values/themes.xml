@@ -1,7 +1,63 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+
     <style name="Theme.PipaTrainer" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- 主色 -->
         <item name="colorPrimary">@color/pipa_primary</item>
         <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/on_primary_container</item>
+
+        <!-- 次色（暖棕）-->
+        <item name="colorSecondary">@color/pipa_accent</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondaryContainer">@color/accent_container</item>
+        <item name="colorOnSecondaryContainer">@color/on_primary_container</item>
+
+        <!-- 表面 / 背景 -->
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorSurfaceVariant">@color/surface_variant</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorOutline">@color/outline</item>
+
+        <!-- 系统栏 -->
         <item name="android:statusBarColor">@color/pipa_primary_dark</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
+
+        <!-- 组件默认样式 -->
+        <item name="materialButtonStyle">@style/App.Button</item>
+        <item name="materialCardViewStyle">@style/App.Card</item>
+    </style>
+
+    <!-- 实心主按钮：16dp 圆角、略高、字距舒展 -->
+    <style name="App.Button" parent="Widget.Material3.Button">
+        <item name="shapeAppearanceOverlay">@style/App.Shape.Button</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">6dp</item>
+    </style>
+
+    <style name="App.Shape.Button" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <!-- 统一卡片外观 -->
+    <style name="App.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">1dp</item>
+        <item name="cardBackgroundColor">@color/surface</item>
+        <item name="contentPadding">0dp</item>
+    </style>
+
+    <!-- 区块小标题 -->
+    <style name="App.SectionLabel" parent="">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:letterSpacing">0.03</item>
     </style>
 </resources>

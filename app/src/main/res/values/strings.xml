@@ -2,6 +2,14 @@
     <string name="app_name">琵琶轮指训练</string>
     <string name="title_home">琵琶轮指训练</string>
     <string name="subtitle_home">分析你的轮指练习：速度 · 均匀度 · 力度</string>
+    <string name="feat_file_title">音频 / 视频分析</string>
+    <string name="feat_file_sub">导入录音，评估速度 · 均匀度 · 力度</string>
+    <string name="feat_live_title">实时练习</string>
+    <string name="feat_live_sub">边弹边看，整段评估轮指表现</string>
+    <string name="feat_tuner_title">调音器</string>
+    <string name="feat_tuner_sub">琵琶 · 古筝 · 吉他，音名 + 音分</string>
+    <string name="feat_metronome_title">节拍器</string>
+    <string name="feat_metronome_sub">整拍 / 分拍 · 重音切换 · 常用速度</string>
     <string name="btn_pick_file">分析音频 / 视频文件</string>
     <string name="btn_live">麦克风实时练习</string>
     <string name="btn_start">开始</string>
@@ -24,6 +32,22 @@
     <string name="metronome">节拍器</string>
     <string name="metro_bpm">速度 (BPM)</string>
     <string name="metro_note">提示：节拍器声会被算法自动剔除，不会被记为轮指击弦</string>
+
+    <!-- 独立节拍器 -->
+    <string name="btn_metronome">节拍器</string>
+    <string name="metro_minus">−</string>
+    <string name="metro_plus">+</string>
+    <string name="metro_presets">常用速度</string>
+    <string name="metro_mode">拍型</string>
+    <string name="metro_quarter">四分 · 整拍</string>
+    <string name="metro_eighth">八分 · 分拍</string>
+    <string name="metro_accent">重音</string>
+    <string name="metro_accent_first">强调首拍</string>
+    <string name="metro_accent_same">四拍相同</string>
+    <string name="metro_start">开始</string>
+    <string name="metro_stop">停止</string>
+    <string name="metro_hint">「四分·整拍」每拍一响；「八分·分拍」每拍中间加一记弱音。「强调首拍」让每小节(4 拍)第一拍用重音、其余三拍相同；「四拍相同」则四拍一个样。速度 20–200，可用 −/+ 微调或点常用速度快捷跳转。</string>
+
     <string name="lbl_loudness">当前击弦力度</string>
     <string name="gate_quiet">环境安静，未检测到信号</string>
     <string name="gate_active">录音中 · 环境门已开启</string>
