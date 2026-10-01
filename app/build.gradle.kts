@@ -11,8 +11,8 @@ android {
         applicationId = "com.vampuck.pipa_trainer"
         minSdk = 24
         targetSdk = 34
-        versionCode = 15
-        versionName = "1.9.1"
+        versionCode = 16
+        versionName = "1.10.0"
         vectorDrawables { useSupportLibrary = true }
     }
 

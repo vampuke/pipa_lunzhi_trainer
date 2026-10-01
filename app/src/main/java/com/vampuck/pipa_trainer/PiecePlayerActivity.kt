@@ -54,10 +54,9 @@ class PiecePlayerActivity : AppCompatActivity() {
     private var accentColor = 0
     private var primaryColor = 0
 
-    // 简谱（有谱才非空）：按拍数定位的音符起始拍，用于高亮当前音符
+    // 简谱（有谱才非空）
     private var score: JScore? = null
-    private var noteStartBeats: DoubleArray = DoubleArray(0)
-    private var lastHlIndex = -1
+    private var lastHlBar = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -298,12 +297,6 @@ class PiecePlayerActivity : AppCompatActivity() {
         score = sc
         if (sc == null) return
 
-        // 计算每个音符的起始拍（flatNotes 顺序）
-        val notes = sc.flatNotes
-        noteStartBeats = DoubleArray(notes.size)
-        var acc = 0.0
-        for (i in notes.indices) { noteStartBeats[i] = acc; acc += notes[i].dur }
-
         b.scoreLabel.visibility = View.VISIBLE
         b.scoreKey.visibility = View.VISIBLE
         b.scoreCard.visibility = View.VISIBLE
@@ -312,19 +305,18 @@ class PiecePlayerActivity : AppCompatActivity() {
     }
 
     /**
-     * 简谱的时间轴可能和「段落结构进度」不同（段落 beats 是粗估，简谱是精确拍数）。
-     * 有谱时，用简谱总拍数把 elapsedBeats 的完成比例映射到谱内拍，定位当前音符。
+     * 按小节高亮：用完成比例映射到谱内总拍，再除以每小节拍数得到当前小节。
      */
     private fun updateScoreHighlight(doneRatio: Double) {
         val sc = score ?: return
-        if (noteStartBeats.isEmpty()) return
         val scoreBeat = doneRatio.coerceIn(0.0, 1.0) * sc.totalBeats
-        // 最后一个 start <= scoreBeat 的音符
-        var idx = noteStartBeats.indexOfLast { it <= scoreBeat + 1e-6 }
-        if (idx < 0) idx = 0
-        if (idx != lastHlIndex) {
-            lastHlIndex = idx
-            b.jianpu.highlightIndex = idx
+        val bpb = sc.beatsPerBar.coerceAtLeast(1)
+        var bar = (scoreBeat / bpb).toInt()
+        val totalBars = Math.ceil(sc.totalBeats / bpb).toInt().coerceAtLeast(1)
+        if (bar >= totalBars) bar = totalBars - 1
+        if (bar != lastHlBar) {
+            lastHlBar = bar
+            b.jianpu.highlightBar = bar
             autoScrollToCurrent()
         }
     }

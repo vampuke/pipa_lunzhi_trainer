@@ -54,12 +54,16 @@ class JianpuView @JvmOverloads constructor(
     private var sectionStarts: List<Int> = emptyList()
     private var sectionNames: List<String> = emptyList()
 
-    var highlightIndex: Int = -1
+    /** 按小节高亮：当前小节序号（0-based），-1 表示无。 */
+    var highlightBar: Int = -1
         set(value) { field = value; updateCurrentBounds(); invalidate() }
 
     private fun updateCurrentBounds() {
         currentTop = -1f; currentBottom = -1f
-        for (g in glyphs) if (g.index == highlightIndex) { currentTop = g.lineTop; currentBottom = g.lineBottom }
+        for (g in glyphs) if (g.barIndex == highlightBar) {
+            if (currentTop < 0 || g.lineTop < currentTop) currentTop = g.lineTop
+            if (g.lineBottom > currentBottom) currentBottom = g.lineBottom
+        }
     }
 
     /** 当前高亮音符的纵向范围（px），布局完成后有效；-1 表示未知。 */
@@ -69,7 +73,7 @@ class JianpuView @JvmOverloads constructor(
 
     // ---- 布局缓存 ----
     private data class Glyph(
-        val note: JNote, val index: Int,
+        val note: JNote, val index: Int, val barIndex: Int,
         val cx: Float, val cy: Float,       // 数字中心
         val cellLeft: Float, val cellRight: Float,
         val lineTop: Float, val lineBottom: Float  // 该行占用的纵向范围（含点/线）
@@ -111,6 +115,7 @@ class JianpuView @JvmOverloads constructor(
         var cy = rowTop + rowH / 2
         var beatInBar = 0.0
         val bpb = s.beatsPerBar
+        var barIndex = 0
 
         val starts = sectionStarts.toHashSet()
 
@@ -134,7 +139,7 @@ class JianpuView @JvmOverloads constructor(
 
             val cx = x + cell / 2
             glyphs.add(
-                Glyph(note, i, cx, cy + numBaselineOffset, x, x + cell, rowTop, rowTop + rowH)
+                Glyph(note, i, barIndex, cx, cy + numBaselineOffset, x, x + cell, rowTop, rowTop + rowH)
             )
 
             // 增时线（二分/全音符）：数字后面画横线，占额外 cell
@@ -155,6 +160,7 @@ class JianpuView @JvmOverloads constructor(
             // 小节线
             if (beatInBar >= bpb - 1e-6) {
                 beatInBar = 0.0
+                barIndex++
                 if (x + dp(6f) < padL + usableW) {
                     barXsPerRow.add(Pair(x + dp(4f), cy))
                     x += dp(10f)
@@ -180,7 +186,7 @@ class JianpuView @JvmOverloads constructor(
         }
 
         for (g in glyphs) {
-            val active = g.index == highlightIndex
+            val active = g.barIndex == highlightBar
             // 高亮底
             if (active) {
                 hlPaint.color = colHl

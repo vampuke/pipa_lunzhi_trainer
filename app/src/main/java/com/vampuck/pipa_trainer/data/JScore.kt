@@ -52,6 +52,10 @@ object Scores {
     private fun n(d: Int, dur: Double, oct: Int = 0, tr: Boolean = true) =
         JNote(d, oct, dur, tr)
 
+    /** 普通音（非轮指），用于民歌旋律。 */
+    private fun m(d: Int, dur: Double, oct: Int = 0) =
+        JNote(d, oct, dur, false)
+
     /** 轮指基础练习：慢→中→快三段，1=D，4/4。全程轮指。 */
     val LUNZHI_ETUDE = JScore(
         key = "1=D  4/4",
@@ -90,4 +94,114 @@ object Scores {
             ),
         )
     )
+
+    // ===== 公有领域传统民歌（旋律属公有领域，作者已故数百年或为佚名民间小调） =====
+
+    /** 茉莉花（江苏民歌，清乾隆年间《鲜花调》，公有领域）。1=D 4/4。普通弹挑。 */
+    val JASMINE = JScore(
+        key = "1=D  4/4",
+        beatsPerBar = 4,
+        sections = listOf(
+            JSectionData(
+                "第一句",
+                listOf(
+                    m(3, 1.0), m(3, 1.0), m(5, 1.0), m(6, 1.0),
+                    m(1, 2.0, oct = 1), m(1, 1.0, oct = 1), m(6, 1.0),
+                    m(5, 1.0), m(5, 1.0), m(6, 1.0), m(5, 1.0),
+                    m(3, 4.0),
+                )
+            ),
+            JSectionData(
+                "第二句",
+                listOf(
+                    m(3, 1.0), m(3, 1.0), m(5, 1.0), m(6, 1.0),
+                    m(1, 2.0, oct = 1), m(1, 1.0, oct = 1), m(6, 1.0),
+                    m(5, 1.0), m(5, 1.0), m(6, 1.0), m(5, 1.0),
+                    m(3, 4.0),
+                )
+            ),
+            JSectionData(
+                "第三句",
+                listOf(
+                    m(5, 1.0), m(5, 1.0), m(5, 1.0), m(3, 1.0),
+                    m(2, 2.0), m(3, 1.0), m(5, 1.0),
+                    m(6, 2.0), m(5, 1.0), m(3, 1.0),
+                    m(2, 2.0), m(1, 2.0),
+                )
+            ),
+            JSectionData(
+                "第四句",
+                listOf(
+                    m(3, 1.0), m(2, 1.0), m(1, 1.0), m(6, 1.0, oct = -1),
+                    m(5, 2.0, oct = -1), m(5, 1.0), m(6, 1.0),
+                    m(1, 2.0), m(2, 2.0),
+                    m(1, 4.0),
+                )
+            ),
+        )
+    )
+
+    /** 凤阳花鼓（安徽民歌，明清传唱，公有领域）主题句。1=D 4/4。 */
+    val FENGYANG = JScore(
+        key = "1=D  4/4",
+        beatsPerBar = 4,
+        sections = listOf(
+            JSectionData(
+                "主题",
+                listOf(
+                    m(5, 1.0), m(6, 1.0), m(5, 1.0), m(3, 1.0),
+                    m(2, 2.0), m(3, 2.0),
+                    m(5, 1.0), m(3, 1.0), m(2, 1.0), m(1, 1.0),
+                    m(6, 2.0, oct = -1), m(5, 2.0, oct = -1),
+                )
+            ),
+            JSectionData(
+                "下句",
+                listOf(
+                    m(1, 1.0), m(2, 1.0), m(3, 1.0), m(5, 1.0),
+                    m(6, 2.0), m(5, 2.0),
+                    m(3, 1.0), m(2, 1.0), m(1, 1.0), m(2, 1.0),
+                    m(1, 4.0),
+                )
+            ),
+            JSectionData(
+                "锣鼓衬句",
+                listOf(
+                    m(5, 0.5), m(5, 0.5), m(3, 0.5), m(5, 0.5),
+                    m(6, 1.0), m(5, 1.0),
+                    m(3, 0.5), m(3, 0.5), m(2, 0.5), m(3, 0.5),
+                    m(1, 2.0),
+                )
+            ),
+        )
+    )
+
+    /** 小白菜（河北民歌，佚名民间小调，公有领域）。1=G 4/4，徵调式级进下行。 */
+    val XIAOBAICAI = JScore(
+        key = "1=G  4/4",
+        beatsPerBar = 4,
+        sections = listOf(
+            JSectionData(
+                "第一句",
+                listOf(
+                    m(6, 1.0), m(6, 1.0), m(5, 1.0), m(5, 1.0),
+                    m(3, 2.0), m(3, 2.0),
+                    m(2, 1.0), m(2, 1.0), m(1, 1.0), m(1, 1.0),
+                    m(6, 2.0, oct = -1), m(6, 2.0, oct = -1),
+                )
+            ),
+            JSectionData(
+                "第二句",
+                listOf(
+                    m(5, 1.0), m(5, 1.0), m(6, 1.0), m(5, 1.0),
+                    m(3, 2.0), m(2, 2.0),
+                    m(1, 1.0), m(2, 1.0), m(1, 1.0), m(6, 1.0, oct = -1),
+                    m(5, 4.0, oct = -1),
+                )
+            ),
+        )
+    )
+
+    /** 导入的曲目（运行期由用户 JSON 录入时填充）。 */
+    val IMPORTED = HashMap<String, JScore>()
 }

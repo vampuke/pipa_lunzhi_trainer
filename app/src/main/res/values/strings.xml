@@ -111,4 +111,16 @@
     <string name="play_score">简谱（跟练高亮当前音符）</string>
     <string name="play_has_score">含简谱</string>
     <string name="play_disclaimer">提示：进度按你设定的速度匀速推进，用来帮你把握段落节奏与整体结构；真实演奏的快慢处理可自行伸缩。配合「实时练习」可同时检查你的轮指均匀度。</string>
+
+    <!-- 导入自定义简谱 -->
+    <string name="import_title">导入简谱</string>
+    <string name="import_entry">导入我的简谱 (JSON)</string>
+    <string name="import_hint">把一首曲子的简谱按 JSON 格式粘贴进来，即可加入「名曲跟练」列表、看着谱子跟练。点「填入模板」看格式示例，照着改成你的谱子。</string>
+    <string name="import_fill_template">填入模板示例</string>
+    <string name="import_do">导入</string>
+    <string name="import_empty">请先粘贴简谱 JSON</string>
+    <string name="import_ok">已导入《%1$s》，可在列表里找到</string>
+    <string name="import_fail">导入失败：%1$s</string>
+    <string name="import_copyright">版权提示：请仅导入你自己拥有或自行录入的谱子作个人练习之用。请勿导入他人享有版权的乐谱并传播。</string>
+    <string name="play_imported_tag">自录</string>
 </resources>

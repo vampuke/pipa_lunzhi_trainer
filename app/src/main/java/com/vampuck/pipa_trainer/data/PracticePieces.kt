@@ -32,13 +32,26 @@ data class PracticePiece(
 
 object PracticePieces {
 
-    /** 曲目 id -> 简谱（有谱才有，目前仅轮指练习曲）。 */
+    /** 曲目 id -> 简谱。先查内置，再查用户导入的。 */
     fun scoreFor(id: String): JScore? = when (id) {
         "lunzhi_etude" -> Scores.LUNZHI_ETUDE
-        else -> null
+        "jasmine" -> Scores.JASMINE
+        "fengyang" -> Scores.FENGYANG
+        "xiaobaicai" -> Scores.XIAOBAICAI
+        else -> Scores.IMPORTED[id]
     }
 
-    val ALL: List<PracticePiece> = listOf(
+    /** 运行期注册一首用户导入的曲目（JSON）。 */
+    fun registerImported(ip: ImportedPiece) {
+        Scores.IMPORTED[ip.piece.id] = ip.score
+        imported.removeAll { it.id == ip.piece.id }
+        imported.add(ip.piece)
+    }
+
+    /** 用户导入的曲目（内存态，由 ImportStore 持久化到 SharedPreferences）。 */
+    val imported = ArrayList<PracticePiece>()
+
+    val builtin: List<PracticePiece> = listOf(
 
         PracticePiece(
             id = "chunjiang",
@@ -133,6 +146,48 @@ object PracticePieces {
         ),
 
         PracticePiece(
+            id = "jasmine",
+            title = "茉莉花",
+            composerOrStyle = "江苏民歌 · 公有领域",
+            refBpm = 72,
+            difficulty = "入门",
+            blurb = "最广为流传的江南小调，源自清乾隆《鲜花调》。旋律婉转，适合练弹挑与连音。",
+            sections = listOf(
+                PieceSection("第一句", 4),
+                PieceSection("第二句", 4),
+                PieceSection("第三句", 4),
+                PieceSection("第四句", 4),
+            )
+        ),
+
+        PracticePiece(
+            id = "fengyang",
+            title = "凤阳花鼓",
+            composerOrStyle = "安徽民歌 · 公有领域",
+            refBpm = 92,
+            difficulty = "入门",
+            blurb = "明清传唱的花鼓调，欢快跳跃，带锣鼓衬句，练习节奏颗粒。",
+            sections = listOf(
+                PieceSection("主题", 4),
+                PieceSection("下句", 4),
+                PieceSection("锣鼓衬句", 2),
+            )
+        ),
+
+        PracticePiece(
+            id = "xiaobaicai",
+            title = "小白菜",
+            composerOrStyle = "河北民歌 · 公有领域",
+            refBpm = 60,
+            difficulty = "入门",
+            blurb = "佚名民间小调，徵调式级进下行，哀婉质朴，适合慢速练音准与情绪。",
+            sections = listOf(
+                PieceSection("第一句", 4),
+                PieceSection("第二句", 4),
+            )
+        ),
+
+        PracticePiece(
             id = "lunzhi_etude",
             title = "轮指基础练习",
             composerOrStyle = "技术练习 · 匀速陪练",
@@ -146,6 +201,9 @@ object PracticePieces {
             )
         ),
     )
+
+    /** 全部曲目 = 内置 + 用户导入。 */
+    val ALL: List<PracticePiece> get() = builtin + imported
 
     fun byId(id: String): PracticePiece? = ALL.firstOrNull { it.id == id }
 }
