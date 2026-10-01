@@ -46,6 +46,11 @@
     <string name="tuner_center">0</string>
     <string name="tuner_sharp">偏高 →</string>
     <string name="tuner_strings_hint">标准 D 调定弦（正调，A-d-e-a）；点任意一行听参考音</string>
+    <string name="tuner_strings_hint_guzheng">标准 D 调定弦（21 弦，D2–D6，五声调式）；点任意一行听参考音</string>
+    <string name="tuner_strings_hint_guitar">标准调弦 EADGBE（E2–E4）；点任意一行听参考音</string>
+    <string name="instrument_pipa">琵琶</string>
+    <string name="instrument_guzheng">古筝</string>
+    <string name="instrument_guitar">吉他</string>
     <string name="tuner_play">▶</string>
     <string name="tuner_playing">正在播放 %1$s %2$s 参考音</string>
     <string name="btn_tuner_start">开始调音</string>

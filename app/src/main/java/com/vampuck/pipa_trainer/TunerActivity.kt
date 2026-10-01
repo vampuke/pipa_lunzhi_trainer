@@ -33,6 +33,10 @@ class TunerActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityTunerBinding
     private val sampleRate = 44100
+
+    /** 实际交付的采样率（不少设备固定 48kHz），换乐器重建 Tuner 时要沿用。 */
+    private var actualRate = 44100
+    private var instrument: Tuning.Instrument = Tuning.PIPA
     @Volatile private var listening = false
     private var recordThread: Thread? = null
     private var tuner: Tuner? = null
@@ -51,6 +55,18 @@ class TunerActivity : AppCompatActivity() {
         b = ActivityTunerBinding.inflate(layoutInflater)
         setContentView(b.root)
         buildStringRows()
+        b.stringsHint.setText(stringsHintRes(instrument))
+        b.instrumentGroup.check(R.id.btnPipa)
+        b.instrumentGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            selectInstrument(
+                when (checkedId) {
+                    R.id.btnGuzheng -> Tuning.GUZHENG
+                    R.id.btnGuitar -> Tuning.GUITAR
+                    else -> Tuning.PIPA
+                }
+            )
+        }
         b.btnTunerToggle.setOnClickListener {
             if (listening) stop() else ensurePermThenStart()
         }
@@ -58,10 +74,33 @@ class TunerActivity : AppCompatActivity() {
         setStatus(getString(R.string.tuner_ready))
     }
 
+    /** 切换乐器：换弦表、重建检测器、清掉上一件乐器的读数。 */
+    private fun selectInstrument(inst: Tuning.Instrument) {
+        if (inst.key == instrument.key) return
+        instrument = inst
+        buildStringRows()
+        b.stringsHint.setText(stringsHintRes(inst))
+        // 弦号/音分是相对定弦表的，换表后旧读数不再有效，必须清掉。
+        b.noteName.text = "--"
+        b.noteFreq.text = getString(R.string.tuner_ready)
+        b.centsText.text = ""
+        b.stringHint.text = ""
+        tintDot(0xFFBDBDBD.toInt())
+        markStrings(-1, 0.0)
+        tuner = tuner?.let { Tuner(actualRate, inst.strings) }
+        setStatus(getString(R.string.tuner_ready))
+    }
+
+    private fun stringsHintRes(inst: Tuning.Instrument): Int = when (inst.key) {
+        Tuning.GUZHENG.key -> R.string.tuner_strings_hint_guzheng
+        Tuning.GUITAR.key -> R.string.tuner_strings_hint_guitar
+        else -> R.string.tuner_strings_hint
+    }
+
     private fun buildStringRows() {
         b.stringList.removeAllViews()
         rows.clear()
-        for (s in Tuning.PIPA_STANDARD) {
+        for (s in instrument.strings) {
             val row = ItemTunerStringBinding.inflate(LayoutInflater.from(this), b.stringList, false)
             row.strLabel.text = "${s.label}  ${s.note}"
             row.strDev.text = String.format(java.util.Locale.US, "%.2f Hz", s.hz)
@@ -101,9 +140,9 @@ class TunerActivity : AppCompatActivity() {
         // 设备不一定按请求的采样率交付（不少机器固定 48kHz）。若实际是 48000 而
         // 我们按 44100 去算，偏差是 1200*log2(48/44.1) ≈ 147 音分——比半个音还多，
         // 表现成「调音器坏了」。所以一律用 AudioRecord 回报的实际采样率。
-        val actualRate = recorder.sampleRate.takeIf { it > 0 } ?: sampleRate
+        actualRate = recorder.sampleRate.takeIf { it > 0 } ?: sampleRate
 
-        val t = Tuner(actualRate)
+        val t = Tuner(actualRate, instrument.strings)
         tuner = t
         lastLevel = 0.0
         listening = true
@@ -218,7 +257,7 @@ class TunerActivity : AppCompatActivity() {
     /** 高亮最接近的那根弦，其余显示目标频率。 */
     private fun markStrings(activeNumber: Int, cents: Double) {
         for ((i, row) in rows.withIndex()) {
-            val s = Tuning.PIPA_STANDARD[i]
+            val s = instrument.strings[i]
             val active = s.number == activeNumber
             if (active) {
                 val off = abs(cents).roundToInt()

@@ -6,11 +6,17 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * 音名 / 音分换算，以及琵琶的定弦表。
+ * 音名 / 音分换算，以及各乐器定弦表。
  *
- * 定弦用最常见的**标准 D 调（正调）**：从一弦（最细）到四弦（最粗）为
- * A3 – E3 – D3 – A2，即 A-d-e-a。别的调（C 调、G 调等）会把某几根弦整体
- * 移高/移低，所以调音器同时给出**十二平均律音名 + 音分**，不依赖这张表也能用。
+ * 定弦用最常见的**标准调**。每张表都按「一弦在最前」排列：弦号越小越细越高，
+ * 所以表是**从高到低**的（琵琶一弦 A3 → 四弦 A2）。
+ *
+ *  - 琵琶：标准 D 调（正调）A-d-e-a。
+ *  - 古筝：标准 D 调，21 弦，跨 D2–D6 四个八度（五声 D-E-F#-A-B）。
+ *  - 吉他：标准调弦 EADGBE。
+ *
+ * 别的调（琵琶 C/G 调、古筝 G 调、吉他降半音等）会把某几根弦整体移高/移低，
+ * 所以调音器同时给出**十二平均律音名 + 音分**，不依赖这张表也能用。
  */
 object Tuning {
 
@@ -22,12 +28,56 @@ object Tuning {
         InstrumentString(4, "四弦", "A2", 110.00)
     )
 
+    /** 古筝标准 D 调，21 弦，一弦最高（D6）、二十一弦最低（D2）。 */
+    val GUZHENG_STANDARD: List<InstrumentString> = listOf(
+        InstrumentString(1, "一弦", "D6", 1174.66),
+        InstrumentString(2, "二弦", "B5", 987.77),
+        InstrumentString(3, "三弦", "A5", 880.00),
+        InstrumentString(4, "四弦", "F#5", 739.99),
+        InstrumentString(5, "五弦", "E5", 659.25),
+        InstrumentString(6, "六弦", "D5", 587.33),
+        InstrumentString(7, "七弦", "B4", 493.88),
+        InstrumentString(8, "八弦", "A4", 440.00),
+        InstrumentString(9, "九弦", "F#4", 369.99),
+        InstrumentString(10, "十弦", "E4", 329.63),
+        InstrumentString(11, "十一弦", "D4", 293.66),
+        InstrumentString(12, "十二弦", "B3", 246.94),
+        InstrumentString(13, "十三弦", "A3", 220.00),
+        InstrumentString(14, "十四弦", "F#3", 185.00),
+        InstrumentString(15, "十五弦", "E3", 164.81),
+        InstrumentString(16, "十六弦", "D3", 146.83),
+        InstrumentString(17, "十七弦", "B2", 123.47),
+        InstrumentString(18, "十八弦", "A2", 110.00),
+        InstrumentString(19, "十九弦", "F#2", 92.50),
+        InstrumentString(20, "二十弦", "E2", 82.41),
+        InstrumentString(21, "二十一弦", "D2", 73.42)
+    )
+
+    /** 吉他标准调弦 EADGBE，一弦最高（E4）、六弦最低（E2）。 */
+    val GUITAR_STANDARD: List<InstrumentString> = listOf(
+        InstrumentString(1, "1弦", "E4", 329.63),
+        InstrumentString(2, "2弦", "B3", 246.94),
+        InstrumentString(3, "3弦", "G3", 196.00),
+        InstrumentString(4, "4弦", "D3", 146.83),
+        InstrumentString(5, "5弦", "A2", 110.00),
+        InstrumentString(6, "6弦", "E2", 82.41)
+    )
+
     data class InstrumentString(
         val number: Int,
-        val label: String,     // 一弦 / 二弦 / 三弦 / 四弦
-        val note: String,      // A3 / E3 / D3 / A2
+        val label: String,     // 一弦 / 二十一弦 / 3弦
+        val note: String,      // A3 / D6 / E2
         val hz: Double
     )
+
+    /** 一件乐器的标准定弦。[key] 供界面映射显示名，dsp 层不依赖资源。 */
+    data class Instrument(val key: String, val strings: List<InstrumentString>)
+
+    val PIPA = Instrument("pipa", PIPA_STANDARD)
+    val GUZHENG = Instrument("guzheng", GUZHENG_STANDARD)
+    val GUITAR = Instrument("guitar", GUITAR_STANDARD)
+
+    val INSTRUMENTS: List<Instrument> = listOf(PIPA, GUZHENG, GUITAR)
 
     data class NoteReading(val name: String, val octave: Int, val cents: Double, val midi: Int) {
         val label: String get() = "$name$octave"
@@ -66,10 +116,13 @@ object Tuning {
         if (hz <= 0.0 || target <= 0.0) 0.0 else 1200.0 * (ln(hz / target) / ln(2.0))
 
     /** 最接近的琵琶弦（按音分距离，跨弦也不会错）。 */
-    fun nearestString(hz: Double): StringMatch {
-        var best = PIPA_STANDARD.first()
+    fun nearestString(hz: Double): StringMatch = nearestString(PIPA_STANDARD, hz)
+
+    /** 在某件乐器的定弦表里找最接近的弦（按音分距离，跨弦也不会错）。 */
+    fun nearestString(strings: List<InstrumentString>, hz: Double): StringMatch {
+        var best = strings.first()
         var bestAbs = Double.MAX_VALUE
-        for (s in PIPA_STANDARD) {
+        for (s in strings) {
             val c = abs(centsBetween(hz, s.hz))
             if (c < bestAbs) { bestAbs = c; best = s }
         }

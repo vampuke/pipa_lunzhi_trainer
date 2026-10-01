@@ -18,7 +18,11 @@ import kotlin.math.sqrt
  * 噪声不会给出读数：随机信号没有真正的周期性极小点，清晰度上不去，
  * 由 [Reading.clarity] 门限挡掉。
  */
-class Tuner(private val sampleRate: Int) {
+class Tuner(
+    private val sampleRate: Int,
+    /** 该乐器的定弦表，用于把频率映射到「哪根弦」。默认琵琶。 */
+    private val strings: List<Tuning.InstrumentString> = Tuning.PIPA_STANDARD
+) {
 
     data class Reading(
         val hz: Double,
@@ -164,7 +168,7 @@ class Tuner(private val sampleRate: Int) {
         if (raw < minHz || raw > maxHz) return null
         val hz = smooth(raw)
 
-        return Reading(hz, clarity, level, Tuning.nearestNote(hz), Tuning.nearestString(hz))
+        return Reading(hz, clarity, level, Tuning.nearestNote(hz), Tuning.nearestString(strings, hz))
     }
 
     /**

@@ -256,4 +256,89 @@ class TunerTest {
         assertEquals(2, m.string.number)
         assertTrue("cents=${m.cents}", m.cents < -30)
     }
+
+    @Test
+    fun guzhengTableIs21StringsInD() {
+        val g = Tuning.GUZHENG_STANDARD
+        assertEquals(21, g.size)
+        assertEquals(1174.66, g.first().hz, 0.01)   // 一弦 D6（最高）
+        assertEquals(73.42, g.last().hz, 0.01)      // 二十一弦 D2（最低）
+        assertEquals((1..21).toList(), g.map { it.number })
+        // 弦号越大越低：整表单调下降
+        for (i in 1 until g.size) assertTrue("${g[i].label}", g[i].hz < g[i - 1].hz)
+    }
+
+    @Test
+    fun guitarTableIsStandardEADGBE() {
+        val g = Tuning.GUITAR_STANDARD
+        assertEquals(6, g.size)
+        val expected = listOf(
+            Triple(1, "E4", 329.63),
+            Triple(2, "B3", 246.94),
+            Triple(3, "G3", 196.00),
+            Triple(4, "D3", 146.83),
+            Triple(5, "A2", 110.00),
+            Triple(6, "E2", 82.41)
+        )
+        for ((num, note, hz) in expected) {
+            val s = g.first { it.number == num }
+            assertEquals("$num 弦 音名", note, s.note)
+            assertEquals("$num 弦 频率", hz, s.hz, 0.01)
+        }
+    }
+
+    /**
+     * 音名标签是人手写的字符串（"D6"/"F#5"/"F#2"），最容易写错。用 App 自己的
+     * 音名换算回推一遍：每根弦的频率必须正好落在它标的那个音名八度上。
+     */
+    @Test
+    fun everyStringLabelMatchesItsFrequency() {
+        for (inst in Tuning.INSTRUMENTS) {
+            for (s in inst.strings) {
+                assertEquals("${inst.key} ${s.label}", s.note, Tuning.nearestNote(s.hz).label)
+            }
+        }
+    }
+
+    /** 拿每根弦自己的标准音去查表，必须查回它自己（且音分≈0）。 */
+    @Test
+    fun eachStringMapsToItself() {
+        for (inst in Tuning.INSTRUMENTS) {
+            for (s in inst.strings) {
+                val m = Tuning.nearestString(inst.strings, s.hz)
+                assertEquals("${inst.key} ${s.label}", s.number, m.string.number)
+                assertTrue("${inst.key} ${s.label} cents=${m.cents}", abs(m.cents) < 0.5)
+            }
+        }
+    }
+
+    @Test
+    fun nearestStringHonoursTheGivenTable() {
+        // 196Hz 在吉他是 3 弦 G3
+        val g = Tuning.nearestString(Tuning.GUITAR_STANDARD, 196.0)
+        assertEquals(3, g.string.number)
+        assertTrue("cents=${g.cents}", abs(g.cents) < 1.0)
+        // 440Hz 在古筝是 八弦 A4
+        val z = Tuning.nearestString(Tuning.GUZHENG_STANDARD, 440.0)
+        assertEquals(8, z.string.number)
+        assertTrue("cents=${z.cents}", abs(z.cents) < 1.0)
+    }
+
+    /** Tuner 要接受传入的定弦表：喂古筝标准音，读数应指向古筝对应弦。 */
+    @Test
+    fun tunerUsesTheSuppliedTuningTable() {
+        val s = Tuning.GUZHENG_STANDARD.first { it.number == 8 }   // 八弦 A4 = 440Hz
+        val t = Tuner(sr, Tuning.GUZHENG_STANDARD)
+        val f = tone(1.0, s.hz)
+        val block = sr / 10
+        var off = 0
+        var last: Tuner.Reading? = null
+        while (off < f.size) {
+            val n = Math.min(block, f.size - off)
+            last = t.push(f.copyOfRange(off, off + n), n) ?: last
+            off += n
+        }
+        assertNotNull(last)
+        assertEquals(8, last!!.string.string.number)
+    }
 }
