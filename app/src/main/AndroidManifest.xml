@@ -26,5 +26,6 @@
         </activity>
         <activity android:name=".FileAnalysisActivity" android:exported="false" />
         <activity android:name=".LiveActivity" android:exported="false" />
+        <activity android:name=".TunerActivity" android:exported="false" />
     </application>
 </manifest>

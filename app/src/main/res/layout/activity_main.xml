@@ -36,6 +36,14 @@
         android:id="@+id/btnLive"
         android:layout_width="match_parent"
         android:layout_height="64dp"
+        android:layout_marginBottom="20dp"
         android:text="@string/btn_live"
+        android:textSize="16sp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnTuner"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:text="@string/btn_tuner"
         android:textSize="16sp" />
 </LinearLayout>

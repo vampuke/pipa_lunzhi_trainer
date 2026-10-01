@@ -17,5 +17,8 @@ class MainActivity : AppCompatActivity() {
         b.btnLive.setOnClickListener {
             startActivity(Intent(this, LiveActivity::class.java))
         }
+        b.btnTuner.setOnClickListener {
+            startActivity(Intent(this, TunerActivity::class.java))
+        }
     }
 }
