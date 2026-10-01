@@ -28,6 +28,7 @@ class MainActivity : AppCompatActivity() {
         bindFeature(b.itLive, R.drawable.ic_live, R.string.feat_live_title, R.string.feat_live_sub)
         bindFeature(b.itTuner, R.drawable.ic_tuner, R.string.feat_tuner_title, R.string.feat_tuner_sub)
         bindFeature(b.itMetronome, R.drawable.ic_metronome, R.string.feat_metronome_title, R.string.feat_metronome_sub)
+        bindFeature(b.itPlay, R.drawable.ic_play, R.string.feat_play_title, R.string.feat_play_sub)
 
         b.btnFile.setOnClickListener {
             startActivity(Intent(this, FileAnalysisActivity::class.java))
@@ -40,6 +41,9 @@ class MainActivity : AppCompatActivity() {
         }
         b.btnMetronome.setOnClickListener {
             startActivity(Intent(this, MetronomeActivity::class.java))
+        }
+        b.btnPlay.setOnClickListener {
+            startActivity(Intent(this, PlayAlongActivity::class.java))
         }
 
         checkForUpdate()

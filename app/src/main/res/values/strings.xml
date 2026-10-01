@@ -10,6 +10,8 @@
     <string name="feat_tuner_sub">琵琶 · 古筝 · 吉他，音名 + 音分</string>
     <string name="feat_metronome_title">节拍器</string>
     <string name="feat_metronome_sub">整拍 / 分拍 · 重音切换 · 常用速度</string>
+    <string name="feat_play_title">名曲跟练</string>
+    <string name="feat_play_sub">预设经典曲目，按速度显示段落与实时进度</string>
     <string name="btn_pick_file">分析音频 / 视频文件</string>
     <string name="btn_live">麦克风实时练习</string>
     <string name="btn_start">开始</string>
@@ -89,4 +91,22 @@
     <string name="update_failed">下载失败或校验不通过，请稍后重试。</string>
     <string name="update_need_permission">安装更新需要允许「安装未知应用」权限，前往设置开启后将自动继续安装。</string>
     <string name="update_goto_settings">前往设置</string>
+
+    <!-- 名曲跟练 -->
+    <string name="play_list_hint">选择一首曲目，按参考速度练习。可整体调速；屏幕实时显示当前段落与进度。注：这里提供的是段落结构+参考速度的练习陪练，不是逐音符曲谱。</string>
+    <string name="play_piece_meta">参考 %1$d BPM · %2$d 段 · 约 %3$d:%4$02d</string>
+    <string name="play_overall">整体进度</string>
+    <string name="play_section_progress">当前段落</string>
+    <string name="play_sections">段落</string>
+    <string name="play_section_idx">第 %1$d / %2$d 段</string>
+    <string name="play_next">下一段：%1$s</string>
+    <string name="play_next_last">这是最后一段</string>
+    <string name="play_next_none">—</string>
+    <string name="play_bpm_label">%1$d BPM</string>
+    <string name="play_pause">暂停</string>
+    <string name="play_reset">重置</string>
+    <string name="play_again">再来一遍</string>
+    <string name="play_click_on">节拍器声：开</string>
+    <string name="play_click_off">节拍器声：关</string>
+    <string name="play_disclaimer">提示：进度按你设定的速度匀速推进，用来帮你把握段落节奏与整体结构；真实演奏的快慢处理可自行伸缩。配合「实时练习」可同时检查你的轮指均匀度。</string>
 </resources>

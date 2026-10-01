@@ -99,11 +99,24 @@
                 style="@style/App.Card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
                 android:clickable="true"
                 android:focusable="true">
 
                 <include layout="@layout/item_feature"
                     android:id="@+id/itMetronome" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btnPlay"
+                style="@style/App.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="true">
+
+                <include layout="@layout/item_feature"
+                    android:id="@+id/itPlay" />
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </LinearLayout>

@@ -31,6 +31,8 @@
         <activity android:name=".LiveActivity" android:exported="false" />
         <activity android:name=".TunerActivity" android:exported="false" />
         <activity android:name=".MetronomeActivity" android:exported="false" />
+        <activity android:name=".PlayAlongActivity" android:exported="false" />
+        <activity android:name=".PiecePlayerActivity" android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

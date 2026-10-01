@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/App.Card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="14dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="18dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/pieceTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="曲名"
+                android:textSize="19sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <!-- 难度徽标（丝弦金胶囊） -->
+            <TextView
+                android:id="@+id/pieceDiff"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_chip_accent"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="4dp"
+                android:text="进阶"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@color/pipa_accent_dark" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/pieceStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="流派"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/pieceBlurb"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="简介"
+            android:textSize="13sp"
+            android:lineSpacingExtra="2dp"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:id="@+id/pieceMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="参考速度 · 段落 · 时长"
+            android:textSize="12sp"
+            android:textColor="@color/pipa_primary" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>
