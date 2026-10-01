@@ -34,7 +34,7 @@ object LunzhiAnalyzer {
      */
     const val TONE_MIN = 0.58
     /** jitter% ≈ modalCv * 74 (from synthetic calibration). */
-    private const val JITTER_SCALE = 74.0
+    const val JITTER_SCALE = 74.0
 
     data class WindowStat(val startSec: Double, val strokes: Int, val ratePerSec: Double, val cv: Double)
 
@@ -50,6 +50,16 @@ object LunzhiAnalyzer {
         val robustCv: Double,      // MAD-based robust CV
         val jitterPct: Double,     // perceptual estimate, % of interval
         val outlierCount: Int,     // IOIs outside the modal band
+        /**
+         * Diagnostics that separate *how* a roll is uneven, because the same CV
+         * means very different things: uniform jitter in every interval, versus
+         * a handful of intervals where a stroke went missing.
+         */
+        val stallCount: Int,       // interval > 2.1x median  -> deliberate break / string change
+        val dropCount: Int,        // interval 1.5-2.1x median -> a stroke went missing
+        val rushCount: Int,        // interval < 0.55x median -> double trigger / rushed
+        val cvRoll: Double,        // CV over roll intervals only (breaks excluded)
+        val rollJitterPct: Double, // cvRoll * JITTER_SCALE -- the scoring basis
         val positionProfile: DoubleArray,
         val perWindow: List<WindowStat>
     )
@@ -288,6 +298,20 @@ object LunzhiAnalyzer {
         val robustCv = if (med > 0) 1.4826 * mad / med else 0.0
         val jitterPct = (modalCv.takeIf { it > 0 } ?: cv) * JITTER_SCALE
 
+        // How the unevenness is distributed. modalCv only looks at the modal
+        // band, so it reports a flawless 0.006 for a take that is missing one
+        // stroke in ten -- the missing strokes live in the excluded tail. cvRoll
+        // keeps those (they are 2x intervals) and drops only the intervals that
+        // are too far out to be part of the roll at all (phrase breaks, double
+        // triggers), which is what the score should be based on.
+        val roll = if (med > 0) ioi.filter { it >= med * 0.55 && it <= med * 2.6 } else ioi
+        val rollMean = if (roll.isNotEmpty()) roll.average() else 0.0
+        val cvRoll = if (rollMean > 0) std(roll, rollMean) / rollMean else 0.0
+        val rollJitterPct = cvRoll * JITTER_SCALE
+        val stallCount = if (med > 0) ioi.count { it > med * 2.6 } else 0
+        val dropCount = if (med > 0) ioi.count { it >= med * 1.45 && it <= med * 2.6 } else 0
+        val rushCount = if (med > 0) ioi.count { it < med * 0.55 } else 0
+
         val profile = fiveFold(a)
 
         val windows = ArrayList<WindowStat>()
@@ -311,7 +335,8 @@ object LunzhiAnalyzer {
         }
 
         return Metrics(t.size, cps, cps * 60, mean * 1000, med * 1000, sd * 1000,
-            cv, modalCv, robustCv, jitterPct, outliers, profile, windows)
+            cv, modalCv, robustCv, jitterPct, outliers,
+            stallCount, dropCount, rushCount, cvRoll, rollJitterPct, profile, windows)
     }
 
     /** IOI list (seconds) for a range — used for distribution display. */
