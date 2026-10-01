@@ -40,7 +40,6 @@ class ScoreEditorActivity : AppCompatActivity() {
 
     private val degreeBtns = ArrayList<MaterialButton>()
     private val durBtns = ArrayList<Pair<MaterialButton, Double>>()
-    private val fingerBtns = ArrayList<Pair<MaterialButton, String>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -115,28 +114,59 @@ class ScoreEditorActivity : AppCompatActivity() {
         for ((btn, v) in durBtns) setSelected(btn, v == curDur)
     }
 
+    private val fingerCells = ArrayList<Pair<View, String>>()
+
     private fun setupFingering() {
-        // 动态生成指法按钮
-        val inflater = layoutInflater
+        val d = resources.displayMetrics.density
         for (f in Fingerings.PALETTE) {
-            val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle)
-            btn.text = "${f.symbol} ${f.name}"
-            btn.textSize = 13f
-            btn.setOnClickListener { curFinger = f.code; highlightFinger() }
+            // 每个指法 = 竖排：符号预览(与谱面同一绘制) + 名称
+            val cell = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                setPadding((d * 8).toInt(), (d * 6).toInt(), (d * 8).toInt(), (d * 6).toInt())
+                isClickable = true
+                isFocusable = true
+            }
+            if (f.code.isNotEmpty()) {
+                val glyph = com.vampuck.pipa_trainer.view.FingerGlyphView(this).apply {
+                    code = f.code
+                    glyphColor = getColor(R.color.text_primary)
+                }
+                cell.addView(glyph)
+            } else {
+                // 「无」用一个短横占位
+                val tv = android.widget.TextView(this).apply {
+                    text = "—"; textSize = 16f; setTextColor(getColor(R.color.text_secondary))
+                    gravity = android.view.Gravity.CENTER
+                    height = (d * 26).toInt()
+                }
+                cell.addView(tv)
+            }
+            val label = android.widget.TextView(this).apply {
+                text = f.name; textSize = 11f
+                setTextColor(getColor(R.color.text_secondary))
+                gravity = android.view.Gravity.CENTER
+            }
+            cell.addView(label)
+            cell.setOnClickListener { curFinger = f.code; highlightFinger() }
             val lp = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            lp.marginEnd = (resources.displayMetrics.density * 6).toInt()
-            btn.layoutParams = lp
-            b.fingerRow.addView(btn)
-            fingerBtns.add(btn to f.code)
+            lp.marginEnd = (d * 6).toInt()
+            cell.layoutParams = lp
+            b.fingerRow.addView(cell)
+            fingerCells.add(cell to f.code)
         }
         highlightFinger()
     }
 
     private fun highlightFinger() {
-        for ((btn, code) in fingerBtns) setSelected(btn, code == curFinger)
+        for ((cell, code) in fingerCells) {
+            cell.setBackgroundColor(
+                if (code == curFinger) getColor(R.color.primary_container) else getColor(R.color.surface)
+            )
+        }
     }
 
     private fun setupBeatsPerBar() {

@@ -236,12 +236,12 @@ class JianpuView @JvmOverloads constructor(
             }
         }
 
-        // 琵琶指法符号：画在数字上方（行顶留出的区域），用几何图形绘制，不依赖字体。
+        // 琵琶指法符号：画在数字上方（行顶留出的区域），与编辑器调色板用同一套绘制。
         // 兼容老数据：若无 finger 但 tremolo=true，按「轮」画。
         val fg = note.finger.ifEmpty { if (note.tremolo) "lun" else "" }
         if (fg.isNotEmpty()) {
             val fc = if (active) colPrimary else colSecondary
-            drawFinger(canvas, fg, g.cx, g.lineTop + dp(12f), fc)
+            FingerSymbols.draw(canvas, fg, g.cx, g.lineTop + dp(12f), dp(10f), fc)
         }
 
         // 时值
@@ -264,90 +264,6 @@ class JianpuView @JvmOverloads constructor(
                 canvas.drawLine(dx + dp(6f), g.cy - dp(6f), dx + dp(28f), g.cy - dp(6f), linePaint)
                 dx += dp(34f)
             }
-        }
-    }
-
-    /**
-     * 用几何图形画琵琶指法符号，中心 x=cx，纵向中心 y=cy。各机型一致。
-     * 依通行琵琶记谱：弹=反斜线「\」，挑=正斜线「/」，轮=草书「卢」(近似螺旋)，
-     * 半轮=「卢」加短撇，扫=向下∨，拂=向上∧，勾/抹用字，泛=空心圆圈。
-     */
-    private fun drawFinger(canvas: Canvas, code: String, cx: Float, cy: Float, color: Int) {
-        trPaint.color = color
-        trPaint.strokeWidth = dp(1.5f)
-        fgPaint.color = color
-        val w = dp(4.5f)
-        when (code) {
-            "tan" -> { // 弹：反斜线「\」(左上→右下)
-                canvas.drawLine(cx - w, cy - dp(4f), cx + w, cy + dp(4f), trPaint)
-            }
-            "tiao" -> { // 挑：正斜线「/」(左下→右上)
-                canvas.drawLine(cx - w, cy + dp(4f), cx + w, cy - dp(4f), trPaint)
-            }
-            "lun" -> { // 轮：五根线从一点放射，形如小花
-                drawFlower(canvas, cx, cy, 5, color)
-            }
-            "changlun" -> { // 长轮：小花后加一点
-                drawFlower(canvas, cx, cy, 5, color)
-                dotPaint.color = color
-                canvas.drawCircle(cx + dp(7f), cy + dp(2f), dp(1.6f), dotPaint)
-            }
-            "banlun" -> { // 半轮：三根线的半朵花
-                drawFlower(canvas, cx, cy, 3, color)
-            }
-            "sao" -> { // 扫：向下的 ∨
-                canvas.drawLine(cx - w, cy - dp(3f), cx, cy + dp(3f), trPaint)
-                canvas.drawLine(cx, cy + dp(3f), cx + w, cy - dp(3f), trPaint)
-            }
-            "fu" -> { // 拂：向上的 ∧
-                canvas.drawLine(cx - w, cy + dp(3f), cx, cy - dp(3f), trPaint)
-                canvas.drawLine(cx, cy - dp(3f), cx + w, cy + dp(3f), trPaint)
-            }
-            "gou" -> { // 勾：用「勹」近似——竖折带钩
-                val p = Path()
-                p.moveTo(cx - dp(3f), cy - dp(4f))
-                p.lineTo(cx + dp(3f), cy - dp(4f))
-                p.quadTo(cx + dp(5f), cy, cx, cy + dp(4f))
-                strokePath(canvas, p, color)
-            }
-            "mo" -> { // 抹：短横线（食指向里）
-                canvas.drawLine(cx - w, cy, cx + w, cy, trPaint)
-            }
-            "fan" -> { // 泛：空心小圆
-                strokeCircle(canvas, cx, cy, dp(3f), color)
-            }
-        }
-    }
-
-    private val pathPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = dp(1.5f)
-        strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
-    }
-
-    private fun strokePath(canvas: Canvas, p: Path, color: Int) {
-        pathPaint.color = color
-        canvas.drawPath(p, pathPaint)
-    }
-
-    private fun strokeCircle(canvas: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
-        pathPaint.color = color
-        canvas.drawCircle(cx, cy, r, pathPaint)
-    }
-
-    /** 轮指「小花」：n 根短线从中心向上/两侧放射，模拟谱面轮指记号。 */
-    private fun drawFlower(canvas: Canvas, cx: Float, cy: Float, n: Int, color: Int) {
-        trPaint.color = color
-        trPaint.strokeWidth = dp(1.3f)
-        val len = dp(5f)
-        // n 根线均匀分布在 -70°..+70°（朝上张开的扇形），形似小花
-        val startDeg = -70.0
-        val endDeg = 70.0
-        val step = if (n > 1) (endDeg - startDeg) / (n - 1) else 0.0
-        for (i in 0 until n) {
-            val a = Math.toRadians(startDeg + step * i)
-            val ex = cx + (Math.sin(a) * len).toFloat()
-            val ey = cy - (Math.cos(a) * len).toFloat()
-            canvas.drawLine(cx, cy + dp(2f), ex, ey, trPaint)
         }
     }
 }
