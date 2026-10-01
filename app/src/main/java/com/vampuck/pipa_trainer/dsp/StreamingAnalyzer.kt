@@ -187,6 +187,15 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     @Volatile var totalSamples: Long = 0
         private set
 
+    /**
+     * The analyzer's own clock: seconds since the first captured sample (t = 0).
+     * This is the timeline that [frameTime] and the metronome mask live on. Callers
+     * that stamp external events (metronome clicks) MUST map them through this,
+     * never through a wall clock started before AudioRecord: the wall clock omits
+     * the mic start-up latency, which shifts every click outside the mask window.
+     */
+    fun currentTimeSec(): Double = totalSamples.toDouble() / sampleRate
+
     data class Live(
         val strokesPerSec: Double,
         val strokesPerMin: Double,

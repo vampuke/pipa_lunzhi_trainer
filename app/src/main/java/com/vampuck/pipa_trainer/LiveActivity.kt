@@ -27,9 +27,6 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
     @Volatile private var analyzer: StreamingAnalyzer? = null
     private val metronome = Metronome()
 
-    /** nanoTime captured just before capture starts — the audio clock origin. */
-    @Volatile private var audioStartNs: Long = 0L
-
     private val permReq = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -109,7 +106,6 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
         b.finalReport.text = ""
         b.btnToggle.setText(R.string.btn_stop)
         recording = true
-        audioStartNs = System.nanoTime()
         recorder.startRecording()
 
         if (b.switchMetro.isChecked) metronome.start()
@@ -129,10 +125,19 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
         }
     }
 
-    /** Called from the metronome worker thread — map onto the audio clock. */
+    /** Called from the metronome worker thread — map onto the ANALYZER's clock. */
     override fun onClick(beatIndex: Long, absoluteNanos: Long) {
-        val t = (absoluteNanos - audioStartNs) / 1_000_000_000.0
-        if (t > 0) analyzer?.addMetronomeClick(t)
+        val an = analyzer ?: return
+        // [absoluteNanos] is System.nanoTime() at the estimated audible moment.
+        // Convert it into the analyzer's sample clock (t = 0 at the first captured
+        // sample) instead of the wall clock: the wall-clock origin is captured
+        // *before* AudioRecord starts, so it omits the mic start-up latency and the
+        // 100 ms feed lag. That offset (commonly tens of ms, far wider than the
+        // 12 ms pre-mask) shoved every click past the mask, so clicks were counted
+        // as strokes — inflating BPM / stroke count. Mapping through the analyzer's
+        // own time cancels both latencies and keeps the mask centred on the click.
+        val t = an.currentTimeSec() + (absoluteNanos - System.nanoTime()) / 1_000_000_000.0
+        if (t > 0) an.addMetronomeClick(t)
     }
 
     private fun updateLive(live: StreamingAnalyzer.Live) {
