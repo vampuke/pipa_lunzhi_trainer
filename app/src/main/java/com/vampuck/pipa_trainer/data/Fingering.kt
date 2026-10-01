@@ -1,42 +1,44 @@
 package com.vampuck.pipa_trainer.data
 
 /**
- * 琵琶指法标记。
+ * 琵琶右手指法标记。符号形态以用户提供的《右手基本指法标记》图为准：
+ *  弹 \  挑 /  双弹 \\  双挑 //  摭 )  分 /  扫 \+羽  拂 /+羽
+ *  轮指 放射星芒  滚 ///  另保留 泛○ 勾 抹 等。
  *
- * 简谱里琵琶指法用符号标注（不用汉字）。各出版社符号略有出入，这里采用
- * 大陆通行（中央音乐学院/人音社教材）常见的一组右手为主的记号，并由
- * JianpuView 用几何图形直接绘制（不依赖字体，保证各机型一致）。
- *
- * code 是存储用的英文键；symbol 是展示用的符号；name 是中文名（编辑器里给用户看）。
- * 绘制逻辑在 JianpuView.drawFinger(code)。
+ * code 为存储键；name 为中文名；实际绘制在 view/FingerSymbols.draw(code)，
+ * 谱面与编辑器调色板共用，保证所见即所得。
  */
-data class Fingering(val code: String, val symbol: String, val name: String)
+data class Fingering(val code: String, val name: String)
 
 object Fingerings {
     const val NONE = ""
 
-    // 右手主要指法（符号依通行记谱：弹=反斜、挑=正斜、轮=小花放射状）
-    val TAN     = Fingering("tan", "\\", "弹")       // 食指向外弹，记号「\」
-    val TIAO    = Fingering("tiao", "/", "挑")       // 拇指向里挑，记号「/」
-    val LUN     = Fingering("lun", "✱", "轮")       // 五指轮：五根线放射如小花
-    val CHANGLUN = Fingering("changlun", "✱·", "长轮") // 长轮：小花后加点
-    val BANLUN  = Fingering("banlun", "⅄", "半轮")  // 半轮：放射线较少
-    val SAO     = Fingering("sao", "∨", "扫")        // 四弦一起向下
-    val FU      = Fingering("fu", "∧", "拂")         // 四弦一起向上
-    val GOU     = Fingering("gou", "勾", "勾")       // 拇指勾弦
-    val MO      = Fingering("mo", "抹", "抹")        // 食指向里抹
-    val FAN     = Fingering("fan", "○", "泛")        // 泛音
+    val TAN        = Fingering("tan", "弹")          // \
+    val TIAO       = Fingering("tiao", "挑")         // /
+    val SHUANGTAN  = Fingering("shuangtan", "双弹")  // \\
+    val SHUANGTIAO = Fingering("shuangtiao", "双挑") // //
+    val ZHE        = Fingering("zhe", "摭")          // )
+    val FEN        = Fingering("fen", "分")          // /
+    val SAO        = Fingering("sao", "扫")          // \ + 羽状穿线
+    val FU         = Fingering("fu", "拂")           // / + 羽状穿线
+    val LUN        = Fingering("lun", "轮")          // 放射星芒
+    val GUN        = Fingering("gun", "滚")          // ///
+    val CHANGLUN   = Fingering("changlun", "长轮")   // 星芒 + 点
+    val BANLUN     = Fingering("banlun", "半轮")     // 半星芒
+    val GOU        = Fingering("gou", "勾")          // 勹
+    val MO         = Fingering("mo", "抹")           // 横
+    val FAN        = Fingering("fan", "泛")          // ○
 
-    /** 调色板顺序（编辑器用）。首项为「无」。 */
+    /** 调色板顺序（编辑器用）。首项为「无」，其余按图顺序 + 常用补充。 */
     val PALETTE: List<Fingering> = listOf(
-        Fingering(NONE, "—", "无"),
-        TAN, TIAO, LUN, CHANGLUN, BANLUN, SAO, FU, GOU, MO, FAN
+        Fingering(NONE, "无"),
+        TAN, TIAO, SHUANGTAN, SHUANGTIAO, ZHE, FEN, SAO, FU,
+        LUN, GUN, CHANGLUN, BANLUN, GOU, MO, FAN
     )
 
-    fun byCode(code: String): Fingering? =
-        PALETTE.firstOrNull { it.code == code }
+    fun byCode(code: String): Fingering? = PALETTE.firstOrNull { it.code == code }
 
-    /** 该指法是否属轮类（轮/长轮/半轮）。 */
+    /** 是否属轮/滚类（长音技法）。 */
     fun isTremolo(code: String): Boolean =
-        code == LUN.code || code == CHANGLUN.code || code == BANLUN.code
+        code == LUN.code || code == CHANGLUN.code || code == BANLUN.code || code == GUN.code
 }

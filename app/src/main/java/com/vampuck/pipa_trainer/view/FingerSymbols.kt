@@ -27,64 +27,110 @@ object FingerSymbols {
         }
         val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
         val w = u * 0.5f
+        val h = u * 0.5f
+
+        // 单条「\」(弹)：左上→右下
+        fun backslash(ox: Float) =
+            canvas.drawLine(cx + ox - w, cy - h, cx + ox + w, cy + h, stroke)
+        // 单条「/」(挑)：左下→右上
+        fun slash(ox: Float) =
+            canvas.drawLine(cx + ox - w, cy + h, cx + ox + w, cy - h, stroke)
 
         when (code) {
-            "tan" -> // 弹：反斜线「\」(左上→右下)
-                canvas.drawLine(cx - w, cy - u * 0.45f, cx + w, cy + u * 0.45f, stroke)
+            "tan" -> backslash(0f)                       // 弹：\
+            "tiao" -> slash(0f)                           // 挑：/
+            "shuangtan" -> { backslash(-u * 0.3f); backslash(u * 0.3f) }   // 双弹：\\
+            "shuangtiao" -> { slash(-u * 0.3f); slash(u * 0.3f) }         // 双挑：//
+            "fen" -> slash(0f)                            // 分：/（同挑向）
 
-            "tiao" -> // 挑：正斜线「/」(左下→右上)
-                canvas.drawLine(cx - w, cy + u * 0.45f, cx + w, cy - u * 0.45f, stroke)
-
-            "lun" -> flower(canvas, cx, cy, 5, u, stroke)          // 轮：五瓣小花
-
-            "changlun" -> {                                        // 长轮：小花 + 右侧点
-                flower(canvas, cx, cy, 5, u, stroke)
-                canvas.drawCircle(cx + u * 0.95f, cy, u * 0.17f, fill)
+            "zhe" -> { // 摭：右括号弧「)」
+                val p = Path()
+                p.moveTo(cx - u * 0.1f, cy - u * 0.55f)
+                p.quadTo(cx + u * 0.55f, cy, cx - u * 0.1f, cy + u * 0.55f)
+                canvas.drawPath(p, stroke)
             }
 
-            "banlun" -> flower(canvas, cx, cy, 3, u, stroke)       // 半轮：三瓣
-
-            "sao" -> { // 扫：向下 ∨
-                canvas.drawLine(cx - w, cy - u * 0.4f, cx, cy + u * 0.4f, stroke)
-                canvas.drawLine(cx, cy + u * 0.4f, cx + w, cy - u * 0.4f, stroke)
+            "sao" -> { // 扫：\ 主线 + 2 条短横穿线（羽状）
+                backslash(0f)
+                featherCross(canvas, cx, cy, u, stroke, backslashDir = true)
+            }
+            "fu" -> { // 拂：/ 主线 + 2 条短横穿线（羽状）
+                slash(0f)
+                featherCross(canvas, cx, cy, u, stroke, backslashDir = false)
             }
 
-            "fu" -> { // 拂：向上 ∧
-                canvas.drawLine(cx - w, cy + u * 0.4f, cx, cy - u * 0.4f, stroke)
-                canvas.drawLine(cx, cy - u * 0.4f, cx + w, cy + u * 0.4f, stroke)
+            "lun" -> flower(canvas, cx, cy, u, stroke, fill)       // 轮：放射星芒
+            "changlun" -> {                                        // 长轮：星芒 + 右点
+                flower(canvas, cx, cy, u, stroke, fill)
+                canvas.drawCircle(cx + u * 1.0f, cy, u * 0.16f, fill)
+            }
+            "banlun" -> flowerHalf(canvas, cx, cy, u, stroke, fill) // 半轮：半星芒
+
+            "gun" -> { // 滚：/// 三条平行斜线
+                slash(-u * 0.42f); slash(0f); slash(u * 0.42f)
             }
 
-            "gou" -> { // 勾：横折带下钩（勹）
+            "gou" -> { // 勾：横折带下钩「勹」
                 val p = Path()
                 p.moveTo(cx - u * 0.4f, cy - u * 0.45f)
                 p.lineTo(cx + u * 0.4f, cy - u * 0.45f)
                 p.quadTo(cx + u * 0.6f, cy, cx, cy + u * 0.5f)
                 canvas.drawPath(p, stroke)
             }
-
-            "mo" -> // 抹：短横线
-                canvas.drawLine(cx - w, cy, cx + w, cy, stroke)
-
-            "fan" -> // 泛：空心小圆
-                canvas.drawCircle(cx, cy, u * 0.4f, stroke)
+            "mo" -> canvas.drawLine(cx - w, cy, cx + w, cy, stroke)   // 抹：横线
+            "fan" -> canvas.drawCircle(cx, cy, u * 0.4f, stroke)      // 泛：○
         }
     }
 
-    /**
-     * 轮指「小花」：n 根短线从中心向四周均匀放射（整圆分布），形如小花/星芒。
-     * 这是琵琶谱里轮指的通行记号形态。
-     */
-    private fun flower(canvas: Canvas, cx: Float, cy: Float, n: Int, u: Float, stroke: Paint) {
-        val len = u * 0.5f
-        for (i in 0 until n) {
-            // 从正上方起，均匀分布 360°/n；5 瓣即五角星芒
-            val a = Math.toRadians(-90.0 + 360.0 * i / n)
-            val ex = cx + (Math.cos(a) * len).toFloat()
-            val ey = cy + (Math.sin(a) * len).toFloat()
-            canvas.drawLine(cx, cy, ex, ey, stroke)
+    /** 扫/拂的羽状穿线：在主斜线中段叠 2 条与之交叉的短线。 */
+    private fun featherCross(
+        canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint, backslashDir: Boolean
+    ) {
+        // 短穿线方向与主线垂直，分别落在主线中上、中下两处
+        val s = u * 0.26f
+        val offs = floatArrayOf(-u * 0.22f, u * 0.22f)
+        for (o in offs) {
+            // 主线上该点坐标
+            val px = cx + o
+            val py = if (backslashDir) cy + o else cy - o
+            if (backslashDir) {
+                // 主线 \，穿线用 /
+                canvas.drawLine(px - s, py + s, px + s, py - s, stroke)
+            } else {
+                // 主线 /，穿线用 \
+                canvas.drawLine(px - s, py - s, px + s, py + s, stroke)
+            }
         }
-        // 中心小点，让放射线像从花心长出
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = stroke.color }
+    }
+
+    /** 轮指「星芒」：多条短线从中心整圆放射（图中约 5 条），中心一点。 */
+    private fun flower(canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint, fill: Paint) {
+        val len = u * 0.52f
+        val n = 6
+        for (i in 0 until n) {
+            val a = Math.toRadians(360.0 * i / n)
+            canvas.drawLine(
+                cx, cy,
+                cx + (Math.cos(a) * len).toFloat(),
+                cy + (Math.sin(a) * len).toFloat(),
+                stroke
+            )
+        }
+        canvas.drawCircle(cx, cy, u * 0.1f, fill)
+    }
+
+    /** 半轮：上半的 3 条放射。 */
+    private fun flowerHalf(canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint, fill: Paint) {
+        val len = u * 0.52f
+        for (deg in intArrayOf(180, 225, 270, 315, 360)) {
+            val a = Math.toRadians(deg.toDouble())
+            canvas.drawLine(
+                cx, cy,
+                cx + (Math.cos(a) * len).toFloat(),
+                cy + (Math.sin(a) * len).toFloat(),
+                stroke
+            )
+        }
         canvas.drawCircle(cx, cy, u * 0.1f, fill)
     }
 }
