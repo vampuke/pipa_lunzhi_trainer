@@ -223,16 +223,17 @@ class JianpuView @JvmOverloads constructor(
 
         // 八度点
         dotPaint.color = color
-        val radius = dp(1.8f)
+        val radius = dp(2f)
         if (note.octave > 0) {
-            val baseY = g.cy - dp(16f)
+            // 高八度点放在数字上沿之上，避免与数字重叠
+            val baseY = g.cy - dp(22f)
             for (k in 0 until note.octave) {
-                canvas.drawCircle(g.cx, baseY - k * dp(5f), radius, dotPaint)
+                canvas.drawCircle(g.cx, baseY - k * dp(5.5f), radius, dotPaint)
             }
         } else if (note.octave < 0) {
-            val baseY = g.cy + dp(8f)
+            val baseY = g.cy + dp(9f)
             for (k in 0 until -note.octave) {
-                canvas.drawCircle(g.cx, baseY + k * dp(5f), radius, dotPaint)
+                canvas.drawCircle(g.cx, baseY + k * dp(5.5f), radius, dotPaint)
             }
         }
 

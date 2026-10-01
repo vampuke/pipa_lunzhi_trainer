@@ -52,6 +52,12 @@ object PracticePieces {
         imported.add(ip.piece)
     }
 
+    /** 删除一首用户导入的曲目（内存态；持久层由 ImportStore 处理）。 */
+    fun removeImported(id: String) {
+        Scores.IMPORTED.remove(id)
+        imported.removeAll { it.id == id }
+    }
+
     /** 用户导入的曲目（内存态，由 ImportStore 持久化到 SharedPreferences）。 */
     val imported = ArrayList<PracticePiece>()
 

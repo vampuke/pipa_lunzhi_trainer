@@ -118,8 +118,8 @@ object FingerSymbols {
 
     /** 轮指「五线放射」：5 条短线呈放射，中心留空（线不交于一点）。 */
     private fun star5(canvas: Canvas, cx: Float, cy: Float, u: Float, stroke: Paint) {
-        val inner = u * 0.16f   // 内端离中心，保证中间空
-        val outer = u * 0.56f
+        val inner = u * 0.30f   // 内端离中心更远，中间留更大空心
+        val outer = u * 0.60f
         // 5 条均布，整体略偏上张开（像一朵小花）
         val base = -90.0        // 从正上方开始
         for (i in 0 until 5) {

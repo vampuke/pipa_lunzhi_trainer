@@ -43,7 +43,7 @@ class PlayAlongActivity : AppCompatActivity() {
             val isImported = PracticePieces.imported.any { it.id == p.id }
             card.pieceDiff.text = if (isImported) getString(R.string.play_imported_tag) else p.difficulty
             card.pieceStyle.text = p.composerOrStyle
-            card.pieceBlurb.text = p.blurb
+            card.pieceBlurb.text = if (isImported) getString(R.string.play_imported_hint) else p.blurb
             val mins = p.totalSeconds(p.refBpm) / 60
             val secs = p.totalSeconds(p.refBpm) % 60
             val meta = getString(R.string.play_piece_meta, p.refBpm, p.sections.size, mins, secs)
@@ -54,7 +54,44 @@ class PlayAlongActivity : AppCompatActivity() {
                         .putExtra(PiecePlayerActivity.EXTRA_PIECE_ID, p.id)
                 )
             }
+            if (isImported) {
+                card.root.setOnLongClickListener {
+                    showImportedMenu(p.id, p.title)
+                    true
+                }
+            }
             b.pieceList.addView(card.root)
         }
+    }
+
+    private fun showImportedMenu(id: String, title: String) {
+        val options = arrayOf(
+            getString(R.string.play_edit),
+            getString(R.string.play_delete)
+        )
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(title)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> startActivity(
+                        Intent(this, ScoreEditorActivity::class.java)
+                            .putExtra(ScoreEditorActivity.EXTRA_EDIT_ID, id)
+                    )
+                    1 -> confirmDelete(id, title)
+                }
+            }
+            .show()
+    }
+
+    private fun confirmDelete(id: String, title: String) {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setMessage(getString(R.string.play_delete_confirm, title))
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                PracticePieces.removeImported(id)
+                com.vampuck.pipa_trainer.data.ImportStore.delete(this, id)
+                rebuildList()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 }

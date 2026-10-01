@@ -31,6 +31,9 @@ class ScoreEditorActivity : AppCompatActivity() {
 
     private val notes = ArrayList<JNote>()
 
+    // 若为编辑现有曲目，记录其 id（保存时沿用，实现覆盖而非新建）
+    private var editingId: String? = null
+
     // 当前编辑状态
     private var curDegree = 1
     private var curOctave = 0
@@ -52,6 +55,8 @@ class ScoreEditorActivity : AppCompatActivity() {
         setupFingering()
         setupBeatsPerBar()
 
+        maybeLoadForEdit()
+
         b.btnAdd.setOnClickListener { addNote(rest = false) }
         b.btnRest.setOnClickListener { addNote(rest = true) }
         b.btnBackspace.setOnClickListener {
@@ -68,6 +73,27 @@ class ScoreEditorActivity : AppCompatActivity() {
         b.btnSave.setOnClickListener { save() }
 
         refreshPreview()
+    }
+
+    private fun maybeLoadForEdit() {
+        val id = intent.getStringExtra(EXTRA_EDIT_ID) ?: return
+        val ip = PracticePieces.imported.firstOrNull { it.id == id } ?: return
+        val sc = PracticePieces.scoreFor(id) ?: return
+        editingId = id
+        b.inputTitle.setText(ip.title)
+        b.inputBpm.setText(ip.refBpm.toString())
+        b.inputDiff.setText(ip.difficulty)
+        b.inputBlurb.setText(ip.blurb)
+        b.inputKey.setText(sc.key.substringBefore("  ").trim())
+        beatsPerBar = sc.beatsPerBar
+        when (beatsPerBar) {
+            3 -> b.bpbGroup.check(R.id.bpb3)
+            2 -> b.bpbGroup.check(R.id.bpb2)
+            else -> b.bpbGroup.check(R.id.bpb4)
+        }
+        sc.sections.firstOrNull()?.let { b.inputSection.setText(it.name) }
+        notes.clear()
+        sc.sections.forEach { notes.addAll(it.notes) }
     }
 
     // ---------------- 输入控件 ----------------
@@ -226,7 +252,7 @@ class ScoreEditorActivity : AppCompatActivity() {
         if (title.isEmpty()) { toast(getString(R.string.editor_need_title)); return }
         if (notes.isEmpty()) { toast(getString(R.string.editor_need_notes)); return }
 
-        val id = "user_" + System.currentTimeMillis()
+        val id = editingId ?: ("user_" + System.currentTimeMillis())
         val sc = currentScore()
         val bpm = b.inputBpm.text?.toString()?.trim()?.toIntOrNull() ?: 60
         val diff = b.inputDiff.text?.toString()?.trim().orEmpty().ifEmpty { "自录" }
@@ -249,4 +275,8 @@ class ScoreEditorActivity : AppCompatActivity() {
     }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_LONG).show()
+
+    companion object {
+        const val EXTRA_EDIT_ID = "edit_id"
+    }
 }

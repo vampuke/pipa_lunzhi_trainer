@@ -123,6 +123,10 @@
     <string name="import_fail">导入失败：%1$s</string>
     <string name="import_copyright">版权提示：请仅导入你自己拥有或自行录入的谱子作个人练习之用。请勿导入他人享有版权的乐谱并传播。</string>
     <string name="play_imported_tag">自录</string>
+    <string name="play_edit">编辑</string>
+    <string name="play_delete">删除</string>
+    <string name="play_delete_confirm">确定删除《%1$s》？此操作无法撤销。</string>
+    <string name="play_imported_hint">长按可编辑或删除</string>
 
     <!-- 交互式简谱编辑器 -->
     <string name="editor_title">简谱编辑器</string>
