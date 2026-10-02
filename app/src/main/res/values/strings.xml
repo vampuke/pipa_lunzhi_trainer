@@ -164,10 +164,10 @@
     <string name="strength_title">指力训练</string>
     <string name="strength_subtitle">逐次设定速度与时长，训练与休息自动衔接</string>
     <string name="strength_plan">训练计划</string>
-    <string name="strength_plan_hint">每一次训练可以单独设定速度与时长（默认 2 分钟），点速度或时长可直接输入。次数随时可增可减。</string>
+    <string name="strength_plan_hint">每一次训练可以单独设定速度与时长（默认 2 分钟、60 BPM），点速度或时长可直接输入。次数随时可增可减。</string>
     <string name="strength_round_n">第 %1$d 次训练</string>
-    <string name="strength_cps_value">%1$.1f 音/秒</string>
-    <string name="strength_cps_sub">≈ %1$d 音/分 · 节拍 %2$d BPM</string>
+    <string name="strength_bpm_value">%1$d BPM</string>
+    <string name="strength_bpm_sub">= %1$.1f 音/秒 · %2$d 音/分</string>
     <string name="strength_add_round">＋ 添加一次训练</string>
     <string name="strength_settings">训练设置</string>
     <string name="strength_rest">轮间休息</string>
@@ -178,6 +178,7 @@
     <string name="strength_guide_stroke">每击一响</string>
     <string name="strength_guide_hint_beat">每拍响一下（1 拍 = 1 轮 = 5 个音），先把整体节奏稳住。麦克风统计需要这个模式。</string>
     <string name="strength_guide_hint_stroke">引导音按目标速度逐音提示（每拍 5 响），适合卡速度；此时引导音会被麦克风当成击弦，统计已自动关闭。</string>
+    <string name="strength_accent">节拍重音</string>
     <string name="strength_mic">环境声统计（麦克风）</string>
     <string name="strength_mic_hint">开：实时显示你实际的速度与均匀度，训练后给出每次的小结。</string>
     <string name="strength_mic_off_hint">关：只按时间与引导音训练，不做统计。</string>
@@ -191,11 +192,11 @@
     <string name="strength_phase_work">训练中</string>
     <string name="strength_phase_rest">休息</string>
     <string name="strength_round_of">第 %1$d / %2$d 次</string>
-    <string name="strength_target_first">第一次：%1$.1f 音/秒</string>
-    <string name="strength_target">目标 %1$.1f 音/秒 · ≈ %2$d 音/分 · 节拍 %3$d BPM</string>
-    <string name="strength_next_rest">做完休息 %1$d 秒，接着第 %2$d 次（%3$.1f 音/秒）</string>
+    <string name="strength_target_first">第一次：%1$d BPM（%2$.1f 音/秒）</string>
+    <string name="strength_target">目标 %1$d BPM · %2$.1f 音/秒 · ≈ %3$d 音/分</string>
+    <string name="strength_next_rest">做完休息 %1$d 秒，接着第 %2$d 次（%3$d BPM）</string>
     <string name="strength_next_last">这是最后一次训练，做完即结束</string>
-    <string name="strength_next_work">接下来第 %1$d 次 · %2$.1f 音/秒</string>
+    <string name="strength_next_work">接下来第 %1$d 次 · %2$d BPM</string>
     <string name="strength_pause">暂停</string>
     <string name="strength_resume">继续</string>
     <string name="strength_skip">跳过当前阶段</string>
@@ -207,7 +208,7 @@
     <string name="strength_live_speed">实测 ≈ %1$.1f 音/秒</string>
     <string name="strength_live_detail">已击 %1$d 击 · 均匀度 ≈ %2$d%%</string>
     <string name="strength_no_stroke">还没检测到击弦：把手机放近琴身、环境安静些。</string>
-    <string name="strength_cps_dialog">训练速度（音/秒）</string>
+    <string name="strength_bpm_dialog">训练速度（BPM）</string>
     <string name="strength_dur_dialog">本次时长（秒）</string>
     <string name="strength_ok">确定</string>
     <string name="strength_cancel">取消</string>
@@ -228,7 +229,7 @@
     <string name="strength_end_title">训练结束</string>
     <string name="strength_summary_head">%1$s共完成 %2$d 次训练 · 用时 %3$s</string>
     <string name="strength_summary_early">【提前结束】</string>
-    <string name="strength_summary_round">第 %1$d 次 · 目标 %2$.1f 音/秒 · %3$s</string>
+    <string name="strength_summary_round">第 %1$d 次 · 目标 %2$d BPM · %3$s</string>
     <string name="strength_summary_measured">　实测 ≈ %1$.1f 音/秒 · %2$d 击 · 均匀度 ≈ %3$d%%</string>
     <string name="strength_summary_nomic">　（未统计）</string>
     <string name="strength_summary_short"> · 提前结束</string>

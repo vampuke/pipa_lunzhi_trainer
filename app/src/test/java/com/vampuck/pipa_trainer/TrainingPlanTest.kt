@@ -14,7 +14,7 @@ import org.junit.Test
  */
 class TrainingPlanTest {
 
-    private fun plan(rounds: List<Pair<Double, Int>>, rest: Int = 30, lead: Int = 5): TrainingPlan {
+    private fun plan(rounds: List<Pair<Int, Int>>, rest: Int = 30, lead: Int = 5): TrainingPlan {
         val p = TrainingPlan(rounds = mutableListOf(), restSec = rest, leadInSec = lead)
         rounds.forEach { p.rounds.add(TrainingPlan.Round(it.first, it.second)) }
         return p
@@ -24,23 +24,31 @@ class TrainingPlanTest {
     fun `defaults match the spec`() {
         val p = TrainingPlan()
         assertEquals(1, p.size)
-        assertEquals(120, p.rounds[0].durationSec)     // 默认每次 2 分钟
-        assertEquals(30, p.restSec)                    // 每次间隔 30 秒
-        assertEquals(5, p.leadInSec)                   // 开始前倒数 5 秒
-        assertEquals(5.0, p.rounds[0].cps, 1e-9)
+        assertEquals(60, p.rounds[0].bpm)               // 默认 60 BPM = 5 音/秒
+        assertEquals(120, p.rounds[0].durationSec)      // 默认每次 2 分钟
+        assertEquals(30, p.restSec)                     // 每次间隔 30 秒
+        assertEquals(5, p.leadInSec)                    // 开始前倒数 5 秒
     }
 
     @Test
-    fun `speed conversion to bpm and strokes per minute`() {
-        val r = TrainingPlan.Round(cps = 5.0, durationSec = 120)
-        assertEquals(60.0, r.bpm, 1e-9)                // 5 音/秒 → 60 BPM（每拍一轮）
+    fun `bpm converts to strokes per second and per minute`() {
+        val r = TrainingPlan.Round(bpm = 60, durationSec = 120)
+        assertEquals(5.0, r.cps, 1e-9)                  // 60 BPM = 每拍一轮 = 5 音/秒
         assertEquals(300.0, r.strokesPerMin, 1e-9)
-        assertEquals(144.0, TrainingPlan.Round(12.0, 60).bpm, 1e-9)
+        assertEquals(60.0, r.bpmD, 1e-9)
+
+        val fast = TrainingPlan.Round(bpm = 144, durationSec = 60)
+        assertEquals(12.0, fast.cps, 1e-9)              // 144 BPM = 12 音/秒
+        assertEquals(720.0, fast.strokesPerMin, 1e-9)
+
+        val slow = TrainingPlan.Round(bpm = 24, durationSec = 60)
+        assertEquals(2.0, slow.cps, 1e-9)
+        assertEquals(120.0, slow.strokesPerMin, 1e-9)
     }
 
     @Test
     fun `total time counts lead-in rests and work`() {
-        val p = plan(listOf(5.0 to 120, 6.0 to 60, 5.5 to 120))
+        val p = plan(listOf(60 to 120, 72 to 60, 66 to 120))
         assertEquals(300, p.workSec)                   // 120 + 60 + 120
         assertEquals(60, p.restTotalSec)               // 2 个间隔 × 30
         assertEquals(365, p.totalSec)                  // 5 + 300 + 60
@@ -48,7 +56,7 @@ class TrainingPlanTest {
 
     @Test
     fun `stage boundaries are exact`() {
-        val p = plan(listOf(5.0 to 120, 6.0 to 60))
+        val p = plan(listOf(60 to 120, 72 to 60))
 
         // 倒数 5 秒
         assertEquals(Phase.LEAD_IN, p.stageAt(0.0).phase)
@@ -82,7 +90,7 @@ class TrainingPlanTest {
 
     @Test
     fun `single round has no rest at all`() {
-        val p = plan(listOf(5.0 to 120))
+        val p = plan(listOf(60 to 120))
         assertEquals(0, p.restTotalSec)
         assertEquals(Phase.WORK, p.stageAt(124.999).phase)
         assertEquals(Phase.DONE, p.stageAt(125.0).phase)
@@ -90,7 +98,7 @@ class TrainingPlanTest {
 
     @Test
     fun `round start times`() {
-        val p = plan(listOf(5.0 to 120, 6.0 to 60, 5.5 to 90))
+        val p = plan(listOf(60 to 120, 72 to 60, 66 to 90))
         assertEquals(5.0, p.roundStartSec(0), 1e-9)
         assertEquals(155.0, p.roundStartSec(1), 1e-9)   // 5 + 120 + 30
         assertEquals(245.0, p.roundStartSec(2), 1e-9)   // + 60 + 30
@@ -98,7 +106,7 @@ class TrainingPlanTest {
 
     @Test
     fun `skip jumps to the end of the current stage`() {
-        val p = plan(listOf(5.0 to 120, 6.0 to 60))
+        val p = plan(listOf(60 to 120, 72 to 60))
         assertEquals(5.0, p.stageEndSec(2.0), 1e-9)          // 倒数 → 训练 1
         assertEquals(125.0, p.stageEndSec(60.0), 1e-9)       // 训练 1 → 休息
         assertEquals(155.0, p.stageEndSec(130.0), 1e-9)      // 休息 → 训练 2
@@ -112,22 +120,22 @@ class TrainingPlanTest {
 
     @Test
     fun `adding a round mid-run does not disturb the elapsed timeline`() {
-        val p = plan(listOf(5.0 to 120))
+        val p = plan(listOf(60 to 120))
         val before = p.stageAt(100.0)
-        p.addRound(cps = 7.0, durationSec = 60)
+        p.addRound(bpm = 84, durationSec = 60)
         val after = p.stageAt(100.0)
         assertEquals(Phase.WORK, after.phase)
         assertEquals(before.roundIndex, after.roundIndex)
         assertEquals(before.remainingSec, after.remainingSec, 1e-9)
         // 新的一次排在 120 秒训练 + 30 秒休息之后
         assertEquals(155.0, p.roundStartSec(1), 1e-9)
-        assertEquals(7.0, p.rounds[1].cps, 1e-9)
+        assertEquals(84, p.rounds[1].bpm)
         assertEquals(2, p.size)
     }
 
     @Test
     fun `remove keeps at least one round and respects the running one`() {
-        val p = plan(listOf(5.0 to 120, 6.0 to 60, 5.5 to 90))
+        val p = plan(listOf(60 to 120, 72 to 60, 66 to 90))
         assertFalse(p.removeRound(3))                       // 越界
         assertTrue(p.removeRound(2))                        // 取消最后一次
         assertEquals(2, p.size)
@@ -138,7 +146,7 @@ class TrainingPlanTest {
 
     @Test
     fun `canRemoveDuringRun guards the current round`() {
-        val p = plan(listOf(5.0 to 120, 6.0 to 60, 5.5 to 90))
+        val p = plan(listOf(60 to 120, 72 to 60, 66 to 90))
         val working = p.stageAt(60.0)                    // 正在做第 1 次
         assertEquals(Phase.WORK, working.phase)
         assertEquals(0, working.roundIndex)
@@ -155,7 +163,7 @@ class TrainingPlanTest {
 
     @Test
     fun `removing a pending round while resting shortens the tail without a jump`() {
-        val p = plan(listOf(5.0 to 120, 6.0 to 60, 5.5 to 90))
+        val p = plan(listOf(60 to 120, 72 to 60, 66 to 90))
         val t = 130.0                                    // 休息中（即将第 2 次）
         assertEquals(Phase.REST, p.stageAt(t).phase)
         assertTrue(p.removeRound(1))
@@ -163,17 +171,17 @@ class TrainingPlanTest {
         assertEquals(Phase.REST, after.phase)            // 还是休息，只是接下来换人
         assertEquals(30.0 - 5.0, after.remainingSec, 1e-9)
         assertEquals(1, after.roundIndex)                // 现在预告的是原来的第 3 次
-        assertEquals(5.5, p.rounds[1].cps, 1e-9)
+        assertEquals(66, p.rounds[1].bpm)
     }
 
     @Test
     fun `round values are clamped`() {
-        val p = plan(listOf(5.0 to 120))
-        p.addRound(cps = 999.0, durationSec = 100000)
-        assertEquals(TrainingPlan.MAX_CPS, p.rounds[1].cps, 1e-9)
+        val p = plan(listOf(60 to 120))
+        p.addRound(bpm = 9999, durationSec = 100000)
+        assertEquals(TrainingPlan.MAX_BPM, p.rounds[1].bpm)
         assertEquals(TrainingPlan.MAX_DURATION_SEC, p.rounds[1].durationSec)
-        p.addRound(cps = -1.0, durationSec = 0)
-        assertEquals(TrainingPlan.MIN_CPS, p.rounds[2].cps, 1e-9)
+        p.addRound(bpm = -1, durationSec = 0)
+        assertEquals(TrainingPlan.MIN_BPM, p.rounds[2].bpm)
         assertEquals(TrainingPlan.MIN_DURATION_SEC, p.rounds[2].durationSec)
     }
 

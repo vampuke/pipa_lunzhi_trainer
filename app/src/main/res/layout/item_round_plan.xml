@@ -59,9 +59,8 @@
                 android:text="速度"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
-
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCpsMinus"
+                android:id="@+id/btnBpmMinus"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
@@ -72,20 +71,20 @@
                 android:textSize="18sp" />
 
             <TextView
-                android:id="@+id/cpsValue"
+                android:id="@+id/bpmValue"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:background="?android:attr/selectableItemBackground"
                 android:gravity="center"
                 android:paddingVertical="6dp"
-                android:text="5.0 音/秒"
+                android:text="60 BPM"
                 android:textColor="@color/pipa_primary_dark"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCpsPlus"
+                android:id="@+id/btnBpmPlus"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
@@ -97,12 +96,12 @@
         </LinearLayout>
 
         <TextView
-            android:id="@+id/cpsSub"
+            android:id="@+id/bpmSub"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="40dp"
             android:gravity="center"
-            android:text="≈ 300 音/分 · 节拍 60 BPM"
+            android:text="= 5.0 音/秒 · 300 音/分"
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 

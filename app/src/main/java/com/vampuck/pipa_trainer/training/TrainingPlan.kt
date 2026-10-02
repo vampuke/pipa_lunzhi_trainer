@@ -6,12 +6,12 @@ package com.vampuck.pipa_trainer.training
  * 时间轴：
  *   倒数 5 秒 → 第 1 次训练 → 休息 30 秒 → 第 2 次训练 → 休息 30 秒 → … → 第 N 次训练 → 完成
  *
- * 每一次训练有**独立的速度**（音/秒）与时长（默认 2:00），次数可随时增删。
+ * 每一次训练有**独立的速度**（节拍器 BPM）与时长（默认 2:00），次数可随时增删。
  * [stageAt] 把「已经过去的秒数」映射成当前阶段，所以训练进行中追加一次训练、
  * 或取消还没开始的那些次，都不会打乱已经过去的时间。
  *
- * 速度单位是「音/秒」（每秒击弦次数），与首页「速度（音/分）」的换算：
- *   音/分 = 音/秒 × 60；节拍器 BPM = 音/秒 × 12（轮指每拍 5 响，1 拍 = 1 轮）。
+ * 速度用 BPM 表示（轮指每拍 5 响，1 拍 = 1 轮）：
+ *   音/秒 = BPM ÷ 12；音/分 = BPM × 5。
  */
 class TrainingPlan(
     val rounds: MutableList<Round> = mutableListOf(Round()),
@@ -19,16 +19,19 @@ class TrainingPlan(
     var leadInSec: Int = DEFAULT_LEAD_IN_SEC
 ) {
 
-    /** 一次训练：目标速度 + 时长。 */
+    /** 一次训练：目标速度（BPM）+ 时长。 */
     data class Round(
-        var cps: Double = DEFAULT_CPS,
+        var bpm: Int = DEFAULT_BPM,
         var durationSec: Int = DEFAULT_DURATION_SEC
     ) {
-        /** 换算成节拍器的 BPM（轮指每拍 5 响）。 */
-        val bpm: Double get() = cps * CPS_TO_BPM
+        /** 换算成节拍器用的 Double BPM。 */
+        val bpmD: Double get() = bpm.toDouble()
 
-        /** 换算成首页用的「音/分」。 */
-        val strokesPerMin: Double get() = cps * 60.0
+        /** 目标轮指速度（音/秒）。 */
+        val cps: Double get() = bpm / CPS_TO_BPM
+
+        /** 目标轮指速度（音/分），与首页「速度（音/分）」同口径。 */
+        val strokesPerMin: Double get() = bpm * STROKES_PER_BEAT
     }
 
     enum class Phase { LEAD_IN, WORK, REST, DONE }
@@ -68,10 +71,10 @@ class TrainingPlan(
     }
 
     /** 追加一次训练；不传参数时复制最后一次的设置。 */
-    fun addRound(cps: Double? = null, durationSec: Int? = null): Round {
+    fun addRound(bpm: Int? = null, durationSec: Int? = null): Round {
         val last = rounds.lastOrNull()
         val r = Round(
-            cps = (cps ?: last?.cps ?: DEFAULT_CPS).coerceIn(MIN_CPS, MAX_CPS),
+            bpm = (bpm ?: last?.bpm ?: DEFAULT_BPM).coerceIn(MIN_BPM, MAX_BPM),
             durationSec = (durationSec ?: last?.durationSec ?: DEFAULT_DURATION_SEC)
                 .coerceIn(MIN_DURATION_SEC, MAX_DURATION_SEC)
         )
@@ -132,17 +135,18 @@ class TrainingPlan(
     }
 
     companion object {
-        const val DEFAULT_CPS = 5.0
+        const val DEFAULT_BPM = 60                 // = 5 音/秒 = 300 音/分
         const val DEFAULT_DURATION_SEC = 120      // 默认每次 2 分钟
         const val DEFAULT_REST_SEC = 30           // 每次之间自动间隔 30 秒
         const val DEFAULT_LEAD_IN_SEC = 5         // 开始后倒数 5 秒
-        const val MIN_CPS = 1.0
-        const val MAX_CPS = 20.0
+        const val MIN_BPM = 20
+        const val MAX_BPM = 240
         const val MIN_DURATION_SEC = 30
         const val MAX_DURATION_SEC = 600
         const val MIN_REST_SEC = 5
         const val MAX_REST_SEC = 180
-        /** 轮指每拍 5 响 → BPM = 音/秒 × 60 / 5。 */
+        /** 轮指每拍 5 响：音/秒 = BPM ÷ 12，音/分 = BPM × 5。 */
         const val CPS_TO_BPM = 12.0
+        const val STROKES_PER_BEAT = 5.0
     }
 }
