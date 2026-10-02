@@ -22,6 +22,17 @@ a recorded audio file or live from the microphone.
   live loudness bar.
 - Tap **Stop** to get a full-session evaluation (same metrics + finger profile).
 
+**Interval training (指力训练)**
+- Build a plan of training rounds before you start: each round has its own
+  target speed (音/秒) and length (default 2:00), and rounds can be added or
+  removed at any time.
+- A built-in lead-in counts **5 seconds** down, then round 1 starts; after each
+  round the app rests **30 s** (adjustable) and moves on automatically.
+- Guide click in 每拍一轮 (one click per 轮) or 每击一响 (one click per stroke,
+  i.e. at the target stroke rate).
+- With the microphone on, the live readout shows your *actual* strokes/sec and
+  evenness during each round, and a per-round summary when the session ends.
+
 ## Metrics — how to read them
 
 - **CV (evenness):** lower is better. ≤0.12 A (near-professional), ≤0.20 B,

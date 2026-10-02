@@ -54,7 +54,6 @@
             android:paddingHorizontal="20dp"
             android:paddingTop="22dp"
             android:paddingBottom="24dp">
-
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btnFile"
                 style="@style/App.Card"
@@ -79,6 +78,19 @@
 
                 <include layout="@layout/item_feature"
                     android:id="@+id/itLive" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btnStrength"
+                style="@style/App.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <include layout="@layout/item_feature"
+                    android:id="@+id/itStrength" />
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.card.MaterialCardView

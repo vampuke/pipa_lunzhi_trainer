@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
 
         bindFeature(b.itFile, R.drawable.ic_file, R.string.feat_file_title, R.string.feat_file_sub)
         bindFeature(b.itLive, R.drawable.ic_live, R.string.feat_live_title, R.string.feat_live_sub)
+        bindFeature(b.itStrength, R.drawable.ic_strength, R.string.feat_strength_title, R.string.feat_strength_sub)
         bindFeature(b.itTuner, R.drawable.ic_tuner, R.string.feat_tuner_title, R.string.feat_tuner_sub)
         bindFeature(b.itMetronome, R.drawable.ic_metronome, R.string.feat_metronome_title, R.string.feat_metronome_sub)
         bindFeature(b.itPlay, R.drawable.ic_play, R.string.feat_play_title, R.string.feat_play_sub)
@@ -38,6 +39,9 @@ class MainActivity : AppCompatActivity() {
         }
         b.btnLive.setOnClickListener {
             startActivity(Intent(this, LiveActivity::class.java))
+        }
+        b.btnStrength.setOnClickListener {
+            startActivity(Intent(this, StrengthTrainingActivity::class.java))
         }
         b.btnTuner.setOnClickListener {
             startActivity(Intent(this, TunerActivity::class.java))
