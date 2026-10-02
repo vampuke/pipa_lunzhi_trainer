@@ -19,8 +19,9 @@ import kotlin.math.sin
  *
  * It supports:
  *  - [setSubdivision]: 1 = 四分音符整拍，2 = 八分音符分拍（每拍中间多一记弱音）。
- *  - [setAccentFirst]: true = 每小节(4 拍)第一拍用重音、其余三拍相同；
- *                      false = 四拍完全相同。
+ *  - [setLunzhi]: 轮指专用——四分拍，每拍均匀响 5 次，每拍的第 1 次重音。
+ *  - [setAccentFirst]: true = 每小节(4 拍)第一拍用重音、其余相同；
+ *                      false = 每拍相同（不强调任何一拍）。
  *
  * Three timbres are mixed: an *accent* (brighter/louder downbeat), a *normal*
  * beat (identical to the original single click, so existing callers are
@@ -30,7 +31,9 @@ import kotlin.math.sin
  * [Listener.onClick] is invoked for every audible click (main beat or
  * subdivision) with the estimated wall-clock time at which it will be audible —
  * callers that mask metronome bleed need all of them, not just downbeats.
- * [onBeat] is an optional UI callback that reports which beat of the bar fired.
+ * [onBeat] is an optional UI callback reporting which indicator slot fired:
+ * (slotIndex, slotCount, accent). slotCount depends on the mode — 4 for 整拍,
+ * 8 for 分拍, 5 for 轮指 — so the UI can lay out the right number of dots.
  */
 class Metronome {
 
@@ -45,18 +48,19 @@ class Metronome {
 
     /**
      * Optional UI beat callback, invoked from the worker thread for every click.
-     * @param beatInBar 0-based index of the main beat within the 4-beat bar
-     * @param accent    this click is the accented downbeat
-     * @param sub       this click is an off-beat subdivision ("and"), not a main beat
+     * @param slotIndex 0-based index of the lit indicator within its cycle
+     * @param slotCount how many indicators the current mode uses
+     *                  (4 整拍 / 8 分拍 / 5 轮指) — the UI lays out this many dots
+     * @param accent    this click is an accented (strong) click
      */
-    @Volatile var onBeat: ((beatInBar: Int, accent: Boolean, sub: Boolean) -> Unit)? = null
+    @Volatile var onBeat: ((slotIndex: Int, slotCount: Int, accent: Boolean) -> Unit)? = null
 
     @Volatile private var bpm: Double = 80.0
 
-    /** 每拍细分数：1 = 四分音符整拍，2 = 八分音符分拍。 */
-    @Volatile private var subdivision: Int = 1
+    /** 模式：0 = 四分整拍，1 = 八分分拍，2 = 轮指（每拍 5 响）。 */
+    @Volatile private var mode: Int = MODE_QUARTER
 
-    /** 是否强调每小节第一拍；false = 四拍完全相同。 */
+    /** 是否强调每小节第一拍；false = 每拍相同（整拍/分拍模式下不强调任何拍）。 */
     @Volatile private var accentFirst: Boolean = false
 
     /** 每小节拍数，固定 4（四声）。 */
@@ -70,7 +74,10 @@ class Metronome {
     val isRunning: Boolean get() = running
 
     fun setBpm(newBpm: Double) { bpm = newBpm.coerceIn(20.0, 240.0) }
-    fun setSubdivision(n: Int) { subdivision = n.coerceIn(1, 4) }
+    /** 兼容旧调用：1 = 整拍，2 = 分拍。 */
+    fun setSubdivision(n: Int) { mode = if (n >= 2) MODE_EIGHTH else MODE_QUARTER }
+    /** 直接设模式：MODE_QUARTER / MODE_EIGHTH / MODE_LUNZHI。 */
+    fun setMode(m: Int) { mode = m.coerceIn(MODE_QUARTER, MODE_LUNZHI) }
     fun setAccentFirst(on: Boolean) { accentFirst = on }
 
     @Synchronized
@@ -171,26 +178,47 @@ class Metronome {
         try {
             while (running && !Thread.currentThread().isInterrupted) {
                 val beatSamples = (sr * 60.0 / bpm).toLong().coerceAtLeast(1)
-                val subdiv = subdivision.coerceAtLeast(1)
-                val subSamples = (beatSamples / subdiv).coerceAtLeast(1)
+                val m = mode
                 val accentOn = accentFirst
 
-                // Schedule every MAIN beat that starts within this block, plus its
-                // off-beat subdivisions (which fall before the next main beat).
+                // Schedule every MAIN beat that starts within this block, plus the
+                // in-beat clicks its mode adds (分拍 1 off-beat / 轮指 4 extra).
                 while (nextBeat < pos + block) {
                     val beatInBar = (beatIndex % beatsPerBar).toInt()
-                    val mainType = if (accentOn && beatInBar == 0) 0 else 1   // accent : normal
-                    scheduleClick(scheduled, nextBeat, mainType, beatInBar,
-                        startNs, sr, latencyNs, clickIndex, false)
-                    clickIndex++
-
-                    for (k in 1 until subdiv) {
-                        val sSample = nextBeat + k.toLong() * subSamples
-                        scheduleClick(scheduled, sSample, 2, beatInBar,
-                            startNs, sr, latencyNs, clickIndex, true)
-                        clickIndex++
+                    when (m) {
+                        MODE_QUARTER -> {
+                            // 4 indicators. Accent only beat 0 when accentFirst; else every beat identical.
+                            val accent = accentOn && beatInBar == 0
+                            scheduleClick(scheduled, nextBeat, if (accent) 0 else 1,
+                                beatInBar, 4, accent, startNs, sr, latencyNs, clickIndex)
+                            clickIndex++
+                        }
+                        MODE_EIGHTH -> {
+                            // 8 indicators (2 per beat). Main beats are slots 0,2,4,6;
+                            // the off-beat "and" is the soft sub between them.
+                            val slot = beatInBar * 2
+                            val accent = accentOn && beatInBar == 0
+                            scheduleClick(scheduled, nextBeat, if (accent) 0 else 1,
+                                slot, 8, accent, startNs, sr, latencyNs, clickIndex)
+                            clickIndex++
+                            val sSample = nextBeat + beatSamples / 2
+                            scheduleClick(scheduled, sSample, 2, slot + 1, 8, false,
+                                startNs, sr, latencyNs, clickIndex)
+                            clickIndex++
+                        }
+                        MODE_LUNZHI -> {
+                            // 轮指：每拍均匀 5 响，强调每拍的第 1 响。显示用 5 个指示器，
+                            // 每拍重新从第 1 个点亮。第 1 响重音，其余四响普通。
+                            val subSamples = (beatSamples / 5).coerceAtLeast(1)
+                            for (k in 0 until 5) {
+                                val sSample = nextBeat + k.toLong() * subSamples
+                                val accent = k == 0
+                                scheduleClick(scheduled, sSample, if (accent) 0 else 1,
+                                    k, 5, accent, startNs, sr, latencyNs, clickIndex)
+                                clickIndex++
+                            }
+                        }
                     }
-
                     beatIndex++
                     nextBeat += beatSamples
                 }
@@ -224,12 +252,18 @@ class Metronome {
     }
 
     private fun scheduleClick(
-        scheduled: ArrayList<Evt>, sample: Long, type: Int, beatInBar: Int,
-        startNs: Long, sr: Int, latencyNs: Long, clickIndex: Long, isSub: Boolean
+        scheduled: ArrayList<Evt>, sample: Long, type: Int, slotIndex: Int, slotCount: Int,
+        accent: Boolean, startNs: Long, sr: Int, latencyNs: Long, clickIndex: Long
     ) {
-        scheduled.add(Evt(sample, type, beatInBar))
+        scheduled.add(Evt(sample, type, slotIndex))
         val audible = startNs + sample * 1_000_000_000L / sr + latencyNs
         listener?.onClick(clickIndex, audible)
-        onBeat?.invoke(beatInBar, type == 0, isSub)
+        onBeat?.invoke(slotIndex, slotCount, accent)
+    }
+
+    companion object {
+        const val MODE_QUARTER = 0
+        const val MODE_EIGHTH = 1
+        const val MODE_LUNZHI = 2
     }
 }

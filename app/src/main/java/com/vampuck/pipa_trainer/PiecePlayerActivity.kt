@@ -101,8 +101,8 @@ class PiecePlayerActivity : AppCompatActivity() {
         b.btnStart.setOnClickListener { if (running) pause() else start() }
         b.btnReset.setOnClickListener { reset() }
 
-        metronome.onBeat = { beatInBar, accent, _ ->
-            runOnUiThread { flashBeat(beatInBar, accent) }
+        metronome.onBeat = { slotIndex, _, accent ->
+            runOnUiThread { flashBeat(slotIndex, accent) }
         }
 
         applyBpm(bpm)

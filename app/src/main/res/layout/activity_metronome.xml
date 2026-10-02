@@ -29,7 +29,7 @@
                 android:paddingTop="20dp"
                 android:paddingBottom="22dp">
 
-                <!-- 节拍指示灯：四个圆点，当前拍点亮并放大回弹 -->
+                <!-- 节拍指示灯：圆点由代码按模式动态生成（4 整拍 / 8 分拍 / 5 轮指） -->
                 <LinearLayout
                     android:id="@+id/beatDots"
                     android:layout_width="wrap_content"
@@ -38,21 +38,7 @@
                     android:clipChildren="false"
                     android:clipToPadding="false"
                     android:paddingVertical="8dp"
-                    android:layout_marginBottom="6dp">
-
-                    <View android:id="@+id/dot0"
-                        android:layout_width="20dp" android:layout_height="20dp"
-                        android:layout_margin="8dp" />
-                    <View android:id="@+id/dot1"
-                        android:layout_width="20dp" android:layout_height="20dp"
-                        android:layout_margin="8dp" />
-                    <View android:id="@+id/dot2"
-                        android:layout_width="20dp" android:layout_height="20dp"
-                        android:layout_margin="8dp" />
-                    <View android:id="@+id/dot3"
-                        android:layout_width="20dp" android:layout_height="20dp"
-                        android:layout_margin="8dp" />
-                </LinearLayout>
+                    android:layout_marginBottom="6dp" />
 
                 <TextView
                     android:id="@+id/bpmValue"
@@ -182,6 +168,11 @@
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp" android:layout_height="wrap_content"
                 android:layout_weight="1" android:text="@string/metro_eighth" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnLunzhi"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="@string/metro_lunzhi" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <!-- 重音：强调首拍 / 四拍相同 -->

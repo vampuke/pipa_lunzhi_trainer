@@ -30,8 +30,9 @@ class MetronomeActivity : AppCompatActivity() {
     private val metronome = Metronome()
 
     private var bpm = 80
-    /** 对应 beatDots 里四个圆点，便于按序点亮。 */
-    private lateinit var dots: List<View>
+    /** 当前模式用到的指示圆点，数量随模式变化（4 整拍 / 8 分拍 / 5 轮指）。 */
+    private var dots: List<View> = emptyList()
+    private var slotCount = 4
 
     private val argb = ArgbEvaluator()
     private var cardFlash: ValueAnimator? = null
@@ -49,8 +50,8 @@ class MetronomeActivity : AppCompatActivity() {
         accentColor = getColor(R.color.pipa_accent)
         downbeatColor = getColor(R.color.pipa_primary)
 
-        dots = listOf(b.dot0, b.dot1, b.dot2, b.dot3)
-        resetDots()
+        dots = emptyList()
+        rebuildDots(4)
 
         // ---- 速度：SeekBar 粗调 (progress 0..180 -> 20..200) ----
         b.seekBpm.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -79,11 +80,19 @@ class MetronomeActivity : AppCompatActivity() {
             applyBpm(v)
         }
 
-        // ---- 拍型：整拍 / 分拍 ----
+        // ---- 拍型：整拍 / 分拍 / 轮指 ----
         b.modeGroup.check(R.id.btnQuarter)
         b.modeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
-            metronome.setSubdivision(if (checkedId == R.id.btnEighth) 2 else 1)
+            when (checkedId) {
+                R.id.btnEighth -> { metronome.setMode(Metronome.MODE_EIGHTH); rebuildDots(8) }
+                R.id.btnLunzhi -> { metronome.setMode(Metronome.MODE_LUNZHI); rebuildDots(5) }
+                else -> { metronome.setMode(Metronome.MODE_QUARTER); rebuildDots(4) }
+            }
+            // 轮指模式强调的是每拍第一响，与「强调首拍」开关无关，禁用重音选项以免误解
+            val lunzhi = checkedId == R.id.btnLunzhi
+            b.accentGroup.isEnabled = !lunzhi
+            for (i in 0 until b.accentGroup.childCount) b.accentGroup.getChildAt(i).isEnabled = !lunzhi
         }
 
         // ---- 重音：强调首拍 / 四拍相同 ----
@@ -97,9 +106,9 @@ class MetronomeActivity : AppCompatActivity() {
         // ---- 声音快捷开关 ----
         b.btnMetroToggle.setOnClickListener { if (metronome.isRunning) stop() else start() }
 
-        // 节拍回调：点亮并弹动当前拍；主拍额外闪一下整张卡（分拍弱音只做小幅提示）。
-        metronome.onBeat = { beatInBar, accent, sub ->
-            runOnUiThread { flashBeat(beatInBar, accent, sub) }
+        // 节拍回调：点亮并弹动当前指示器；强响额外闪一下整张卡。
+        metronome.onBeat = { slotIndex, count, accent ->
+            runOnUiThread { flashBeat(slotIndex, count, accent) }
         }
 
         applyBpm(bpm)   // 初始化显示与 SeekBar
@@ -144,20 +153,20 @@ class MetronomeActivity : AppCompatActivity() {
 
     // ---- 节拍指示 ----
 
-    private fun flashBeat(beatInBar: Int, accent: Boolean, sub: Boolean) {
-        // 1) 圆点：当前拍点亮并「放大回弹」，其余熄灭复位。
+    private fun flashBeat(slotIndex: Int, count: Int, accent: Boolean) {
+        // 1) 指示器：当前点亮并「放大回弹」，其余熄灭复位。
         for ((i, dot) in dots.withIndex()) {
-            val on = i == beatInBar
+            val on = i == slotIndex
             val color = when {
                 !on -> DOT_OFF
                 accent -> downbeatColor
                 else -> accentColor
             }
             tintDot(dot, color)
-            if (on) popDot(dot, if (sub) 1.25f else 1.7f) else resetDotScale(dot)
+            if (on) popDot(dot, if (accent) 1.7f else 1.3f) else resetDotScale(dot)
         }
-        // 2) 整卡闪一下：主拍强、首拍更强；分拍弱音不闪卡，避免喧宾夺主。
-        if (!sub) flashCard(if (accent) downbeatColor else accentColor)
+        // 2) 整卡闪一下：强响(重音)闪得更明显，普通响只做轻微提示。
+        flashCard(if (accent) downbeatColor else accentColor)
     }
 
     /** 瞬间放大，再平滑回到原尺寸——像节拍器摆锤到位时的「点」。 */
@@ -194,6 +203,29 @@ class MetronomeActivity : AppCompatActivity() {
 
     private fun resetDots() {
         for (d in dots) { resetDotScale(d); tintDot(d, DOT_OFF) }
+    }
+
+    /** 按模式重建指示圆点（4 整拍 / 8 分拍 / 5 轮指）。圆点动态加入 beatDots 容器。 */
+    private fun rebuildDots(count: Int) {
+        slotCount = count
+        b.beatDots.removeAllViews()
+        val density = resources.displayMetrics.density
+        // 点多了就缩小，避免横向挤出屏幕
+        val sizeDp = if (count >= 8) 15f else if (count >= 5) 17f else 20f
+        val marginDp = if (count >= 8) 5f else 8f
+        val size = (sizeDp * density).toInt()
+        val margin = (marginDp * density).toInt()
+        val list = ArrayList<View>(count)
+        for (i in 0 until count) {
+            val v = View(this)
+            val lp = android.widget.LinearLayout.LayoutParams(size, size)
+            lp.setMargins(margin, margin, margin, margin)
+            v.layoutParams = lp
+            b.beatDots.addView(v)
+            list.add(v)
+        }
+        dots = list
+        resetDots()
     }
 
     private fun tintDot(dot: View, color: Int) {
