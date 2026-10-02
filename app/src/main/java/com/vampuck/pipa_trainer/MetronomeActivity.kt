@@ -86,13 +86,9 @@ class MetronomeActivity : AppCompatActivity() {
             if (!isChecked) return@addOnButtonCheckedListener
             when (checkedId) {
                 R.id.btnEighth -> { metronome.setMode(Metronome.MODE_EIGHTH); rebuildDots(8) }
-                R.id.btnLunzhi -> { metronome.setMode(Metronome.MODE_LUNZHI); rebuildDots(5) }
+                R.id.btnLunzhi -> { metronome.setMode(Metronome.MODE_LUNZHI); rebuildDots(0) }
                 else -> { metronome.setMode(Metronome.MODE_QUARTER); rebuildDots(4) }
             }
-            // 轮指模式强调的是每拍第一响，与「强调首拍」开关无关，禁用重音选项以免误解
-            val lunzhi = checkedId == R.id.btnLunzhi
-            b.accentGroup.isEnabled = !lunzhi
-            for (i in 0 until b.accentGroup.childCount) b.accentGroup.getChildAt(i).isEnabled = !lunzhi
         }
 
         // ---- 重音：强调首拍 / 四拍相同 ----
@@ -154,6 +150,9 @@ class MetronomeActivity : AppCompatActivity() {
     // ---- 节拍指示 ----
 
     private fun flashBeat(slotIndex: Int, count: Int, accent: Boolean) {
+        // 轮指模式无指示器（count=0）：只发声，不做任何视觉。
+        if (dots.isEmpty()) return
+        if (slotIndex !in dots.indices) return
         // 1) 指示器：当前点亮并「放大回弹」，其余熄灭复位。
         for ((i, dot) in dots.withIndex()) {
             val on = i == slotIndex
@@ -165,8 +164,10 @@ class MetronomeActivity : AppCompatActivity() {
             tintDot(dot, color)
             if (on) popDot(dot, if (accent) 1.7f else 1.3f) else resetDotScale(dot)
         }
-        // 2) 整卡闪一下：强响(重音)闪得更明显，普通响只做轻微提示。
-        flashCard(if (accent) downbeatColor else accentColor)
+        // 2) 整卡闪一下：分拍时只在「正拍」(偶数槽)闪，避免 8 响把整卡闪成频闪；
+        //    重音闪得更明显。
+        val isMainPulse = count != 8 || slotIndex % 2 == 0
+        if (isMainPulse || accent) flashCard(if (accent) downbeatColor else accentColor)
     }
 
     /** 瞬间放大，再平滑回到原尺寸——像节拍器摆锤到位时的「点」。 */

@@ -49,7 +49,7 @@
     <string name="metro_accent_same">每拍相同</string>
     <string name="metro_start">开始</string>
     <string name="metro_stop">停止</string>
-    <string name="metro_hint">「四分·整拍」每拍一响，4 个指示器；「八分·分拍」每拍加一记弱音，8 个指示器；「轮指·每拍5响」每拍均匀响 5 次、强调每拍第一响，5 个指示器——专门练轮指颗粒。「强调首拍」让每小节第一拍用重音、其余相同；「每拍相同」则每拍一个样（轮指模式固定强调每拍首响，与此开关无关）。速度 20–200，可用 −/+ 微调或点常用速度快捷跳转。</string>
+    <string name="metro_hint">「四分·整拍」每拍一响，4 个指示器；「八分·分拍」每拍 2 响共 8 响、8 个指示器（「每拍相同」八响同一个声音，「强调首拍」只有整小节第 1 响不同）；「轮指·每拍5响」每拍均匀响 5 次、无指示器只发声（「强调首拍」每拍第 1 响不同，「每拍相同」五响一样）。速度 20–200，可用 −/+ 微调或点常用速度快捷跳转。</string>
 
     <string name="lbl_loudness">当前击弦力度</string>
     <string name="gate_quiet">环境安静，未检测到信号</string>

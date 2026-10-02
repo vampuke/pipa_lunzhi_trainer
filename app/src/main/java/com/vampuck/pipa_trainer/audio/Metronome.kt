@@ -194,25 +194,25 @@ class Metronome {
                             clickIndex++
                         }
                         MODE_EIGHTH -> {
-                            // 8 indicators (2 per beat). Main beats are slots 0,2,4,6;
-                            // the off-beat "and" is the soft sub between them.
+                            // 8 响（每拍 2 个）。「每拍相同」八响同一个声音，不再有弱音；
+                            // 「强调首拍」只有整小节的第 1 响用重音，其余七响相同。
                             val slot = beatInBar * 2
                             val accent = accentOn && beatInBar == 0
                             scheduleClick(scheduled, nextBeat, if (accent) 0 else 1,
                                 slot, 8, accent, startNs, sr, latencyNs, clickIndex)
                             clickIndex++
                             val sSample = nextBeat + beatSamples / 2
-                            scheduleClick(scheduled, sSample, 2, slot + 1, 8, false,
+                            scheduleClick(scheduled, sSample, 1, slot + 1, 8, false,
                                 startNs, sr, latencyNs, clickIndex)
                             clickIndex++
                         }
                         MODE_LUNZHI -> {
-                            // 轮指：每拍均匀 5 响，强调每拍的第 1 响。显示用 5 个指示器，
-                            // 每拍重新从第 1 个点亮。第 1 响重音，其余四响普通。
+                            // 轮指：每拍均匀 5 响。「强调首拍」每拍第 1 响重音、其余四响相同；
+                            // 「每拍相同」五响完全一样。无指示器，仅发声。
                             val subSamples = (beatSamples / 5).coerceAtLeast(1)
                             for (k in 0 until 5) {
                                 val sSample = nextBeat + k.toLong() * subSamples
-                                val accent = k == 0
+                                val accent = accentOn && k == 0
                                 scheduleClick(scheduled, sSample, if (accent) 0 else 1,
                                     k, 5, accent, startNs, sr, latencyNs, clickIndex)
                                 clickIndex++
