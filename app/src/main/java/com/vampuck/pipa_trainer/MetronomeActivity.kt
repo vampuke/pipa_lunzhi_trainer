@@ -83,7 +83,7 @@ class MetronomeActivity : AppCompatActivity() {
 
         // ---- 拍型：按钮只显示符号（四分音符 / 八分音符 / 轮指标记），不放文字 ----
         b.btnQuarter.symbol = SymbolButton.Symbol.QUARTER
-        b.btnEighth.symbol = SymbolButton.Symbol.EIGHTH
+        b.btnEighth.symbol = SymbolButton.Symbol.EIGHTH_PAIR
         b.btnLunzhi.symbol = SymbolButton.Symbol.LUN
         b.modeGroup.check(R.id.btnQuarter)
         b.modeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
