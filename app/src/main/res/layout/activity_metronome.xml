@@ -158,21 +158,36 @@
             app:selectionRequired="true"
             app:singleSelection="true">
 
-            <com.google.android.material.button.MaterialButton
+            <com.vampuck.pipa_trainer.view.SymbolButton
                 android:id="@+id/btnQuarter"
                 style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp" android:layout_height="wrap_content"
-                android:layout_weight="1" android:text="@string/metro_quarter" />
-            <com.google.android.material.button.MaterialButton
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:contentDescription="@string/metro_quarter"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:padding="0dp" />
+            <com.vampuck.pipa_trainer.view.SymbolButton
                 android:id="@+id/btnEighth"
                 style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp" android:layout_height="wrap_content"
-                android:layout_weight="1" android:text="@string/metro_eighth" />
-            <com.google.android.material.button.MaterialButton
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:contentDescription="@string/metro_eighth"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:padding="0dp" />
+            <com.vampuck.pipa_trainer.view.SymbolButton
                 android:id="@+id/btnLunzhi"
                 style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp" android:layout_height="wrap_content"
-                android:layout_weight="1" android:text="@string/metro_lunzhi" />
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:contentDescription="@string/metro_lunzhi"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:padding="0dp" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <!-- 重音：强调首拍 / 四拍相同 -->

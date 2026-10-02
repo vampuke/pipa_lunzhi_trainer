@@ -56,6 +56,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     // ---- 设置项 ----
     private var guidePerBeat = true      // true = 每拍一轮（整拍）；false = 每击一响（轮指模式）
+    private var accentFirst = true       // true = 强调每小节首拍；false = 每拍相同
     private var useMic = true
     private var syncingSwitches = false
 
@@ -107,8 +108,15 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         setContentView(b.root)
 
         metronome.listener = this
-        metronome.setAccentFirst(true)
+        metronome.setAccentFirst(accentFirst)
         metronome.setMode(Metronome.MODE_QUARTER)
+
+        b.accentGroup.check(if (accentFirst) R.id.btnAccentFirst else R.id.btnAccentSame)
+        b.accentGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            accentFirst = checkedId == R.id.btnAccentFirst
+            metronome.setAccentFirst(accentFirst)   // 立即生效，训练中改也听得见
+        }
 
         b.btnAddRound.setOnClickListener { plan.addRound(); rebuildRoundRows() }
         b.btnRestMinus.setOnClickListener { stepRest(-REST_STEP) }
@@ -187,15 +195,15 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         plan.rounds.forEachIndexed { i, r ->
             val row = ItemRoundPlanBinding.inflate(layoutInflater, b.roundContainer, false)
             row.roundTitle.text = getString(R.string.strength_round_n, i + 1)
-            row.cpsValue.text = getString(R.string.strength_cps_value, r.cps)
-            row.cpsSub.text = getString(
-                R.string.strength_cps_sub, r.strokesPerMin.roundToInt(), r.bpm.roundToInt()
+            row.bpmValue.text = getString(R.string.strength_bpm_value, r.bpm)
+            row.bpmSub.text = getString(
+                R.string.strength_bpm_sub, r.cps, r.strokesPerMin.roundToInt()
             )
             row.durValue.text = mmss(r.durationSec.toDouble())
             row.btnRemove.isEnabled = plan.size > 1
-            row.btnCpsMinus.setOnClickListener { stepCps(i, -CPS_STEP) }
-            row.btnCpsPlus.setOnClickListener { stepCps(i, CPS_STEP) }
-            row.cpsValue.setOnClickListener { askCps(i) }
+            row.btnBpmMinus.setOnClickListener { stepBpm(i, -BPM_STEP) }
+            row.btnBpmPlus.setOnClickListener { stepBpm(i, BPM_STEP) }
+            row.bpmValue.setOnClickListener { askBpm(i) }
             row.btnDurMinus.setOnClickListener { stepDur(i, -DUR_STEP) }
             row.btnDurPlus.setOnClickListener { stepDur(i, DUR_STEP) }
             row.durValue.setOnClickListener { askDur(i) }
@@ -232,10 +240,9 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun roundAt(i: Int): TrainingPlan.Round? = plan.rounds.getOrNull(i)
 
-    private fun stepCps(i: Int, delta: Double) {
+    private fun stepBpm(i: Int, delta: Int) {
         val r = roundAt(i) ?: return
-        r.cps = ((r.cps + delta).coerceIn(TrainingPlan.MIN_CPS, TrainingPlan.MAX_CPS) * 10)
-            .roundToInt() / 10.0
+        r.bpm = (r.bpm + delta).coerceIn(TrainingPlan.MIN_BPM, TrainingPlan.MAX_BPM)
         rebuildRoundRows()
     }
 
@@ -260,24 +267,23 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         rebuildRoundRows()
     }
 
-    private fun askCps(i: Int) {
+    private fun askBpm(i: Int) {
         val r = roundAt(i) ?: return
         val input = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setText(String.format("%.1f", r.cps))
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(r.bpm.toString())
             setSelection(text.length)
         }
         AlertDialog.Builder(this)
-            .setTitle(R.string.strength_cps_dialog)
+            .setTitle(R.string.strength_bpm_dialog)
             .setView(input)
             .setNegativeButton(R.string.strength_cancel, null)
             .setPositiveButton(R.string.strength_ok) { _, _ ->
-                val v = input.text.toString().trim().replace(',', '.').toDoubleOrNull()
+                val v = input.text.toString().trim().toIntOrNull()
                 if (v == null) {
                     toast(R.string.strength_bad_number)
                 } else {
-                    r.cps = (v.coerceIn(TrainingPlan.MIN_CPS, TrainingPlan.MAX_CPS) * 10)
-                        .roundToInt() / 10.0
+                    r.bpm = v.coerceIn(TrainingPlan.MIN_BPM, TrainingPlan.MAX_BPM)
                     rebuildRoundRows()
                 }
             }
@@ -406,14 +412,15 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun startGuideFor(i: Int) {
         val r = roundAt(i) ?: return
+        metronome.setAccentFirst(accentFirst)
         if (guidePerBeat) {
             metronome.setMode(Metronome.MODE_QUARTER)
-            metronome.setBpm(r.bpm)
-            analyzer?.setMetronomeBeat(60.0 / r.bpm)
+            metronome.setBpm(r.bpmD)
+            analyzer?.setMetronomeBeat(60.0 / r.bpmD)
         } else {
             metronome.setMode(Metronome.MODE_LUNZHI)
-            metronome.setBpm(r.bpm)
-            analyzer?.setMetronomeBeat(60.0 / (r.bpm * 5))
+            metronome.setBpm(r.bpmD)
+            analyzer?.setMetronomeBeat(60.0 / (r.bpmD * 5))
         }
         metronome.start()
     }
@@ -432,7 +439,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
                 b.countdownLabel.setText(R.string.strength_leadin_label)
                 b.runProgress.progress = progressOf(st)
                 roundAt(0)?.let {
-                    b.targetSpeed.text = getString(R.string.strength_target_first, it.cps)
+                    b.targetSpeed.text = getString(R.string.strength_target_first, it.bpm, it.cps)
                 }
                 b.nextSpeed.text = ""
             }
@@ -444,13 +451,12 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
                 b.runProgress.progress = progressOf(st)
                 if (r != null) {
                     b.targetSpeed.text = getString(
-                        R.string.strength_target, r.cps, r.strokesPerMin.roundToInt(),
-                        r.bpm.roundToInt()
+                        R.string.strength_target, r.bpm, r.cps, r.strokesPerMin.roundToInt()
                     )
                 }
                 b.nextSpeed.text = if (st.roundIndex < total - 1) {
                     getString(R.string.strength_next_rest, plan.restSec, st.roundIndex + 2,
-                        plan.rounds[st.roundIndex + 1].cps)
+                        plan.rounds[st.roundIndex + 1].bpm)
                 } else {
                     getString(R.string.strength_next_last)
                 }
@@ -463,10 +469,9 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
                 val r = roundAt(st.roundIndex)
                 if (r != null) {
                     b.targetSpeed.text = getString(
-                        R.string.strength_target, r.cps, r.strokesPerMin.roundToInt(),
-                        r.bpm.roundToInt()
+                        R.string.strength_target, r.bpm, r.cps, r.strokesPerMin.roundToInt()
                     )
-                    b.nextSpeed.text = getString(R.string.strength_next_work, st.roundIndex + 1, r.cps)
+                    b.nextSpeed.text = getString(R.string.strength_next_work, st.roundIndex + 1, r.bpm)
                 }
                 // 休息最后 3 秒轻响提示，准备起手
                 val left = ceil(st.remainingSec).toInt()
@@ -647,7 +652,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         val jitter = if (roundLiveSamples > 0) roundLiveJitSum / roundLiveSamples else 0.0
         results.add(
             RoundResult(
-                index = index, targetCps = r.cps, strokes = strokes, measuredCps = measured,
+                index = index, targetBpm = r.bpm, strokes = strokes, measuredCps = measured,
                 jitterPct = jitter, mic = useMic, full = playedMsOverride == null
             )
         )
@@ -675,7 +680,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             sb.append('\n')
             sb.append(
                 getString(
-                    R.string.strength_summary_round, r.index + 1, r.targetCps,
+                    R.string.strength_summary_round, r.index + 1, r.targetBpm,
                     mmss(plan.rounds.getOrNull(r.index)?.durationSec?.toDouble() ?: 0.0)
                 )
             )
@@ -714,7 +719,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private class RoundResult(
         val index: Int,
-        val targetCps: Double,
+        val targetBpm: Int,
         val strokes: Int,
         val measuredCps: Double,
         val jitterPct: Double,
@@ -724,7 +729,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private companion object {
         const val TICK_MS = 100L
-        const val CPS_STEP = 0.5
+        const val BPM_STEP = 5
         const val DUR_STEP = 30
         const val REST_STEP = 5
         const val REST_TICK_HZ = 880.0

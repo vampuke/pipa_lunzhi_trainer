@@ -68,6 +68,14 @@ class Metronome {
 
     @Volatile private var running = false
     private var worker: Thread? = null
+
+    /**
+     * 上一次的工作线程。stop() 只把 [track] 停下来，真正 release 是工作线程在做，
+     * 那要花几到几十毫秒；这段时间里如果直接开新一轮，两个 AudioTrack 会重叠一小会儿，
+     * 听感上就是开头多出一下。所以 start() 前先等它退干净（不在锁内 join，
+     * 避免与 onBeat/onClick 回调互等）。
+     */
+    @Volatile private var lastWorker: Thread? = null
     @Volatile private var track: AudioTrack? = null
     @Volatile var listener: Listener? = null
 
@@ -80,18 +88,30 @@ class Metronome {
     fun setMode(m: Int) { mode = m.coerceIn(MODE_QUARTER, MODE_LUNZHI) }
     fun setAccentFirst(on: Boolean) { accentFirst = on }
 
-    @Synchronized
     fun start() {
-        if (running) return
-        running = true
-        worker = thread(name = "metronome", isDaemon = true) { run() }
+        lastWorker?.let { w ->
+            if (w.isAlive) {
+                w.interrupt()
+                try { w.join(400) } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                }
+            }
+        }
+        lastWorker = null
+        synchronized(this) {
+            if (running) return
+            running = true
+            worker = thread(name = "metronome", isDaemon = true) { run() }
+        }
     }
 
     @Synchronized
     fun stop() {
         running = false
-        worker?.interrupt()
+        val w = worker
         worker = null
+        lastWorker = w
+        w?.interrupt()
         // Only *stop* here to unblock a pending write(). The worker thread owns
         // the release, so the same AudioTrack is never released twice.
         try { track?.stop() } catch (_: Throwable) {}
@@ -163,7 +183,6 @@ class Metronome {
                 .build()
         } catch (_: Throwable) { return }
         track = at
-        try { at.play() } catch (_: Throwable) { return }
 
         // conservative estimate of the output path latency (buffer half-fill)
         val latencyNs = ((bufBytes / 2).toLong() * 1_000_000_000L / (sr * 2)).coerceIn(
@@ -173,9 +192,12 @@ class Metronome {
         val buf = ShortArray(block)
         val scheduled = ArrayList<Evt>()   // clicks awaiting playback
         var pos = 0L                       // absolute index of the next sample to write
-        var nextBeat = 0L                  // sample index of the next MAIN beat
+        // 第一击不从 0 号采样开始：留一小段起始静音，起播瞬间的任何毛刺/重复
+        // 都落在静音上，而不是落在第一声上。
+        var nextBeat = (sr * START_SILENCE_SEC).toLong()   // sample index of the next MAIN beat
         var beatIndex = 0L                 // main-beat counter (for bar position)
         var clickIndex = 0L                // audible-click counter (for the Listener)
+        var started = false                // play() 只在第一块写进去之后调用
         val startNs = System.nanoTime()
 
         try {
@@ -250,8 +272,15 @@ class Metronome {
                 }
 
                 val written = at.write(buf, 0, block)   // blocks when the buffer is full
-                if (written < 0) break
-                pos += block
+                if (written <= 0) break
+                pos += written
+                if (!started) {
+                    // 先把第一块（起始静音）写进缓冲再起播。原来是 play() 在写之前，
+                    // 空缓冲起播时设备会把第一块重复/毛刺出来——听感就是每次开始
+                    // 「第一声」响两次。先喂一块再播，起播点落在静音里。
+                    started = true
+                    try { at.play() } catch (_: Throwable) { break }
+                }
             }
         } catch (_: Throwable) {
             // interrupted / device error -> exit
@@ -275,5 +304,11 @@ class Metronome {
         const val MODE_QUARTER = 0
         const val MODE_EIGHTH = 1
         const val MODE_LUNZHI = 2
+
+        /**
+         * 起播静音（秒）：第一击不从 0 号采样开始，起播瞬间设备可能把第一块缓冲
+         * 重复/毛刺出来，留一段静音就不会落成「第一声响两次」。
+         */
+        const val START_SILENCE_SEC = 0.09
     }
 }
