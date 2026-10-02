@@ -50,8 +50,6 @@ class StreamingAnalyzer(private val sampleRate: Int) {
      * 处的局部均值越低、相对门限越松，安静房间误报从 13 涨到 27 击/30s。保持 0.12s。
      */
     private val fluxWindowLen = (0.12 * fps).toInt().coerceAtLeast(1)
-    private val fluxHistory = ArrayDeque<Double>()
-    private var fluxSum = 0.0
     private var runningMax = 1e-9
 
     // ---- look-ahead ring so prominence can be evaluated like file mode ----
@@ -60,7 +58,8 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     private val toneSpanFrames = (0.030 * fps).toLong().coerceAtLeast(2L)
     private val ringLen = 2 * W + 3
     private val nfRing = DoubleArray(ringLen)
-    private val medRing = DoubleArray(ringLen)
+    /** Was this frame's flux included in the statistics (not metronome-masked)? */
+    private val okRing = BooleanArray(ringLen)
     private val rmsRing = DoubleArray(ringLen)
     private val toneRing = DoubleArray(ringLen)
     private val magBuf = DoubleArray(win / 2 + 1)
@@ -109,8 +108,8 @@ class StreamingAnalyzer(private val sampleRate: Int) {
 
     var noiseGateEnabled = true
 
-    private var gateRatio = 3.0
-    private var gateAbsMin = 0.004
+    @Volatile private var gateRatio = 3.0
+    @Volatile private var gateAbsMin = 0.004
 
     /**
      * A pipa at arm's length is 20-60 dB above the room, i.e. 10-1000x in RMS.
@@ -131,7 +130,7 @@ class StreamingAnalyzer(private val sampleRate: Int) {
      * presets sit around that boundary — 灵敏 is for a quiet room where the
      * level gate already handles the noise.
      */
-    var minTone = 0.58
+    @Volatile var minTone = 0.58
 
     fun setSensitivity(level: Int) {
         when (level) {
@@ -146,6 +145,9 @@ class StreamingAnalyzer(private val sampleRate: Int) {
 
     /** [Timbre.harmonicity] measured at each accepted onset (diagnostics). */
     val onsetTone = ArrayList<Double>()
+
+    /** Guards [onsetTimes] / [strokeAmp] / [onsetTone] against cross-thread reads. */
+    private val listLock = Any()
 
     // ---- metronome masking ----
     // Written from the metronome thread, read from the audio thread every frame.
@@ -259,20 +261,15 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val f = frameIndex
         val masked = isMetronomeMasked(frameTime(f))
 
-        // Never let a (loud) metronome click skew the normalisation or the
-        // moving average — that would desensitise the detector for ~1s after
-        // every click and swallow real strokes.
-        if (!masked) {
-            runningMax = maxOf(runningMax * 0.9995, flux)
-            val nf0 = if (runningMax > 1e-9) flux / runningMax else 0.0
-            fluxHistory.addLast(nf0); fluxSum += nf0
-            if (fluxHistory.size > fluxWindowLen) fluxSum -= fluxHistory.removeFirst()
-        }
+        // Never let a (loud) metronome click skew the normalisation — that would
+        // desensitise the detector for ~1s after every click and swallow real
+        // strokes. Masked frames are also flagged so the adaptive threshold
+        // window can skip them.
+        if (!masked) runningMax = maxOf(runningMax * 0.9995, flux)
         val nf = if (runningMax > 1e-9) flux / runningMax else 0.0
-        val med = if (fluxHistory.isEmpty()) 0.0 else fluxSum / fluxHistory.size
 
         nfRing[slot(f)] = nf
-        medRing[slot(f)] = med
+        okRing[slot(f)] = !masked
         rmsRing[slot(f)] = rms
         toneRing[slot(f)] = tone
 
@@ -290,10 +287,24 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         if (!floorReady) return
         val cv = nfRing[slot(c)]
         if (cv <= 0.0) return
-        // local maximum
-        if (!(cv > nfRing[slot(c - 1)] && cv >= nfRing[slot(c + 1)])) return
-        // relative adaptive threshold
-        if (cv <= medRing[slot(c)] * 1.2 + 0.02) return
+        // local maximum — the same rule as the file detector
+        if (!(cv >= nfRing[slot(c - 1)] && cv > nfRing[slot(c + 1)])) return
+        // Relative adaptive threshold over a CENTERED 0.12 s window, matching
+        // LunzhiAnalyzer's movingAverage(flux, 0.12s). It used to be the trailing
+        // mean at the *confirm* frame — i.e. a window sitting entirely in the
+        // peak's future — so live and file applied a different threshold curve to
+        // the same audio. Metronome-masked frames are excluded from the mean.
+        val half = fluxWindowLen / 2
+        var acc = 0.0
+        var cnt = 0
+        var k = max(c - half, c - W)
+        val kHi = min(c + half, latest)
+        while (k <= kHi) {
+            if (okRing[slot(k)]) { acc += nfRing[slot(k)]; cnt++ }
+            k++
+        }
+        val med = if (cnt > 0) acc / cnt else 0.0
+        if (cv <= med * 1.2 + 0.02) return
         // prominence within +/- W
         val lo = max(0L, c - W); val hi = min(c + W, latest)
         var lm = cv; var i = c - 1
@@ -313,9 +324,14 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val tone = onsetTone(c, latest)
         if (minTone > 0.0 && tone < minTone) return
 
-        onsetTimes.add(frameTime(c))
-        strokeAmp.add(cv)
-        onsetTone.add(tone)
+        // Reads happen on other threads too (the final report runs on the UI
+        // thread after a join that can time out), so appends and snapshots share
+        // one lock.
+        synchronized(listLock) {
+            onsetTimes.add(frameTime(c))
+            strokeAmp.add(cv)
+            onsetTone.add(tone)
+        }
         lastStrokeAmp = cv
         lastPeakFrame = c
     }
@@ -401,7 +417,8 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val now = totalSamples.toDouble() / sampleRate
         // 实时均匀度采用 **3 秒滑动窗口**：窗太长会把几秒前已纠正的抖动一直拖在读数里，
         // 练习者看不到当下的改善；3 秒在 8~20 击/秒下含 24~60 击，足够稳定估计 CV。
-        val recentRaw = onsetTimes.filter { it >= now - 3.0 }
+        val onsets = synchronized(listLock) { ArrayList(onsetTimes) }
+        val recentRaw = onsets.filter { it >= now - 3.0 }
         // 与文件模式一致：先合并双触发再算间隔，否则实时读数会被假起音推高。
         val recent = dedoubleTimes(recentRaw)
         val ioi = ArrayList<Double>()
@@ -424,11 +441,23 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val cvRoll = if (rollMean > 0) std(roll, rollMean) / rollMean else 0.0
         val gate = gateValue()
         return Live(cps, cps * 60, cv, modalCv, cvRoll, cvRoll * LunzhiAnalyzer.JITTER_SCALE,
-            onsetTimes.size, lastStrokeAmp, noiseFloor, gate, lastRms, gateOpen = lastRms > gate)
+            onsets.size, lastStrokeAmp, noiseFloor, gate, lastRms, gateOpen = lastRms > gate)
     }
 
-    fun metrics(): LunzhiAnalyzer.Metrics =
-        LunzhiAnalyzer.metrics(onsetTimes.toDoubleArray(), strokeAmp.toDoubleArray())
+    /**
+     * Final report metrics. Safe to call from another thread (the UI thread reads
+     * this after a `join` that is allowed to time out) — the lists are snapshotted
+     * under the same lock the audio thread appends with.
+     */
+    fun metrics(): LunzhiAnalyzer.Metrics {
+        val t: DoubleArray
+        val a: DoubleArray
+        synchronized(listLock) {
+            t = onsetTimes.toDoubleArray()
+            a = strokeAmp.toDoubleArray()
+        }
+        return LunzhiAnalyzer.metrics(t, a)
+    }
 
     private fun median(v: List<Double>): Double {
         if (v.isEmpty()) return 0.0
