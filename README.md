@@ -1,7 +1,8 @@
-# Pipa Lunzhi Trainer (琵琶轮指练习分析)
+# 轮指大作战 (Pipa Lunzhi Trainer)
 
-An Android app to analyze pipa **lunzhi** (tremolo / 轮指) practice — either from
-a recorded audio file or live from the microphone.
+Android app for pipa **lunzhi** (tremolo / 轮指) practice — the display name is
+**轮指大作战**. Analyze a recorded audio/video file or practise live from the
+microphone.
 
 ## Features
 
@@ -30,6 +31,9 @@ a recorded audio file or live from the microphone.
   round the app rests **30 s** (adjustable) and moves on automatically.
 - Guide click in 每拍一轮 (one click per 轮) or 每击一响 (one click per stroke),
   with the accent set to 强调首拍 or 每拍相同.
+- **Remembers your last plan** and keeps up to 8 reusable configs (tap a chip to
+  load, long-press to delete); configs are recorded automatically when a
+  session starts.
 - With the microphone on, the live readout shows your *actual* strokes/sec and
   evenness during each round, and a per-round summary when the session ends.
 

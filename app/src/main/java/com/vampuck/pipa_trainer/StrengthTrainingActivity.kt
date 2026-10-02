@@ -10,9 +10,12 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.text.InputType
+import android.text.TextUtils
 import android.view.View
 import android.view.WindowManager
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,9 +24,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.vampuck.pipa_trainer.audio.Metronome
 import com.vampuck.pipa_trainer.audio.TonePlayer
+import com.vampuck.pipa_trainer.data.TrainingConfigStore
 import com.vampuck.pipa_trainer.databinding.ActivityStrengthTrainingBinding
 import com.vampuck.pipa_trainer.databinding.ItemRoundPlanBinding
 import com.vampuck.pipa_trainer.dsp.StreamingAnalyzer
+import com.vampuck.pipa_trainer.training.TrainingConfig
 import com.vampuck.pipa_trainer.training.TrainingPlan
 import kotlin.concurrent.thread
 import kotlin.math.ceil
@@ -116,6 +121,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             if (!isChecked) return@addOnButtonCheckedListener
             accentFirst = checkedId == R.id.btnAccentFirst
             metronome.setAccentFirst(accentFirst)   // 立即生效，训练中改也听得见
+            persistDraft()
         }
 
         b.btnAddRound.setOnClickListener { plan.addRound(); rebuildRoundRows() }
@@ -124,7 +130,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
         b.guideGroup.check(if (guidePerBeat) R.id.btnGuideBeat else R.id.btnGuideStroke)
         b.guideGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
+            if (!isChecked || syncingSwitches) return@addOnButtonCheckedListener
             val beat = checkedId == R.id.btnGuideBeat
             if (!beat && useMic) {
                 // 每击一响的引导音与击弦同频，遮蔽窗会吃掉大量真实起音，统计必然失真。
@@ -134,6 +140,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             }
             guidePerBeat = beat
             updateGuideHint()
+            persistDraft()
         }
 
         b.switchMic.setOnCheckedChangeListener { _, on ->
@@ -146,6 +153,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             }
             useMic = on
             updateMicHint()
+            persistDraft()
         }
 
         b.btnStartTraining.setOnClickListener { onStartTraining() }
@@ -169,7 +177,10 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         syncMicSwitch()
         updateGuideHint()
         updateMicHint()
+        b.btnSaveConfig.setOnClickListener { askSaveConfig() }
+        restoreLastConfig()
         rebuildRoundRows()
+        renderConfigs()
     }
 
     override fun onStop() {
@@ -211,6 +222,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             b.roundContainer.addView(row.root)
         }
         updateSummary()
+        persistDraft()
     }
 
     private fun updateSummary() {
@@ -257,6 +269,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         plan.restSec = (plan.restSec + delta).coerceIn(TrainingPlan.MIN_REST_SEC, TrainingPlan.MAX_REST_SEC)
         b.restValue.text = getString(R.string.strength_rest_value, plan.restSec)
         updateSummary()
+        persistDraft()
     }
 
     private fun removeRound(i: Int) {
@@ -315,6 +328,111 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             .show()
     }
 
+    // ---------------- 配置：记住上次 + 多套快捷选择 ----------------
+
+    private fun autoConfigName(): String =
+        TrainingConfig.autoName(plan.rounds, plan.restSec, plan.leadInSec)
+
+    private fun currentConfig(name: String): TrainingConfig =
+        TrainingConfig.of(plan, name, guidePerBeat, accentFirst, useMic)
+
+    /** 每次改动都存一份「上一次编辑的配置」，下次进来自动恢复。 */
+    private fun persistDraft() {
+        TrainingConfigStore.saveLast(this, currentConfig(autoConfigName()))
+    }
+
+    private fun restoreLastConfig() {
+        val c = TrainingConfigStore.last(this) ?: return
+        applyConfig(c, announce = false)
+        toast(getString(R.string.strength_restored, c.name))
+    }
+
+    /** 把一套配置灌进当前计划与开关（不触发监听器，避免互相覆盖）。 */
+    private fun applyConfig(c: TrainingConfig, announce: Boolean) {
+        c.applyTo(plan)
+        guidePerBeat = c.guidePerBeat
+        accentFirst = c.accentFirst
+        useMic = c.useMic
+        if (!guidePerBeat && useMic) useMic = false      // 与手动切换同一条规则
+        syncingSwitches = true
+        b.guideGroup.check(if (guidePerBeat) R.id.btnGuideBeat else R.id.btnGuideStroke)
+        b.accentGroup.check(if (accentFirst) R.id.btnAccentFirst else R.id.btnAccentSame)
+        b.switchMic.isChecked = useMic
+        syncingSwitches = false
+        metronome.setAccentFirst(accentFirst)
+        b.restValue.text = getString(R.string.strength_rest_value, plan.restSec)
+        updateGuideHint()
+        updateMicHint()
+        rebuildRoundRows()
+        persistDraft()
+        if (announce) toast(getString(R.string.strength_config_loaded, c.name))
+    }
+
+    private fun renderConfigs() {
+        val list = TrainingConfigStore.saved(this)
+        b.configRow.removeAllViews()
+        if (list.isEmpty()) {
+            b.configHint.setText(R.string.strength_configs_empty)
+            return
+        }
+        b.configHint.setText(R.string.strength_configs_hint)
+        val density = resources.displayMetrics.density
+        val padH = (14 * density).toInt()
+        val padV = (8 * density).toInt()
+        val chipColor = getColor(R.color.pipa_primary_dark)
+        for (c in list) {
+            val chip = TextView(this).apply {
+                text = c.name
+                textSize = 13f
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(chipColor)
+                setBackgroundResource(R.drawable.bg_chip_accent)
+                setPadding(padH, padV, padH, padV)
+                isClickable = true
+                isLongClickable = true
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = (8 * density).toInt() }
+                setOnClickListener { applyConfig(c, announce = true) }
+                setOnLongClickListener { confirmDeleteConfig(c); true }
+            }
+            b.configRow.addView(chip)
+        }
+    }
+
+    private fun askSaveConfig() {
+        val auto = autoConfigName()
+        val input = EditText(this).apply {
+            setText(auto)
+            setSelection(text.length)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.strength_config_name_title)
+            .setView(input)
+            .setNegativeButton(R.string.strength_cancel, null)
+            .setPositiveButton(R.string.strength_ok) { _, _ ->
+                val name = TrainingConfig.sanitize(input.text.toString()).ifBlank { auto }
+                TrainingConfigStore.put(this, currentConfig(name))
+                renderConfigs()
+                toast(getString(R.string.strength_config_saved, name))
+            }
+            .show()
+    }
+
+    private fun confirmDeleteConfig(c: TrainingConfig) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.strength_config_delete_title)
+            .setMessage(getString(R.string.strength_config_delete_msg, c.name))
+            .setNegativeButton(R.string.strength_cancel, null)
+            .setPositiveButton(R.string.strength_config_delete_ok) { _, _ ->
+                TrainingConfigStore.delete(this, c.name)
+                renderConfigs()
+            }
+            .show()
+    }
+
     // ---------------- 训练流程 ----------------
 
     private fun onStartTraining() {
@@ -349,6 +467,10 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         b.micHintRun.text = ""
         b.btnPause.setText(R.string.strength_pause)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        // 记下这次实际开跑的配置：下次进来能在「常用配置」里直接选
+        TrainingConfigStore.put(this, currentConfig(autoConfigName()))
+        renderConfigs()
 
         if (useMic) startMic()
         handler.post(ticker)
