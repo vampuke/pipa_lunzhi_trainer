@@ -55,8 +55,8 @@ class TrainingPlan(
     /** 休息总时长。 */
     val restTotalSec: Int get() = restSec * (rounds.size - 1).coerceAtLeast(0)
 
-    /** 全程总时长（含倒数与休息）。 */
-    val totalSec: Int get() = leadInSec + workSec + restTotalSec
+    /** 全程总时长（含倒数与休息）。空计划为 0。 */
+    val totalSec: Int get() = if (rounds.isEmpty()) 0 else leadInSec + workSec + restTotalSec
 
     /** 第 [index] 次训练相对整个训练开始的起始秒。 */
     fun roundStartSec(index: Int): Double {

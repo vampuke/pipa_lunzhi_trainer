@@ -182,5 +182,6 @@ class TrainingPlanTest {
         val p = plan(listOf())
         assertEquals(Phase.DONE, p.stageAt(0.0).phase)
         assertEquals(0, p.totalSec)
+        assertEquals(0.0, p.stageEndSec(0.0), 1e-9)
     }
 }
