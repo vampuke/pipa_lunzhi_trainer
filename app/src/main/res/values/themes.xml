@@ -45,12 +45,17 @@
         <item name="cornerSize">16dp</item>
     </style>
 
-    <!-- 统一卡片外观 -->
-    <style name="App.Card" parent="Widget.Material3.CardView.Elevated">
+    <!-- 统一卡片外观：四边均匀的细描边。
+         原来用 1dp 投影（Widget.Material3.CardView.Elevated），但 1dp 的「点投影」在浅色背景上
+         只在卡片**下方**压出一条硬边，左右/上方几乎看不到——截图上就是「卡片像只有下边框」，
+         看起来别扭。改成 M3 描边卡片：没有投影，四边同一条 outline 色细线。 -->
+    <style name="App.Card" parent="Widget.Material3.CardView.Outlined">
         <item name="cardCornerRadius">18dp</item>
-        <item name="cardElevation">1dp</item>
+        <item name="cardElevation">0dp</item>
         <item name="cardBackgroundColor">@color/surface</item>
         <item name="contentPadding">0dp</item>
+        <item name="strokeColor">@color/outline</item>
+        <item name="strokeWidth">1dp</item>
     </style>
 
     <!-- 区块小标题 -->
