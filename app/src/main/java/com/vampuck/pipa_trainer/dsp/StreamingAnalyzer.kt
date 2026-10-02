@@ -399,7 +399,11 @@ class StreamingAnalyzer(private val sampleRate: Int) {
 
     private fun live(): Live {
         val now = totalSamples.toDouble() / sampleRate
-        val recent = onsetTimes.filter { it >= now - 6.0 }
+        // 实时均匀度采用 **3 秒滑动窗口**：窗太长会把几秒前已纠正的抖动一直拖在读数里，
+        // 练习者看不到当下的改善；3 秒在 8~20 击/秒下含 24~60 击，足够稳定估计 CV。
+        val recentRaw = onsetTimes.filter { it >= now - 3.0 }
+        // 与文件模式一致：先合并双触发再算间隔，否则实时读数会被假起音推高。
+        val recent = dedoubleTimes(recentRaw)
         val ioi = ArrayList<Double>()
         for (j in 1 until recent.size) {
             val d = recent[j] - recent[j - 1]
@@ -430,6 +434,28 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         if (v.isEmpty()) return 0.0
         val s = v.sorted(); val m = s.size / 2
         return if (s.size % 2 == 1) s[m] else (s[m - 1] + s[m]) / 2
+    }
+
+    /**
+     * 合并双触发（时间版，供实时读数用）：相邻间隔 < max(45ms, 0.5×中位间隔) 的两个
+     * 起音并成一个。与 [LunzhiAnalyzer.dedouble] 口径一致，只是实时侧没有逐击幅度，
+     * 直接保留先到的那个时间（对 CV 影响等价）。
+     */
+    private fun dedoubleTimes(times: List<Double>): List<Double> {
+        if (times.size < 2) return times
+        val rough = ArrayList<Double>()
+        for (i in 1 until times.size) {
+            val d = times[i] - times[i - 1]
+            if (d in LunzhiAnalyzer.MIN_IOI..LunzhiAnalyzer.MAX_IOI) rough.add(d)
+        }
+        val med = median(rough)
+        val floor = maxOf(0.045, 0.5 * med)
+        val out = ArrayList<Double>(times.size)
+        out.add(times[0])
+        for (i in 1 until times.size) {
+            if (times[i] - out[out.size - 1] >= floor) out.add(times[i])
+        }
+        return out
     }
 
     private fun std(v: List<Double>, mean: Double): Double {

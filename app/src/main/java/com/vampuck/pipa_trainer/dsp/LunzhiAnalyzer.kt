@@ -287,13 +287,42 @@ object LunzhiAnalyzer {
             FloatArray(flux.size) { flux[it].toFloat() }, fluxTimes, m)
     }
 
+    /**
+     * 合并「双触发」起音：相邻间隔 < max(45ms, 0.5×中位间隔) 的两个起音视作同一击
+     * （onset 检测把一下弹拆成两个），保留更响的那个的时间与幅度。中位间隔用一次
+     * 粗过滤的 IOI 估计，避免被双触发自身污染。
+     */
+    private fun dedouble(t: DoubleArray, a: DoubleArray): Pair<DoubleArray, DoubleArray> {
+        if (t.size < 2) return t to a
+        val rough = ArrayList<Double>()
+        for (i in 1 until t.size) { val d = t[i] - t[i - 1]; if (d in MIN_IOI..MAX_IOI) rough.add(d) }
+        val med = median(rough)
+        val floor = max(0.045, 0.5 * med)
+        val kt = ArrayList<Double>(t.size)
+        val ka = ArrayList<Double>(t.size)
+        kt.add(t[0]); ka.add(a[0])
+        for (i in 1 until t.size) {
+            if (t[i] - kt[kt.size - 1] < floor) {
+                if (a[i] > ka[ka.size - 1]) { kt[kt.size - 1] = t[i]; ka[ka.size - 1] = a[i] }
+            } else {
+                kt.add(t[i]); ka.add(a[i])
+            }
+        }
+        return kt.toDoubleArray() to ka.toDoubleArray()
+    }
+
     /** Recompute metrics for onsets within [from, to] (seconds). */
     fun metrics(onsetTimes: DoubleArray, amp: DoubleArray,
                 from: Double = 0.0, to: Double = Double.MAX_VALUE): Metrics {
         val idx = ArrayList<Int>()
         for (i in onsetTimes.indices) if (onsetTimes[i] >= from && onsetTimes[i] <= to) idx.add(i)
-        val t = DoubleArray(idx.size) { onsetTimes[idx[it]] }
-        val a = DoubleArray(idx.size) { amp[idx[it]] }
+        val t0 = DoubleArray(idx.size) { onsetTimes[idx[it]] }
+        val a0 = DoubleArray(idx.size) { amp[idx[it]] }
+        // 先合并「双触发」：同一下弹被 onset 检测拆成两个极近的起音，会同时虚增击数、
+        // 把 IOI 分布的快端塞满、推高 cvRoll。实测两段真实录像（初学者/接近专业）里，
+        // 这类 <0.5×中位 的间隔在初学者有 ~84、接近专业有 ~35 个，全是检测假象而非演奏。
+        // 合并规则：相邻起音间隔 < max(45ms, 0.5×中位) 时视作同一击，保留更响的那一个。
+        val (t, a) = dedouble(t0, a0)
 
         val ioiAll = ArrayList<Double>()
         for (i in 1 until t.size) ioiAll.add(t[i] - t[i - 1])

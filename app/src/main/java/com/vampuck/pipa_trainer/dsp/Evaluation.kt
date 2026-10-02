@@ -270,10 +270,12 @@ object Evaluation {
         return 1.0 - 6.0 * d2 / (n * (n * n - 1).toDouble())
     }
 
-    /** 评分只用 cvRoll 派生的抖动：既抓住漏击，也不会把乐句间的停顿算成不匀。 */
+    /** 评分只用 cvRoll 派生的抖动：既抓住漏击，也不会把乐句间的停顿算成不匀。
+     * 停顿(stall)按断点扣分；抢拍(rush) 不再单独扣分——真实录像里它主要是 onset 双触发
+     * 的假象，已在 [LunzhiAnalyzer] 的起音合并里处理，残余量再扣分等于对同一现象双重惩罚。 */
     private fun evennessScore(m: LunzhiAnalyzer.Metrics): Int {
         val base = 110.0 - m.rollJitterPct * 3.5
-        val breakPenalty = min(12.0, (m.stallCount + m.rushCount) * 2.0)
+        val breakPenalty = min(12.0, m.stallCount * 2.0)
         return (base - breakPenalty).coerceIn(0.0, 100.0).roundToInt()
     }
 

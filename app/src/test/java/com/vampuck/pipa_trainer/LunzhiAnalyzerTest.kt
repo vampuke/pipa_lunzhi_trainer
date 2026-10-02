@@ -83,6 +83,27 @@ class LunzhiAnalyzerTest {
     }
 
     @Test
+    fun doubleTriggersAreMergedNotCountedAsRushing() {
+        // 一下弹被 onset 检测拆成两个极近起音（间隔 ~15ms），不应虚增击数或推高 cvRoll。
+        val base = 0.11
+        val t = ArrayList<Double>()
+        var acc = 0.15
+        for (i in 0 until 60) {
+            t.add(acc)
+            // 每 3 击插一个紧随其后的双触发
+            if (i % 3 == 0) t.add(acc + 0.015)
+            acc += base
+        }
+        val arr = t.toDoubleArray()
+        val amp = DoubleArray(arr.size) { 1.0 }
+        val m = LunzhiAnalyzer.metrics(arr, amp)
+        // 合并后击数应接近 60（而非 ~80），且几乎没有 rush
+        assertTrue("strokes=${m.strokes}", m.strokes in 56..64)
+        assertTrue("rush=${m.rushCount}", m.rushCount <= 2)
+        assertTrue("cvRoll=${m.cvRoll}", m.cvRoll < 0.12)
+    }
+
+    @Test
     fun fiveFoldPicksWeakPosition() {
         // amps where position 5 (index 4) is consistently weak; positions are
         // counted from the first stroke, so index 4 is 第5击
