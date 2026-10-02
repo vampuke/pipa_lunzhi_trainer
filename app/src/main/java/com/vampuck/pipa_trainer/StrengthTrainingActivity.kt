@@ -834,6 +834,8 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun toast(res: Int) = Toast.makeText(this, res, Toast.LENGTH_SHORT).show()
 
+    private fun toast(text: CharSequence) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+
     private fun mmss(seconds: Double): String {
         val s = ceil(seconds).toInt().coerceAtLeast(0)
         return "%d:%02d".format(s / 60, s % 60)
