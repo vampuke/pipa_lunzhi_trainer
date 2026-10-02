@@ -119,8 +119,11 @@ class Metronome {
         return pcm
     }
 
-    /** A scheduled click: absolute sample index + which timbre to play. */
-    private class Evt(val sample: Long, val type: Int, val beatInBar: Int)
+    /** A scheduled click: absolute sample index + which timbre + UI slot info. */
+    private class Evt(
+        val sample: Long, val type: Int,
+        val slotIndex: Int, val slotCount: Int, val accent: Boolean
+    ) { var uiFired = false }
 
     private fun run() {
         val sr = 44100
@@ -229,6 +232,13 @@ class Metronome {
                     val e = it.next()
                     val wave = clicks[e.type]
                     val off = (e.sample - pos).toInt()
+                    // UI 点亮必须发生在该击「真正写入输出」的这一刻，而不是排程时——
+                    // 一个 block 会一次排好多击（还含 look-ahead），若排程即上报，圆点会
+                    // 整批抢跑、与声音错位。这里当 e.sample 落入当前 block 时才上报一次。
+                    if (!e.uiFired && off in 0 until block) {
+                        e.uiFired = true
+                        onBeat?.invoke(e.slotIndex, e.slotCount, e.accent)
+                    }
                     for (k in wave.indices) {
                         val i = off + k
                         if (i in 0 until block) {
@@ -255,10 +265,10 @@ class Metronome {
         scheduled: ArrayList<Evt>, sample: Long, type: Int, slotIndex: Int, slotCount: Int,
         accent: Boolean, startNs: Long, sr: Int, latencyNs: Long, clickIndex: Long
     ) {
-        scheduled.add(Evt(sample, type, slotIndex))
+        scheduled.add(Evt(sample, type, slotIndex, slotCount, accent))
+        // 节拍遮蔽需要「预定时间 + 延迟」的听觉时刻，仍在排程时上报（它只喂给算法做遮蔽）。
         val audible = startNs + sample * 1_000_000_000L / sr + latencyNs
         listener?.onClick(clickIndex, audible)
-        onBeat?.invoke(slotIndex, slotCount, accent)
     }
 
     companion object {
