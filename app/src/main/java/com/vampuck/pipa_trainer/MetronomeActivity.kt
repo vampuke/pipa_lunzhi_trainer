@@ -245,6 +245,17 @@ class MetronomeActivity : AppCompatActivity() {
         if (metronome.isRunning) stop()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        // 节拍器的工作线程持有这个 lambda（以及它捕获的 Activity / Binding），
+        // 不清掉的话，工作线程没及时退出时会把已销毁的界面一起拖住。
+        metronome.onBeat = null
+        metronome.stop()
+        cardFlash?.cancel()
+        cardFlash = null
+        for (d in dots) d.animate().cancel()
+    }
+
     private companion object {
         const val MIN_BPM = 20
         const val MAX_BPM = 200

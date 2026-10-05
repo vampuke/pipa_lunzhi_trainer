@@ -146,6 +146,7 @@ class PiecePlayerActivity : AppCompatActivity() {
         running = true
         lastTickMs = SystemClock.elapsedRealtime()
         b.btnStart.setText(R.string.play_pause)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (clickOn) startClick()
     }
 
@@ -163,6 +164,7 @@ class PiecePlayerActivity : AppCompatActivity() {
         b.btnStart.setText(R.string.btn_start)
         metronome.stop()
         resetDots()
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     private fun reset() {
@@ -177,6 +179,7 @@ class PiecePlayerActivity : AppCompatActivity() {
         b.btnStart.setText(R.string.btn_start)
         metronome.stop()
         resetDots()
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     private fun startClick() {
@@ -214,6 +217,7 @@ class PiecePlayerActivity : AppCompatActivity() {
         b.btnStart.setText(R.string.play_again)
         metronome.stop()
         resetDots()
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     /** 当前小节 = floor(elapsedBeats / beatsPerBar)。整小节高亮。 */
@@ -269,6 +273,16 @@ class PiecePlayerActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         if (running) pause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // 工作线程持有这个 lambda（连同 Activity / Binding）：不清掉它，线程没
+        // 及时退出时就一直拖着一个已销毁的界面。
+        metronome.onBeat = null
+        metronome.stop()
+        countdownJob?.cancel()
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     companion object {

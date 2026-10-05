@@ -69,11 +69,17 @@ object JScoreJson {
             val notes = ArrayList<JNote>()
             for (j in 0 until notesArr.length()) {
                 val n = notesArr.getJSONObject(j)
+                // 导入的字段必须有界：越界的音级/八度/时值会一路进到渲染与时值
+                // 计算里（总拍数、进度条直接错乱），NaN 更会让整段布局算不出来。
+                val d = n.optInt("d", 1)
+                require(d in 0..7) { "第 ${j + 1} 个音的音级 d=$d 越界（只能是 0~7，0 表示休止）" }
+                val durRaw = n.optDouble("dur", 1.0)
+                val dur = if (durRaw.isFinite() && durRaw > 0.0) durRaw.coerceIn(0.0625, 16.0) else 1.0
                 notes.add(
                     JNote(
-                        degree = n.getInt("d"),
-                        octave = n.optInt("oct", 0),
-                        dur = n.optDouble("dur", 1.0),
+                        degree = d,
+                        octave = n.optInt("oct", 0).coerceIn(-3, 3),
+                        dur = dur,
                         tremolo = n.optBoolean("tr", false),
                         finger = n.optString("fg", "")
                     )
@@ -85,14 +91,14 @@ object JScoreJson {
 
         val score = JScore(
             key = o.optString("key", ""),
-            beatsPerBar = o.optInt("beatsPerBar", 4),
+            beatsPerBar = o.optInt("beatsPerBar", 4).coerceIn(1, 16),
             sections = sections
         )
         val piece = PracticePiece(
             id = id,
             title = o.optString("title", id),
             composerOrStyle = o.optString("composerOrStyle", "导入曲目"),
-            refBpm = o.optInt("refBpm", 60),
+            refBpm = o.optInt("refBpm", 60).coerceIn(20, 300),
             difficulty = o.optString("difficulty", "自定义"),
             blurb = o.optString("blurb", ""),
             sections = sections.map { PieceSection(it.name, it.beats.toInt().coerceAtLeast(1)) }

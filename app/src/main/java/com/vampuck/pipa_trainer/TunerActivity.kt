@@ -1,23 +1,22 @@
 package com.vampuck.pipa_trainer
 
 import android.Manifest
-import android.content.pm.PackageManager
 import android.graphics.drawable.GradientDrawable
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Bundle
 import android.view.LayoutInflater
-import android.widget.LinearLayout
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import com.vampuck.pipa_trainer.audio.TonePlayer
 import com.vampuck.pipa_trainer.databinding.ActivityTunerBinding
 import com.vampuck.pipa_trainer.databinding.ItemTunerStringBinding
 import com.vampuck.pipa_trainer.dsp.Tuner
 import com.vampuck.pipa_trainer.dsp.Tuning
+import java.util.Locale
 import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -39,7 +38,15 @@ class TunerActivity : AppCompatActivity() {
     private var instrument: Tuning.Instrument = Tuning.PIPA
     @Volatile private var listening = false
     private var recordThread: Thread? = null
-    private var tuner: Tuner? = null
+
+    /** 持有 recorder 才能在停止时先打断阻塞中的 read()，再去 join。 */
+    @Volatile private var recorder: AudioRecord? = null
+
+    /**
+     * 当前正在用的检测器实例。换乐器会重启引擎并换掉它；录音线程闭包里是构造时
+     * 捕获的那个 Tuner，界面用 [tuner] 做一次身份校验，丢掉换表瞬间还在飞的旧读数。
+     */
+    @Volatile private var tuner: Tuner? = null
     private val tonePlayer = TonePlayer()
     private var lastLevel = 0.0
     private val rows = ArrayList<ItemTunerStringBinding>()
@@ -47,7 +54,9 @@ class TunerActivity : AppCompatActivity() {
     private val permReq = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) start() else Toast.makeText(this, R.string.need_mic, Toast.LENGTH_LONG).show()
+        if (granted) start() else MicPermission.showHelp(this) {
+            permReq.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,8 +96,13 @@ class TunerActivity : AppCompatActivity() {
         b.stringHint.text = ""
         tintDot(0xFFBDBDBD.toInt())
         markStrings(-1, 0.0)
-        tuner = tuner?.let { Tuner(actualRate, inst.strings) }
         setStatus(getString(R.string.tuner_ready))
+        // 录音线程闭包捕获的是构造时的 Tuner：只换字段的话，跑着的线程会继续用
+        // 旧弦表出「第几弦、往哪拧」，用户照着拧就拧错弦。所以正在听就重启引擎。
+        if (listening) {
+            stop()
+            start()
+        }
     }
 
     private fun stringsHintRes(inst: Tuning.Instrument): Int = when (inst.key) {
@@ -103,7 +117,7 @@ class TunerActivity : AppCompatActivity() {
         for (s in instrument.strings) {
             val row = ItemTunerStringBinding.inflate(LayoutInflater.from(this), b.stringList, false)
             row.strLabel.text = "${s.label}  ${s.note}"
-            row.strDev.text = String.format(java.util.Locale.US, "%.2f Hz", s.hz)
+            row.strDev.text = String.format(Locale.US, "%.2f Hz", s.hz)
             row.strDev.setTextColor(getColor(R.color.black))
             row.root.setOnClickListener {
                 tonePlayer.play(s.hz)
@@ -115,9 +129,8 @@ class TunerActivity : AppCompatActivity() {
     }
 
     private fun ensurePermThenStart() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            == PackageManager.PERMISSION_GRANTED
-        ) start() else permReq.launch(Manifest.permission.RECORD_AUDIO)
+        if (MicPermission.granted(this)) start()
+        else permReq.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     private fun start() {
@@ -125,30 +138,40 @@ class TunerActivity : AppCompatActivity() {
             sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
         val bufSize = maxOf(minBuf, sampleRate / 4) * 2
-        val recorder = try {
+        val rec = try {
             AudioRecord(
                 MediaRecorder.AudioSource.MIC, sampleRate,
                 AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize
             )
-        } catch (e: SecurityException) {
-            Toast.makeText(this, R.string.need_mic, Toast.LENGTH_LONG).show(); return
+        } catch (e: Throwable) {
+            Toast.makeText(this, R.string.mic_init_failed, Toast.LENGTH_LONG).show(); return
         }
-        if (recorder.state != AudioRecord.STATE_INITIALIZED) {
-            Toast.makeText(this, "麦克风初始化失败", Toast.LENGTH_LONG).show(); return
+        if (rec.state != AudioRecord.STATE_INITIALIZED) {
+            // 构造成功了也要 release，否则每次重试漏一个 native 缓冲。
+            try { rec.release() } catch (_: Throwable) {}
+            Toast.makeText(this, R.string.mic_init_failed, Toast.LENGTH_LONG).show(); return
         }
 
         // 设备不一定按请求的采样率交付（不少机器固定 48kHz）。若实际是 48000 而
         // 我们按 44100 去算，偏差是 1200*log2(48/44.1) ≈ 147 音分——比半个音还多，
         // 表现成「调音器坏了」。所以一律用 AudioRecord 回报的实际采样率。
-        actualRate = recorder.sampleRate.takeIf { it > 0 } ?: sampleRate
+        actualRate = rec.sampleRate.takeIf { it > 0 } ?: sampleRate
 
         val t = Tuner(actualRate, instrument.strings)
         tuner = t
+        try {
+            rec.startRecording()
+        } catch (e: Throwable) {
+            // 麦克风被其它应用占用时会抛 IllegalStateException（原来是裸调用 → 崩溃）。
+            try { rec.release() } catch (_: Throwable) {}
+            Toast.makeText(this, R.string.mic_init_failed, Toast.LENGTH_LONG).show(); return
+        }
+        recorder = rec
         lastLevel = 0.0
         listening = true
         b.btnTunerToggle.setText(R.string.btn_tuner_stop)
         setStatus(getString(R.string.tuner_listening))
-        recorder.startRecording()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         recordThread = thread(name = "tuner-mic") {
             // 512 采样 ≈ 11.6ms：相邻两次分析窗重叠 75%，指针才稳；按 100ms 读时
@@ -157,7 +180,7 @@ class TunerActivity : AppCompatActivity() {
             val floatBuf = FloatArray(shortBuf.size)
             var lastUi = 0L
             while (listening) {
-                val n = recorder.read(shortBuf, 0, shortBuf.size)
+                val n = try { rec.read(shortBuf, 0, shortBuf.size) } catch (e: Throwable) { -1 }
                 if (n > 0) {
                     var acc = 0.0
                     for (i in 0 until n) {
@@ -172,11 +195,12 @@ class TunerActivity : AppCompatActivity() {
                     val now = System.currentTimeMillis()
                     if (reading != null && now - lastUi >= UI_MIN_INTERVAL_MS) {
                         lastUi = now
-                        runOnUiThread { show(reading) }
+                        runOnUiThread { show(reading, t) }
                     }
                 }
             }
-            recorder.stop(); recorder.release()
+            try { rec.stop() } catch (_: Throwable) {}
+            try { rec.release() } catch (_: Throwable) {}
         }
     }
 
@@ -186,10 +210,15 @@ class TunerActivity : AppCompatActivity() {
 
     private fun stop() {
         listening = false
-        recordThread?.join(500)
-        recordThread = null
+        tuner = null
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         b.btnTunerToggle.setText(R.string.btn_tuner_start)
         setStatus(getString(R.string.tuner_ready))
+        // 先 stop() 打断阻塞中的 read()，再 join —— 否则主线程最多干等 500ms。
+        try { recorder?.stop() } catch (_: Throwable) {}
+        recordThread?.join(300)
+        recordThread = null
+        recorder = null
     }
 
     override fun onStop() {
@@ -198,7 +227,18 @@ class TunerActivity : AppCompatActivity() {
         tonePlayer.stop()
     }
 
-    private fun show(reading: Tuner.Reading?) {
+    override fun onDestroy() {
+        super.onDestroy()
+        tonePlayer.stop()
+    }
+
+    /**
+     * @param t 产生这个读数的 [Tuner]。必须用它来取「第几弦」，不能用字段——换乐器
+     *          时旧线程可能还有一两次读数在飞，字段已经指向新弦表了。
+     */
+    private fun show(reading: Tuner.Reading?, t: Tuner) {
+        // 换乐器时旧线程可能还有一两次读数在飞，直接丢掉。
+        if (t !== tuner) return
         if (reading == null) {
             // 区分「没拨弦」和「有声音但听不出音高」
             if (lastLevel < 0.006) {
@@ -210,7 +250,7 @@ class TunerActivity : AppCompatActivity() {
             return
         }
         b.noteName.text = reading.note.label
-        b.noteFreq.text = String.format(java.util.Locale.US, "%.1f Hz", reading.hz)
+        b.noteFreq.text = String.format(Locale.US, "%.1f Hz", reading.hz)
 
         val cents = reading.note.cents.roundToInt()
         val inTune = abs(reading.note.cents) <= Tuning.IN_TUNE_CENTS
@@ -226,6 +266,8 @@ class TunerActivity : AppCompatActivity() {
         }
         b.centsText.setTextColor(color)
 
+        // 弦位来自产生这个读数的 Tuner（它有自己的弦表，已通过上面的身份校验），
+        // 不要再用字段 instrument 重算一遍——那正是原来「切了乐器还按旧表提示」的来源。
         val m = reading.string
         b.stringHint.text = getString(
             R.string.tuner_string_hint,
@@ -257,6 +299,7 @@ class TunerActivity : AppCompatActivity() {
     /** 高亮最接近的那根弦，其余显示目标频率。 */
     private fun markStrings(activeNumber: Int, cents: Double) {
         for ((i, row) in rows.withIndex()) {
+            if (i >= instrument.strings.size) break
             val s = instrument.strings[i]
             val active = s.number == activeNumber
             if (active) {
@@ -269,7 +312,7 @@ class TunerActivity : AppCompatActivity() {
                 row.strDev.setTextColor(getColor(R.color.pipa_primary_dark))
                 row.root.setBackgroundColor(0x228D3B2E)
             } else {
-                row.strDev.text = String.format(java.util.Locale.US, "%.2f Hz", s.hz)
+                row.strDev.text = String.format(Locale.US, "%.2f Hz", s.hz)
                 row.strDev.setTextColor(getColor(R.color.black))
                 row.root.setBackgroundColor(0x00000000)
             }

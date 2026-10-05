@@ -82,6 +82,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     @Volatile private var recording = false
     private var recordThread: Thread? = null
     @Volatile private var analyzer: StreamingAnalyzer? = null
+    @Volatile private var recorder: AudioRecord? = null
     private var lastStrokes = 0
     private var roundStartStrokes = 0
     private var roundLiveCpsSum = 0.0
@@ -696,6 +697,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             toast(R.string.strength_mic_failed)
             return
         }
+        this@StrengthTrainingActivity.recorder = recorder
         recordThread = thread(name = "strength-mic") {
             val shortBuf = ShortArray(sampleRate / 10)
             val floatBuf = FloatArray(shortBuf.size)
@@ -748,7 +750,10 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun stopMic() {
         recording = false
-        recordThread?.join(500)
+        // 先打断阻塞中的 read()，再 join：否则主线程最多干等 500ms。
+        try { recorder?.stop() } catch (_: Throwable) {}
+        recorder = null
+        recordThread?.join(300)
         recordThread = null
         analyzer = null
     }
@@ -783,7 +788,9 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun finishTraining(early: Boolean = false) {
         // 还没做完的那一次也计入小结（按已经弹过的时间算）
         if (running && early && currentPhase == TrainingPlan.Phase.WORK && phaseRound >= 0) {
-            val played = (elapsedMs - roundStartMs - roundPausedMs).coerceAtLeast(1000L)
+            // elapsedMs 在暂停时本来就不累加，再减 roundPausedMs 等于把暂停时间
+            // 扣了两次 → played 偏小 → 实测速度偏高。
+            val played = (elapsedMs - roundStartMs).coerceAtLeast(1000L)
             captureRoundResult(phaseRound, played)
         }
         val usedMs = elapsedMs

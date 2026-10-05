@@ -246,4 +246,26 @@
     <string name="strength_summary_short"> · 提前结束</string>
     <string name="strength_summary_note">注：实测速度由手机麦克风估计，仅供参考。</string>
     <string name="strength_done_btn">完成</string>
+
+    <!-- 麦克风权限 / 初始化（实时练习、调音器共用） -->
+    <string name="mic_init_failed">麦克风初始化失败。可能有其它应用正在占用麦克风，稍后重试。</string>
+    <string name="mic_denied_title">需要麦克风权限</string>
+    <string name="mic_denied_msg">实时练习与调音器靠麦克风分析你的轮指。请在接下来弹出的系统提示里选择「允许」。</string>
+    <string name="mic_denied_retry">重新授权</string>
+    <string name="mic_blocked_title">麦克风权限被拒绝了</string>
+    <string name="mic_blocked_msg">系统已经不再弹出授权提示。请到「应用信息 → 权限 → 麦克风」里手动打开，再回来重试。</string>
+    <string name="mic_open_settings">打开设置</string>
+    <string name="mic_settings_failed">打不开系统设置，请手动到「应用信息 → 权限」里打开麦克风。</string>
+
+    <!-- 实时练习页 -->
+    <string name="live_sens_strict">严格</string>
+    <string name="live_sens_normal">标准</string>
+    <string name="live_sens_sensitive">灵敏</string>
+    <string name="live_too_few">只检测到 %1$d 击，样本太少。</string>
+    <string name="live_too_few_hint">可尝试：把「灵敏度」调到「灵敏」；手机离琴近一些；确认开始后确实在弹。</string>
+    <string name="live_report_head">【整段评估】</string>
+    <string name="live_report_score">综合 %1$d 分 · %2$s</string>
+    <string name="live_report_advice">练习建议：</string>
+    <string name="live_strokes_line">%1$d 击　·　全段CV %2$.2f</string>
+    <string name="live_gate_line">底噪 %1$.4f · 门限 %2$.4f · 当前 %3$.4f</string>
 </resources>
