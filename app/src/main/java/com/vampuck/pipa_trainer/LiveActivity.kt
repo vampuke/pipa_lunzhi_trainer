@@ -33,14 +33,13 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
     /** 节拍器速度的唯一真源：滑杆 progress = BPM - [BPM_OFFSET]。 */
     private var bpm: Double = DEFAULT_BPM.toDouble()
 
-    // 显式写类型：lambda 里会回调自己（重试授权），不写类型 Kotlin 推断不出来
+    // 显式写类型：lambda 里会走重试授权，不写类型 Kotlin 推断不出来
     // （报 "Type checking has run into a recursive problem"）。
     private val permReq: ActivityResultLauncher<String> = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) start() else MicPermission.showHelp(this) {
-            permReq.launch(Manifest.permission.RECORD_AUDIO)
-        }
+        // 属性初始化表达式里不能引用自己，所以重试走成员函数（同一套入口）。
+        if (granted) start() else MicPermission.showHelp(this) { ensurePermThenStart() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
