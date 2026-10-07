@@ -181,23 +181,15 @@ object LunzhiAnalyzer {
             tone[i] = Timbre.harmonicity(mag, sampleRate, WIN)
             prev = mag
         }
-        // Normalize by a high percentile instead of the absolute maximum: a
-        // single loud transient (a knock, a scraped string in the first second)
-        // would otherwise scale every other frame down, pushing real strokes
-        // under the fixed absolute threshold (0.02) and silently dropping them
-        // for the whole take. The live detector guards against the same thing
-        // with a slowly-decaying running max.
-        val fmax = highPercentile(flux, 0.99).coerceAtLeast(1e-9)
+        // 按最大值归一化。曾经改成按 99 分位归一化（想让一个突发巨响不再把整曲
+        // 压低），但那会把整体尺度抬高，让按最大值标定好的**绝对**阈值
+        // （+0.02、prominence 0.04）全部失效：同一段房间噪声的误报从 12 击/20s
+        // 涨到 30 击/20s（TimbreClassificationTest 抓到的）。要改口径，必须把
+        // 整条链路（阈值、prominence、timbre 门）一起重标定，不能只改归一化。
+        var fmax = 1e-9
+        for (v in flux) if (v > fmax) fmax = v
         for (i in flux.indices) flux[i] = flux[i] / fmax
         return OnsetFn(flux, sampleRate.toDouble() / HOP, tone)
-    }
-
-    /** Value at percentile [p] (0..1) of a copy of [x]; 0.0 for an empty input. */
-    private fun highPercentile(x: DoubleArray, p: Double): Double {
-        if (x.isEmpty()) return 0.0
-        val s = x.copyOf()
-        s.sort()
-        return s[((s.size - 1) * p).toInt().coerceIn(0, s.size - 1)]
     }
 
     /**
@@ -216,11 +208,16 @@ object LunzhiAnalyzer {
         val minGap = (MIN_ONSET_GAP * fps).toInt().coerceAtLeast(1)
         val w = (0.12 * fps).toInt().coerceAtLeast(1)
         val cand = ArrayList<Int>()
+        // 候选阶段就吃掉最小间距：让被 prominence/timbre 否掉的噪声峰也占用间距。
+        // 试过改成「只对保留的峰计间距」（想和实时模式对齐），实测房间噪声误报
+        // 12 → 30 击/20s；而轮指最快约 12 击/秒、相邻击间隔 83ms，远大于 40ms 的
+        // 间距，所以那个对齐带来的收益是假想的、代价是真的。要改先重标定整条链路。
+        var last = -minGap
         for (i in 1 until flux.size - 1) {
             val thr = med[i] * 1.2 + 0.02
-            // Same local-maximum rule as the live detector (a flat top resolves
-            // to its left frame in both paths).
-            if (flux[i] > thr && flux[i] >= flux[i - 1] && flux[i] > flux[i + 1]) cand.add(i)
+            if (flux[i] > thr && flux[i] >= flux[i - 1] && flux[i] > flux[i + 1] && i - last >= minGap) {
+                cand.add(i); last = i
+            }
         }
         // prominence filter
         val keep = ArrayList<Int>(cand.size)
@@ -234,29 +231,11 @@ object LunzhiAnalyzer {
             while (jx <= hi && flux[jx] <= flux[p]) { rm = min(rm, flux[jx]); jx++ }
             if (flux[p] - max(lm, rm) >= PROMINENCE) keep.add(p)
         }
-        if (tone == null || minTone <= 0.0) return minGapFilter(keep, minGap)
+        if (tone == null || minTone <= 0.0) return keep.toIntArray()
         val span = (0.030 * fps).toInt().coerceAtLeast(2)
         val out = ArrayList<Int>(keep.size)
         for (p in keep) {
             if (medianAfter(tone, p, span, flux.size) >= minTone) out.add(p)
-        }
-        return minGapFilter(out, minGap)
-    }
-
-    /**
-     * Minimum-distance bookkeeping over *accepted* peaks only.
-     *
-     * The candidate loop used to consume the gap even for peaks that the
-     * prominence/timbre tests then rejected, so a rejected candidate could
-     * swallow a real stroke 25 ms later. The live detector has always counted
-     * only accepted peaks — this is the file side catching up, so one recording
-     * yields the same onsets in both modes.
-     */
-    private fun minGapFilter(peaks: ArrayList<Int>, minGap: Int): IntArray {
-        val out = ArrayList<Int>(peaks.size)
-        var last = Int.MIN_VALUE
-        for (p in peaks) {
-            if (last == Int.MIN_VALUE || p - last >= minGap) { out.add(p); last = p }
         }
         return out.toIntArray()
     }
