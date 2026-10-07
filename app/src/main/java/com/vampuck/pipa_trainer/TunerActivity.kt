@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.vampuck.pipa_trainer.audio.TonePlayer
@@ -61,7 +62,9 @@ class TunerActivity : AppCompatActivity() {
     private var rateText = "44.1 kHz"
     private val rows = ArrayList<ItemTunerStringBinding>()
 
-    private val permReq = registerForActivityResult(
+    // 显式写类型：lambda 里会回调自己（重试授权），不写类型 Kotlin 推断不出来
+    // （报 "Type checking has run into a recursive problem"）。
+    private val permReq: ActivityResultLauncher<String> = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) start() else MicPermission.showHelp(this) {

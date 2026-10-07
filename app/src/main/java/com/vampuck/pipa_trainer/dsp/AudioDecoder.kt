@@ -109,6 +109,9 @@ object AudioDecoder {
             var encoding = AudioFormat.ENCODING_PCM_16BIT
             var factor = downFactor(outRate)
             var maxOut = MAX_SECONDS * effectiveRate(outRate, factor)
+            // 输出格式可能中途才确定（KEY_SAMPLE_RATE 有时只有输出侧才知道），
+            // 所以降采样累加器要在确定/变化时重建——漏了它，push() 就是空引用。
+            var down = Down(factor)
             var dataStarted = false
             // 30 min at the effective rate: ~40 M floats. Grow from a 60 s seed
             // rather than reserving the cap up front (that would be ~160 MB).
@@ -150,6 +153,7 @@ object AudioDecoder {
                             encoding = of.getInteger(MediaFormat.KEY_PCM_ENCODING)
                         factor = downFactor(outRate)
                         maxOut = MAX_SECONDS * effectiveRate(outRate, factor)
+                        down = Down(factor)
                     }
                 } else if (outIdx >= 0) {
                     if (info.size > 0) {
