@@ -45,6 +45,17 @@ jobs:
       - name: Run unit tests (DSP validation)
         run: ./gradlew testDebugUnitTest --stacktrace
 
+      # 失败时把单测报告传上来：失败断言里带的具体数字（阈值、计数）只在
+      # XML/HTML 报告里，控制台只有 "AssertionError at Xxx:140"，不带数字。
+      - name: Upload unit test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            app/build/reports/tests/testDebugUnitTest
+            app/build/test-results/testDebugUnitTest
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 
