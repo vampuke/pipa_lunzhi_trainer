@@ -67,10 +67,21 @@
                 android:background="@color/surface"
                 android:padding="18dp">
 
+                <!-- 主显示 = 正在调的那根弦 + 它的音名（目标）；麦克风实际听到的绝对音高在下一行 -->
+                <TextView
+                    android:id="@+id/stringHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/tuner_ready"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/pipa_primary_dark" />
+
                 <TextView
                     android:id="@+id/noteName"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="--"
                     android:textSize="62sp"
                     android:textStyle="bold"
@@ -81,23 +92,15 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/tuner_ready"
-                    android:textSize="16sp" />
+                    android:textSize="15sp" />
 
                 <TextView
                     android:id="@+id/centsText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:textSize="18sp"
+                    android:textSize="19sp"
                     android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/stringHint"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textSize="13sp"
-                    android:textColor="@color/black" />
 
                 <FrameLayout
                     android:id="@+id/centsBar"

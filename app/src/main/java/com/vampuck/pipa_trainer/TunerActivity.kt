@@ -25,8 +25,15 @@ import kotlin.math.sqrt
 /**
  * 调音器：拨一根弦，看音名与偏高/偏低多少音分。
  *
- * 主显示是最接近的十二平均律音名 + 音分（任何定弦都对），下面再用音分距离
- * 指出是哪根弦、往哪边拧。点任意一行可以听该弦的参考音。
+ * 主显示是「正在调的那根弦 + 它的音名」，因为用户是照着**弦**调音；麦克风实际听到的
+ * 绝对音高放在次行（「听到 B3 · 246.9 Hz」），指针与偏高/偏低于相对这根弦算。
+ *
+ * 为什么不能反过来（曾经的写法）：一弦高整整一个全音时，绝对音名正好落在 B3 上，
+ * 音分≈0，屏幕就会显示「B3」并把指针放到中间报「准了」——用户既以为一弦的
+ * 音名是 B3，又以为弦已经调好了。相对弦算的话，同一读数会显示
+ * 「一弦 / A3 / 听到 B3 / 偏高 200 音分 · 松一点」，该怎么调一目了然。
+ *
+ * 下面仍用音分距离指出是哪根弦，点任意一行可以听该弦的参考音。
  */
 class TunerActivity : AppCompatActivity() {
 
@@ -49,6 +56,9 @@ class TunerActivity : AppCompatActivity() {
     @Volatile private var tuner: Tuner? = null
     private val tonePlayer = TonePlayer()
     private var lastLevel = 0.0
+
+    /** 状态行里显示的实际采样率，出「音高整体偏移」类问题时一眼能看出来。 */
+    private var rateText = "44.1 kHz"
     private val rows = ArrayList<ItemTunerStringBinding>()
 
     private val permReq = registerForActivityResult(
@@ -156,6 +166,7 @@ class TunerActivity : AppCompatActivity() {
         // 我们按 44100 去算，偏差是 1200*log2(48/44.1) ≈ 147 音分——比半个音还多，
         // 表现成「调音器坏了」。所以一律用 AudioRecord 回报的实际采样率。
         actualRate = rec.sampleRate.takeIf { it > 0 } ?: sampleRate
+        rateText = String.format(Locale.US, "%.1f kHz", actualRate / 1000f)
 
         val t = Tuner(actualRate, instrument.strings)
         tuner = t
@@ -170,7 +181,7 @@ class TunerActivity : AppCompatActivity() {
         lastLevel = 0.0
         listening = true
         b.btnTunerToggle.setText(R.string.btn_tuner_stop)
-        setStatus(getString(R.string.tuner_listening))
+        setStatus(getString(R.string.tuner_listening_rate, rateText))
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         recordThread = thread(name = "tuner-mic") {
@@ -249,37 +260,39 @@ class TunerActivity : AppCompatActivity() {
             markStrings(-1, 0.0)
             return
         }
-        b.noteName.text = reading.note.label
-        b.noteFreq.text = String.format(Locale.US, "%.1f Hz", reading.hz)
 
-        val cents = reading.note.cents.roundToInt()
-        val inTune = abs(reading.note.cents) <= Tuning.IN_TUNE_CENTS
+        // 主显示 = 要调的那根弦 + 它的音名（目标）；绝对音高降为次行。
+        // 弦位来自产生这个读数的 Tuner（它有自己的弦表，已通过上面的身份校验），
+        // 不要再用字段 instrument 重算一遍。
+        val m = reading.string
+        b.stringHint.text = getString(R.string.tuner_tuning_target, m.string.label)
+        b.noteName.text = m.string.note
+        b.noteFreq.text = getString(
+            R.string.tuner_heard,
+            reading.note.label,
+            String.format(Locale.US, "%.1f Hz", reading.hz)
+        )
+
+        // 「准不准」「偏高/偏低多少」「指针」全部相对这根弦算。绝不能相对绝对音名算：
+        // 一弦高一个全音时绝对音名正好是 B3（音分≈0），那样会报「准了」。
+        val cents = m.cents.roundToInt()
+        val inTune = m.inTune
         val color = when {
             inTune -> getColor(R.color.good)
-            abs(reading.note.cents) <= 20 -> getColor(R.color.warn)
+            abs(m.cents) <= 20 -> getColor(R.color.warn)
             else -> getColor(R.color.bad)
         }
         b.centsText.text = when {
             inTune -> getString(R.string.tuner_in_tune)
-            cents > 0 -> getString(R.string.tuner_sharp_by, cents)
-            else -> getString(R.string.tuner_flat_by, -cents)
+            cents > 0 -> getString(R.string.tuner_adjust_loosen, cents)
+            else -> getString(R.string.tuner_adjust_tighten, -cents)
         }
         b.centsText.setTextColor(color)
 
-        // 弦位来自产生这个读数的 Tuner（它有自己的弦表，已通过上面的身份校验），
-        // 不要再用字段 instrument 重算一遍——那正是原来「切了乐器还按旧表提示」的来源。
-        val m = reading.string
-        b.stringHint.text = getString(
-            R.string.tuner_string_hint,
-            m.string.label, m.string.note,
-            m.direction, abs(m.cents).roundToInt()
-        )
-        b.stringHint.setTextColor(if (m.inTune) getColor(R.color.good) else getColor(R.color.black))
-
         tintDot(color)
-        positionDot(reading.note.cents)
+        positionDot(m.cents)
         markStrings(m.string.number, m.cents)
-        setStatus(getString(R.string.tuner_listening))
+        setStatus(getString(R.string.tuner_listening_rate, rateText))
     }
 
     private fun positionDot(cents: Double) {

@@ -2,6 +2,7 @@ package com.vampuck.pipa_trainer.audio
 
 import android.media.AudioAttributes
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioTrack
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
@@ -30,7 +31,11 @@ class TonePlayer {
         stop()
         val gen = generation.incrementAndGet()
         worker = thread(name = "ref-tone", isDaemon = true) {
-            val sr = 44100
+            // 参考音按设备的**原生输出采样率**生成：个别机型对非原生采样率的
+            // AudioTrack 处理不干净，会把整段音高抬高（≈1.5 个半音）。用户照着
+            // 「一弦 A3」的参考音调弦，就会把弦调得偏高一个全音——调音器再准也白搭。
+            val sr = AudioTrack.getNativeOutputSampleRate(AudioManager.STREAM_MUSIC)
+                .takeIf { it > 0 } ?: 44100
             val pcm = ToneGen.pcm(hz, seconds, sr)
 
             val minBuf = AudioTrack.getMinBufferSize(

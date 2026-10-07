@@ -63,6 +63,12 @@
     <string name="tuner_unclear">听不清音高：环境太吵，或几根弦同时在响</string>
     <string name="tuner_listening">正在听…</string>
     <string name="tuner_in_tune">准了</string>
+    <!-- 调音器主显示：要调的弦 + 它的音名；绝对音高降为次行，避免「听到的音名」被当成弦名 -->
+    <string name="tuner_tuning_target">正在调 %1$s</string>
+    <string name="tuner_heard">听到 %1$s · %2$s</string>
+    <string name="tuner_adjust_loosen">偏高 %1$d 音分 · 松一点</string>
+    <string name="tuner_adjust_tighten">偏低 %1$d 音分 · 紧一点</string>
+    <string name="tuner_listening_rate">正在听… · %1$s</string>
     <string name="tuner_sharp_by">偏高 %1$d 音分</string>
     <string name="tuner_flat_by">偏低 %1$d 音分</string>
     <string name="tuner_string_hint">最接近 %1$s %2$s · %3$s %4$d 音分</string>
