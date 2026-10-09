@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import com.vampuck.pipa_trainer.R
 import com.vampuck.pipa_trainer.data.JNote
 import com.vampuck.pipa_trainer.data.JScore
 import kotlin.math.max

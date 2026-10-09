@@ -263,3 +263,4 @@ class MetronomeActivity : AppCompatActivity() {
 
     /** 熄灭圆点的颜色：取资源，深色模式下自动变暗，不会在深色底上发白。 */
     private val dotOff: Int by lazy { getColor(R.color.metro_dot_off) }
+}
