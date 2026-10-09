@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 根布局是 FrameLayout：「开始训练」做成悬浮按钮（右下角常驻），
+     这样不管计划列表滚到哪里都能一指点到，不用先滑到页面最底部。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg"
-    android:orientation="vertical">
+    android:background="@color/bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
     <!-- 头部 -->
     <LinearLayout
@@ -304,14 +310,6 @@
                 android:textColor="@color/text_primary"
                 android:textSize="14sp" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnStartTraining"
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:layout_marginTop="14dp"
-                android:text="@string/strength_start"
-                android:textSize="18sp" />
-
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -533,4 +531,24 @@
                 android:textSize="12sp" />
         </LinearLayout>
     </ScrollView>
-</LinearLayout>
+
+    </LinearLayout>
+
+    <!-- 常驻的「开始训练」悬浮按钮：设置页任意位置都能一指点到 -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/btnStartTraining"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="20dp"
+        android:contentDescription="@string/strength_start"
+        android:text="@string/strength_start"
+        android:textColor="@color/white"
+        android:textSize="17sp"
+        app:backgroundTint="@color/pipa_primary"
+        app:icon="@drawable/ic_play_light"
+        app:iconSize="22dp"
+        app:iconTint="@color/white"
+        android:minHeight="60dp" />
+</FrameLayout>

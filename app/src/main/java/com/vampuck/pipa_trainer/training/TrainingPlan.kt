@@ -10,13 +10,18 @@ package com.vampuck.pipa_trainer.training
  * [stageAt] 把「已经过去的秒数」映射成当前阶段，所以训练进行中追加一次训练、
  * 或取消还没开始的那些次，都不会打乱已经过去的时间。
  *
+ * [preroll] 给出「提前起节拍」的窗口：倒数与休息的最后 [DEFAULT_PREROLL_SEC] 秒里，
+ * 先用**下一轮**的速度把节拍响起来，让人在阶段真正开始前就对上节奏。
+ *
  * 速度用 BPM 表示（轮指每拍 5 响，1 拍 = 1 轮）：
  *   音/秒 = BPM ÷ 12；音/分 = BPM × 5。
  */
 class TrainingPlan(
     val rounds: MutableList<Round> = mutableListOf(Round()),
     var restSec: Int = DEFAULT_REST_SEC,
-    var leadInSec: Int = DEFAULT_LEAD_IN_SEC
+    var leadInSec: Int = DEFAULT_LEAD_IN_SEC,
+    /** 倒数/休息的最后几秒提前起节拍（0 = 关闭）。 */
+    var prerollSec: Int = DEFAULT_PREROLL_SEC
 ) {
 
     /** 一次训练：目标速度（BPM）+ 时长。 */
@@ -101,7 +106,40 @@ class TrainingPlan(
         }
     }
 
-    /** 把已过去的秒数映射成当前阶段。 */
+    /**
+     * 「提前起节拍」：当前时刻是否已经进入倒数的最后几秒（或某次休息的最后几秒）。
+     * 是的话返回**接下来要练的那一次**的下标，否则返回 null。
+     *
+     * 窗口取「不超过 [prerollSec] 的整数拍」（见 [prerollWindowSec]），于是提前起的
+     * 这串节拍长度正好是下一轮的整数拍，起拍点落在拍上、不会出现半拍。注意调用方**不要**
+     * 在阶段的边界重启节拍器——提前起的节拍要直接接进正式训练，才有「无缝续上」的听感。
+     */
+    fun preroll(elapsedSec: Double): Int? {
+        if (rounds.isEmpty() || prerollSec <= 0) return null
+        val st = stageAt(elapsedSec)
+        val next = when (st.phase) {
+            Phase.LEAD_IN -> 0
+            Phase.REST -> st.roundIndex
+            else -> return null
+        }
+        val r = rounds.getOrNull(next) ?: return null
+        // 注意传的是**下标** next（不是 r.bpm）：窗口是按「下一轮」的拍长整拍对齐的。
+        if (st.remainingSec > prerollWindowSec(next)) return null
+        return next
+    }
+
+    /** 第 [roundIndex] 次训练实际提前多少秒起节拍（整拍对齐后 ≤ [prerollSec]）。 */
+    fun prerollWindowSec(roundIndex: Int): Double {
+        if (prerollSec <= 0) return 0.0
+        val bpm = rounds.getOrNull(roundIndex)?.bpm ?: return 0.0
+        val beat = 60.0 / bpm
+        val beats = (prerollSec / beat).toInt()
+        return if (beats < 1) 0.0 else beats * beat
+    }
+
+    /**
+     * 把已过去的秒数映射成当前阶段。
+     */
     fun stageAt(elapsedSec: Double): Stage {
         if (rounds.isEmpty()) return Stage(Phase.DONE, 0, 0.0, 0.0)
         if (elapsedSec < leadInSec) {
@@ -139,6 +177,11 @@ class TrainingPlan(
         const val DEFAULT_DURATION_SEC = 120      // 默认每次 2 分钟
         const val DEFAULT_REST_SEC = 30           // 每次之间自动间隔 30 秒
         const val DEFAULT_LEAD_IN_SEC = 5         // 开始后倒数 5 秒
+        /** 倒数/休息的最后 5 秒提前起节拍，先适应节奏再开始。 */
+        const val DEFAULT_PREROLL_SEC = 5
+        /** 提前起节拍的取值范围（上限不超过倒数时长本身由 UI 约束）。 */
+        const val MIN_PREROLL_SEC = 0
+        const val MAX_PREROLL_SEC = 10
         const val MIN_BPM = 20
         const val MAX_BPM = 240
         const val MIN_DURATION_SEC = 30

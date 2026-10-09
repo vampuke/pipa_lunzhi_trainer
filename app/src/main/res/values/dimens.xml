@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 悬浮「开始训练」按钮下方要留出的空白（按钮 60dp + 边距）。 -->
+    <dimen name="fab_clearance">92dp</dimen>
+</resources>

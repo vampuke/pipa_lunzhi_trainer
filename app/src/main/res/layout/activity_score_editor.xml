@@ -195,16 +195,112 @@
                 android:layout_marginTop="16dp"
                 android:text="@string/editor_meta" />
 
-            <EditText android:id="@+id/inputTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:hint="@string/editor_hint_title" android:textColorHint="@color/text_secondary" android:textColor="@color/text_primary" android:inputType="text" />
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-                <EditText android:id="@+id/inputKey" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:hint="@string/editor_hint_key" android:textColorHint="@color/text_secondary" android:textColor="@color/text_primary" android:inputType="text" />
-                <EditText android:id="@+id/inputBpm" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:hint="@string/editor_hint_bpm" android:textColorHint="@color/text_secondary" android:textColor="@color/text_primary" android:inputType="number" />
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/layoutTitle"
+                style="@style/App.TextField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:hint="@string/editor_hint_title">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputTitle"
+                    style="@style/App.TextInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/App.TextField"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="@string/editor_hint_key">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputKey"
+                        style="@style/App.TextInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/App.TextField"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:hint="@string/editor_hint_bpm">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputBpm"
+                        style="@style/App.TextInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-                <EditText android:id="@+id/inputSection" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:hint="@string/editor_hint_section" android:textColorHint="@color/text_secondary" android:textColor="@color/text_primary" android:inputType="text" />
-                <EditText android:id="@+id/inputDiff" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:hint="@string/editor_hint_diff" android:textColorHint="@color/text_secondary" android:textColor="@color/text_primary" android:inputType="text" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/App.TextField"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="@string/editor_hint_section">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputSection"
+                        style="@style/App.TextInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/App.TextField"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:hint="@string/editor_hint_diff">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputDiff"
+                        style="@style/App.TextInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
-            <EditText android:id="@+id/inputBlurb" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="@string/editor_hint_blurb" android:textColorHint="@color/text_secondary" android:textColor="@color/text_primary" android:inputType="text" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/App.TextField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:hint="@string/editor_hint_blurb">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputBlurb"
+                    style="@style/App.TextInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+            </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSave"

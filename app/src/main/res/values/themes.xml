@@ -45,6 +45,27 @@
         <item name="cornerSize">16dp</item>
     </style>
 
+    <!-- 输入框：与卡片同一套暖色描边（未聚焦时 @color/outline，聚焦/悬停转红木主色）。
+         提示文字走 M3 描边框的标准 label 行为：空时落在框内，聚焦或有内容后浮到边框上。 -->
+    <style name="App.TextField" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">@color/field_box_stroke</item>
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="boxStrokeWidthFocused">1.5dp</item>
+        <item name="boxCornerRadiusTopStart">14dp</item>
+        <item name="boxCornerRadiusTopEnd">14dp</item>
+        <item name="boxCornerRadiusBottomStart">14dp</item>
+        <item name="boxCornerRadiusBottomEnd">14dp</item>
+        <item name="hintTextColor">@color/pipa_primary</item>
+        <item name="android:textColorHint">@color/text_secondary</item>
+        <item name="errorTextColor">@color/bad</item>
+    </style>
+
+    <!-- 输入框内的文字外观：正文色、14sp，与「卡片 + 说明」的层级一致。 -->
+    <style name="App.TextInput" parent="Widget.Material3.TextInputEditText.OutlinedBox">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
     <!-- 统一卡片外观：四边均匀的细描边。
          原来用 1dp 投影（Widget.Material3.CardView.Elevated），但 1dp 的「点投影」在浅色背景上
          只在卡片**下方**压出一条硬边，左右/上方几乎看不到——截图上就是「卡片像只有下边框」，
