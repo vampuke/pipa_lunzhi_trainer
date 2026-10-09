@@ -20,7 +20,7 @@
             android:text="曲名"
             android:textSize="22sp"
             android:textStyle="bold"
-            android:textColor="@color/pipa_primary_dark" />
+            android:textColor="@color/brand_text_strong" />
 
         <TextView
             android:id="@+id/scoreKey"
@@ -63,11 +63,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:gravity="center"
-                    android:background="#F2FFFBF8"
+                    android:background="@color/countdown_scrim"
                     android:text="3"
                     android:textSize="96sp"
                     android:textStyle="bold"
-                    android:textColor="@color/pipa_primary"
+                    android:textColor="@color/brand_text"
                     android:visibility="gone" />
             </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -115,7 +115,7 @@
                 android:text="60 BPM"
                 android:textSize="15sp"
                 android:textStyle="bold"
-                android:textColor="@color/pipa_primary_dark" />
+                android:textColor="@color/brand_text_strong" />
         </LinearLayout>
 
         <!-- 速度微调 -->

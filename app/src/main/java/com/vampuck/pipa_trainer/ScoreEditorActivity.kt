@@ -3,7 +3,7 @@ package com.vampuck.pipa_trainer
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.vampuck.pipa_trainer.data.Fingerings
@@ -64,7 +64,7 @@ class ScoreEditorActivity : AppCompatActivity() {
         }
         b.btnClear.setOnClickListener {
             if (notes.isEmpty()) return@setOnClickListener
-            AlertDialog.Builder(this)
+            MaterialAlertDialogBuilder(this)
                 .setMessage(R.string.editor_clear_confirm)
                 .setPositiveButton(android.R.string.ok) { _, _ -> notes.clear(); refreshPreview() }
                 .setNegativeButton(android.R.string.cancel, null)
@@ -213,7 +213,7 @@ class ScoreEditorActivity : AppCompatActivity() {
             if (on) getColor(R.color.primary_container) else getColor(R.color.surface)
         )
         btn.setTextColor(
-            if (on) getColor(R.color.pipa_primary_dark) else getColor(R.color.text_primary)
+            if (on) getColor(R.color.brand_text_strong) else getColor(R.color.text_primary)
         )
     }
 

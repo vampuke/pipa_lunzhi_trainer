@@ -49,7 +49,7 @@
             android:layout_height="wrap_content"
             android:text="@string/tuner_hint"
             android:textSize="14sp"
-            android:textColor="@color/black" />
+            android:textColor="@color/text_primary" />
 
         <!-- 音名与指针 -->
         <androidx.cardview.widget.CardView
@@ -75,7 +75,7 @@
                     android:text="@string/tuner_ready"
                     android:textSize="15sp"
                     android:textStyle="bold"
-                    android:textColor="@color/pipa_primary_dark" />
+                    android:textColor="@color/brand_text_strong" />
 
                 <TextView
                     android:id="@+id/noteName"
@@ -85,7 +85,7 @@
                     android:text="--"
                     android:textSize="62sp"
                     android:textStyle="bold"
-                    android:textColor="@color/pipa_primary_dark" />
+                    android:textColor="@color/brand_text_strong" />
 
                 <TextView
                     android:id="@+id/noteFreq"
@@ -112,7 +112,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="4dp"
                         android:layout_gravity="center_vertical"
-                        android:background="#FFDDD5CC" />
+                        android:background="@color/outline" />
 
                     <View
                         android:layout_width="2dp"
@@ -153,7 +153,7 @@
             android:layout_marginTop="18dp"
             android:text="@string/tuner_strings_hint"
             android:textSize="12sp"
-            android:textColor="@color/black" />
+            android:textColor="@color/text_primary" />
 
         <LinearLayout
             android:id="@+id/stringList"
@@ -169,7 +169,7 @@
             android:layout_marginTop="12dp"
             android:gravity="center"
             android:textSize="13sp"
-            android:textColor="@color/pipa_primary_dark" />
+            android:textColor="@color/brand_text_strong" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnTunerToggle"

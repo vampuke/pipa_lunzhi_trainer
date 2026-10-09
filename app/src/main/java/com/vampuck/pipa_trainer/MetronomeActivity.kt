@@ -161,7 +161,7 @@ class MetronomeActivity : AppCompatActivity() {
         for ((i, dot) in dots.withIndex()) {
             val on = i == slotIndex
             val color = when {
-                !on -> DOT_OFF
+                !on -> dotOff
                 accent -> downbeatColor
                 else -> accentColor
             }
@@ -207,7 +207,7 @@ class MetronomeActivity : AppCompatActivity() {
     }
 
     private fun resetDots() {
-        for (d in dots) { resetDotScale(d); tintDot(d, DOT_OFF) }
+        for (d in dots) { resetDotScale(d); tintDot(d, dotOff) }
     }
 
     /** 按模式重建指示圆点（4 整拍 / 8 分拍 / 5 轮指）。圆点动态加入 beatDots 容器。 */
@@ -259,6 +259,7 @@ class MetronomeActivity : AppCompatActivity() {
     private companion object {
         const val MIN_BPM = 20
         const val MAX_BPM = 200
-        const val DOT_OFF = 0xFFE0D2C6.toInt()
     }
-}
+
+    /** 熄灭圆点的颜色：取资源，深色模式下自动变暗，不会在深色底上发白。 */
+    private val dotOff: Int by lazy { getColor(R.color.metro_dot_off) }

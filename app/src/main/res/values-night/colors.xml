@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    深色模式配色（values-night，跟随系统「深色主题」）。
+
+    应用原本只有一套浅色值：主题是 Theme.Material3.DayNight，手机开深色模式后，
+    Material 会把弹窗容器、输入框容器、默认文字这些**框架 token** 切成深色，
+    而我们自己写死的颜色仍是浅色 → 结果就是「弹窗是深色底、里面的字还是近黑色」，
+    几乎看不清。这一份把深色下用到的颜色补齐。
+
+    主色仍是红木，但深色底上要提亮一档（否则红木压在深底上发闷、对比度不够）；
+    强调色（丝弦金）保持不变——它在深色下反而更亮眼。文字用暖白，不用纯白，
+    和「宣纸 / 红木」的暖色调保持一致。
+-->
+<resources>
+    <!-- 品牌色：深色下提亮一档 -->
+    <color name="pipa_primary">#FF9C4433</color>
+    <color name="pipa_primary_dark">#FF6E2C22</color>
+    <!-- 深色下的品牌文字：比填充色亮，压在暖黑底上才清楚 -->
+    <color name="brand_text">#FFE8A48D</color>
+    <color name="brand_text_strong">#FFF5C4B0</color>
+    <color name="accent_chip_text">#FFF0CE97</color>
+
+    <color name="pipa_accent">#FFE0B565</color>
+    <color name="pipa_accent_dark">#FFF0CE97</color>
+
+    <!-- M3 容器 / 表面：暖黑，surface 比 background 略亮（卡片浮于其上） -->
+    <color name="primary_container">#FF4A2119</color>
+    <color name="on_primary_container">#FFFFDBD0</color>
+    <color name="accent_container">#FF47381C</color>
+    <color name="surface">#FF241E1B</color>
+    <color name="surface_variant">#FF322B27</color>
+    <color name="outline">#FF554A44</color>
+    <color name="text_primary">#FFF0E7E0</color>
+    <color name="text_secondary">#FFB5A69C</color>
+
+    <!-- 评价色：深色下提亮，保证在暖黑底上可读 -->
+    <color name="good">#FF5CBE84</color>
+    <color name="warn">#FFD9A93C</color>
+    <color name="bad">#FFFF8A80</color>
+    <color name="chart_line">#FF7FA6FF</color>
+    <!-- 起音散点（深色下提亮） -->
+    <color name="chart_onset">#FFC08CF0</color>
+
+    <color name="bg">#FF1A1614</color>
+
+    <!-- 开始前倒数覆盖层：深色下用不透明的暖黑，压住下面的谱面 -->
+    <color name="countdown_scrim">#F21A1614</color>
+    <!-- 节拍器熄灭的指示圆点：深色下用暗色，不能再用浅米色 -->
+    <color name="metro_dot_off">#FF3A322D</color>
+</resources>

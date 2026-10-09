@@ -8,7 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.core.content.ContextCompat
 
 /**
@@ -32,14 +32,14 @@ internal object MicPermission {
     fun showHelp(activity: Activity, onRetry: () -> Unit) {
         val rationale = activity.shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)
         if (rationale) {
-            AlertDialog.Builder(activity)
+            MaterialAlertDialogBuilder(activity)
                 .setTitle(R.string.mic_denied_title)
                 .setMessage(R.string.mic_denied_msg)
                 .setNegativeButton(R.string.strength_cancel, null)
                 .setPositiveButton(R.string.mic_denied_retry) { _, _ -> onRetry() }
                 .show()
         } else {
-            AlertDialog.Builder(activity)
+            MaterialAlertDialogBuilder(activity)
                 .setTitle(R.string.mic_blocked_title)
                 .setMessage(R.string.mic_blocked_msg)
                 .setNegativeButton(R.string.strength_cancel, null)

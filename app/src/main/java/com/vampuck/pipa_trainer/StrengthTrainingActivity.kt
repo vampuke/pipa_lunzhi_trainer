@@ -18,10 +18,10 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.updatePadding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.vampuck.pipa_trainer.audio.Metronome
@@ -305,7 +305,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun askBpm(i: Int) {
         val r = roundAt(i) ?: return
         val field = numberField(r.bpm, R.string.strength_bpm_field)
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.strength_bpm_dialog)
             .setView(field.root)
             .setNegativeButton(R.string.strength_cancel, null)
@@ -324,7 +324,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun askDur(i: Int) {
         val r = roundAt(i) ?: return
         val field = numberField(r.durationSec, R.string.strength_dur_field)
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.strength_dur_dialog)
             .setView(field.root)
             .setNegativeButton(R.string.strength_cancel, null)
@@ -393,7 +393,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         val density = resources.displayMetrics.density
         val padH = (14 * density).toInt()
         val padV = (8 * density).toInt()
-        val chipColor = getColor(R.color.pipa_primary_dark)
+        val chipColor = getColor(R.color.accent_chip_text)
         for (c in list) {
             val chip = TextView(this).apply {
                 text = c.name
@@ -419,7 +419,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun askSaveConfig() {
         val auto = autoConfigName()
         val field = textField(auto, R.string.strength_config_name_field)
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.strength_config_name_title)
             .setView(field.root)
             .setNegativeButton(R.string.strength_cancel, null)
@@ -433,7 +433,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     }
 
     private fun confirmDeleteConfig(c: TrainingConfig) {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.strength_config_delete_title)
             .setMessage(getString(R.string.strength_config_delete_msg, c.name))
             .setNegativeButton(R.string.strength_cancel, null)
@@ -706,7 +706,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     }
 
     private fun confirmEndTraining() {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.strength_quit_title)
             .setMessage(R.string.strength_quit_msg)
             .setNegativeButton(R.string.strength_quit_no, null)
@@ -886,7 +886,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         sb.append("\n\n").append(getString(R.string.strength_summary_note))
 
         if (isFinishing || isDestroyed) return
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(if (early) R.string.strength_end_title else R.string.strength_done_title)
             .setMessage(sb.toString())
             .setCancelable(false)

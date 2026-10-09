@@ -5,7 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.vampuck.pipa_trainer.databinding.ActivityMainBinding
@@ -96,7 +96,7 @@ class MainActivity : AppCompatActivity() {
                     append(m.notes)
                 }
             }
-            AlertDialog.Builder(this@MainActivity)
+            MaterialAlertDialogBuilder(this@MainActivity)
                 .setTitle(R.string.update_title)
                 .setMessage(msg)
                 .setPositiveButton(R.string.update_now) { _, _ -> startDownload(m) }
@@ -106,7 +106,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startDownload(m: UpdateChecker.Manifest) {
-        val dlg = AlertDialog.Builder(this)
+        val dlg = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.update_downloading)
             .setMessage("0%")
             .setCancelable(false)
@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
             if (isFinishing || isDestroyed) return@launch
 
             if (apk == null) {
-                AlertDialog.Builder(this@MainActivity)
+                MaterialAlertDialogBuilder(this@MainActivity)
                     .setTitle(R.string.update_title)
                     .setMessage(R.string.update_failed)
                     .setPositiveButton(android.R.string.ok, null)
@@ -145,7 +145,7 @@ class MainActivity : AppCompatActivity() {
         // 需要用户先授予「安装未知应用」权限
         savePendingApk(apk)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AlertDialog.Builder(this)
+            MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.update_title)
                 .setMessage(R.string.update_need_permission)
                 .setPositiveButton(R.string.update_goto_settings) { _, _ ->

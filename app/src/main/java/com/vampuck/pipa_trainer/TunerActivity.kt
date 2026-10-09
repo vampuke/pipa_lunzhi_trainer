@@ -91,7 +91,7 @@ class TunerActivity : AppCompatActivity() {
         b.btnTunerToggle.setOnClickListener {
             if (listening) stop() else ensurePermThenStart()
         }
-        tintDot(0xFFBDBDBD.toInt())   // 未取到读数时指针也要可见，停在中间
+        tintDot(getColor(R.color.text_secondary))   // 未取到读数时指针也要可见，停在中间
         setStatus(getString(R.string.tuner_ready))
     }
 
@@ -106,7 +106,7 @@ class TunerActivity : AppCompatActivity() {
         b.noteFreq.text = getString(R.string.tuner_ready)
         b.centsText.text = ""
         b.stringHint.text = ""
-        tintDot(0xFFBDBDBD.toInt())
+        tintDot(getColor(R.color.text_secondary))
         markStrings(-1, 0.0)
         setStatus(getString(R.string.tuner_ready))
         // 录音线程闭包捕获的是构造时的 Tuner：只换字段的话，跑着的线程会继续用
@@ -130,7 +130,7 @@ class TunerActivity : AppCompatActivity() {
             val row = ItemTunerStringBinding.inflate(LayoutInflater.from(this), b.stringList, false)
             row.strLabel.text = "${s.label}  ${s.note}"
             row.strDev.text = String.format(Locale.US, "%.2f Hz", s.hz)
-            row.strDev.setTextColor(getColor(R.color.black))
+            row.strDev.setTextColor(getColor(R.color.text_primary))
             row.root.setOnClickListener {
                 tonePlayer.play(s.hz)
                 setStatus(getString(R.string.tuner_playing, s.label, s.note))
@@ -311,6 +311,15 @@ class TunerActivity : AppCompatActivity() {
         b.centsDot.background = d
     }
 
+    /**
+     * 选中的弦整行底色：主色兑一点点透明度。写死 ARGB 在深色模式下会变成
+     * 「深底上再压一层暗色」，几乎看不出来；这里从当前主题的主色取，深浅都合适。
+     */
+    private fun highlightTint(): Int {
+        val c = getColor(R.color.pipa_primary)
+        return (c and 0x00FFFFFF) or (0x24 shl 24)   // ≈14% 不透明
+    }
+
     /** 高亮最接近的那根弦，其余显示目标频率。 */
     private fun markStrings(activeNumber: Int, cents: Double) {
         for ((i, row) in rows.withIndex()) {
@@ -324,11 +333,11 @@ class TunerActivity : AppCompatActivity() {
                     cents > 0 -> getString(R.string.tuner_string_sharp, off)
                     else -> getString(R.string.tuner_string_flat, off)
                 }
-                row.strDev.setTextColor(getColor(R.color.pipa_primary_dark))
-                row.root.setBackgroundColor(0x228D3B2E)
+                row.strDev.setTextColor(getColor(R.color.brand_text))
+                row.root.setBackgroundColor(highlightTint())
             } else {
                 row.strDev.text = String.format(Locale.US, "%.2f Hz", s.hz)
-                row.strDev.setTextColor(getColor(R.color.black))
+                row.strDev.setTextColor(getColor(R.color.text_primary))
                 row.root.setBackgroundColor(0x00000000)
             }
         }

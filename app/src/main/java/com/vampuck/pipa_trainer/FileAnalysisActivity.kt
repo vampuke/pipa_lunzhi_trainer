@@ -123,7 +123,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         b.scoreGrade.text = rep.grade
         b.headline.text = rep.headline
         (b.scoreCard.getChildAt(0) as LinearLayout).background =
-            GradientDrawable().apply { setColor(Evaluation.levelColor(rep.level)) }
+            GradientDrawable().apply { setColor(getColor(Evaluation.levelColorRes(rep.level))) }
 
         b.dimRow.removeAllViews()
         for (d in rep.dimensions) {
@@ -132,7 +132,7 @@ class FileAnalysisActivity : AppCompatActivity() {
             item.dimValue.text = d.valueText
             item.dimGrade.text = d.grade
             item.dimGrade.background = GradientDrawable().apply {
-                cornerRadius = 24f; setColor(Evaluation.levelColor(d.level))
+                cornerRadius = 24f; setColor(getColor(Evaluation.levelColorRes(d.level)))
             }
             item.dimSub.text = d.subText
             b.dimRow.addView(item.root)
@@ -293,7 +293,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         val axis = b.chartFlux.xAxis
         playhead?.let { axis.removeLimitLine(it) }
         val ph = LimitLine(tAnalysis.toFloat())
-        ph.lineColor = 0xCC2255CC.toInt(); ph.lineWidth = 2f
+        ph.lineColor = getColor(R.color.chart_line); ph.lineWidth = 2f
         axis.addLimitLine(ph)
         playhead = ph
         b.chartFlux.invalidate()
@@ -350,7 +350,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         }
         val line = LineDataSet(entries, "波形").apply {
             setDrawCircles(false); lineWidth = 1f
-            color = 0xFF33BB66.toInt(); setDrawValues(false)
+            color = getColor(R.color.good); setDrawValues(false)
         }
         // onset markers as a second dataset with an invisible line -> dots spread
         // naturally across the whole range (no stacking like limit lines did)
@@ -365,7 +365,7 @@ class FileAnalysisActivity : AppCompatActivity() {
             lineWidth = 0f
             setDrawCircles(true)
             circleRadius = 2.5f
-            setCircleColor(0xFF9933DD.toInt())
+            setCircleColor(getColor(R.color.chart_onset))
             setDrawFilled(false)
             setDrawValues(false)
         }
@@ -377,7 +377,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         chart.xAxis.setDrawGridLines(false)
         chart.xAxis.removeAllLimitLines()
         val ph = LimitLine(s.toFloat())
-        ph.lineColor = 0xCC2255CC.toInt(); ph.lineWidth = 2f
+        ph.lineColor = getColor(R.color.chart_line); ph.lineWidth = 2f
         chart.xAxis.addLimitLine(ph)
         playhead = ph
         b.lblFlux.text = "起音波形与检测到的每一击（%.1f–%.1fs）".format(s, e)
@@ -398,7 +398,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         }
         val m = LunzhiAnalyzer.metrics(onsets, res.strokeAmp, s, e)
         val ds = ScatterDataSet(entries, "间隔").apply {
-            color = 0xFF2255CC.toInt(); scatterShapeSize = 8f; setDrawValues(false)
+            color = getColor(R.color.chart_line); scatterShapeSize = 8f; setDrawValues(false)
         }
         val chart = b.chartIoi
         chart.data = ScatterData(ds)
@@ -408,7 +408,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         chart.axisLeft.axisMinimum = 0f
         chart.axisLeft.axisMaximum = (maxY * 1.1).coerceAtLeast(50.0).toFloat()
         val mean = LimitLine(m.meanIoiMs.toFloat(), "平均 ${m.meanIoiMs.roundToInt()}ms")
-        mean.lineColor = 0xFFEE3333.toInt(); mean.lineWidth = 1.2f
+        mean.lineColor = getColor(R.color.bad); mean.lineWidth = 1.2f
         chart.axisLeft.removeAllLimitLines()
         chart.axisLeft.addLimitLine(mean)
         b.lblIoi.text = "相邻音间隔随时间变化（%.1f–%.1fs，越平越匀）".format(s, e)
@@ -421,7 +421,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         for (p in m.positionProfile.indices) {
             entries.add(BarEntry(p.toFloat(), (m.positionProfile[p] * 100).toFloat()))
         }
-        val ds = BarDataSet(entries, "力度%").apply { color = 0xFF8D3B2E.toInt() }
+        val ds = BarDataSet(entries, "力度%").apply { color = getColor(R.color.pipa_primary) }
         val chart = b.chartFinger
         chart.data = BarData(ds)
         chart.description.isEnabled = false

@@ -1,5 +1,7 @@
 ﻿package com.vampuck.pipa_trainer.dsp
 
+import com.vampuck.pipa_trainer.R
+
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -473,10 +475,14 @@ object Evaluation {
         TempoBand.VERY_FAST -> "极快"
     }
 
-    fun levelColor(level: Int): Int = when (level) {
-        0 -> 0xFF2E9E5B.toInt()
-        1 -> 0xFFE0A32E.toInt()
-        2 -> 0xFFD64545.toInt()
-        else -> 0xFF9E9E9E.toInt()   // 仅参考
+    /**
+     * 等级徽标底色。这里只返回**资源 id**，由调用方在 Activity 里 getColor 取实例值——
+     * 否则写死的浅色在深色模式下要么太暗、要么和深底糊在一起（values-night 有对应一份）。
+     */
+    fun levelColorRes(level: Int): Int = when (level) {
+        0 -> R.color.good
+        1 -> R.color.warn
+        2 -> R.color.bad
+        else -> R.color.text_secondary   // 仅参考
     }
 }
