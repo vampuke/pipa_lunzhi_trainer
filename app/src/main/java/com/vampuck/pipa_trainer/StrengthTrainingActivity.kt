@@ -22,6 +22,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.updatePadding
 import com.vampuck.pipa_trainer.audio.Metronome
 import com.vampuck.pipa_trainer.audio.TonePlayer
 import com.vampuck.pipa_trainer.data.TrainingConfigStore
@@ -76,6 +77,13 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private var roundStartMs = 0L
     private var roundPausedMs = 0L
     private var lastRestTick = -1
+
+    // ---- 引导音状态：当前在按哪一轮的速度响（-1 = 没响）----
+    // 用来判断「要不要重启节拍器」：阶段切换时如果目标一样就不重启，
+    // 提前起的节拍能无缝接进正式训练，不会有一下停顿或重复的第一声。
+    private var guideRound = -1
+    private var guideBpm = -1
+    private var guideMode = -1
 
     // ---- 环境声统计 ----
     private val sampleRate = 44100
@@ -182,6 +190,17 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         restoreLastConfig()
         rebuildRoundRows()
         renderConfigs()
+        reserveFabSpace()
+    }
+
+    /**
+     * 悬浮的「开始训练」按钮会盖在滚动内容上：给设置页底部留出空白（按钮高度 + 边距），
+     * 这样把计划列表滚到底时，最后一段说明文字也不会被按钮压住。
+     * 训练页不需要——那时按钮已经收起，而且多出来的空白只会让页面显得空。
+     */
+    private fun reserveFabSpace() {
+        val v = b.setupGroup
+        v.updatePadding(bottom = v.paddingBottom + resources.getDimensionPixelSize(R.dimen.fab_clearance))
     }
 
     override fun onStop() {
@@ -191,6 +210,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             stopEverything()
             b.setupGroup.visibility = View.VISIBLE
             b.runGroup.visibility = View.GONE
+            b.btnStartTraining.visibility = View.VISIBLE
             rebuildRoundRows()
         }
     }
@@ -459,9 +479,13 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         lastStrokes = 0
         roundStartStrokes = 0
         lastRestTick = -1
+        guideRound = -1
+        guideBpm = -1
+        guideMode = -1
 
         b.setupGroup.visibility = View.GONE
         b.runGroup.visibility = View.VISIBLE
+        b.btnStartTraining.visibility = View.GONE
         b.micCard.visibility = if (useMic) View.VISIBLE else View.GONE
         b.liveSpeed.setText(R.string.strength_live_placeholder)
         b.liveDetail.text = ""
@@ -511,6 +535,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             if (!running) return          // 收尾（总结弹窗）已接管
         }
         paint(st)
+        updateGuide()                     // 引导音（含倒数/休息最后几秒的提前起拍）
     }
 
     private fun onEnter(st: TrainingPlan.Stage) {
@@ -522,30 +547,70 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
                 roundLiveSamples = 0
                 roundStartMs = elapsedMs
                 roundPausedMs = 0L
-                startGuideFor(st.roundIndex)
             }
             TrainingPlan.Phase.REST -> {
-                metronome.stop()
                 lastRestTick = -1
             }
             TrainingPlan.Phase.DONE -> finishTraining()
-            TrainingPlan.Phase.LEAD_IN -> { /* 倒数中，什么都不响 */ }
+            TrainingPlan.Phase.LEAD_IN -> { /* 倒数中，节拍由 updateGuide 提前起 */ }
         }
     }
 
-    private fun startGuideFor(i: Int) {
-        val r = roundAt(i) ?: return
-        metronome.setAccentFirst(accentFirst)
-        if (guidePerBeat) {
-            metronome.setMode(Metronome.MODE_QUARTER)
-            metronome.setBpm(r.bpmD)
-            analyzer?.setMetronomeBeat(60.0 / r.bpmD)
-        } else {
-            metronome.setMode(Metronome.MODE_LUNZHI)
-            metronome.setBpm(r.bpmD)
-            analyzer?.setMetronomeBeat(60.0 / (r.bpmD * 5))
+    /** 引导音现在该按哪一轮响：训练中 = 本轮；倒数/休息的最后几秒 = 提前起的那一轮。 */
+    private fun guideTargetIndex(): Int {
+        val sec = elapsedMs / 1000.0
+        val st = plan.stageAt(sec)
+        return when (st.phase) {
+            TrainingPlan.Phase.WORK -> st.roundIndex
+            TrainingPlan.Phase.DONE -> -1
+            else -> plan.preroll(sec) ?: -1
         }
+    }
+
+    /**
+     * 让引导音跟上当前阶段——每个 tick 都调，但只在「目标变了」时才动节拍器：
+     * 同一轮、同一速度就让它继续响，于是提前起的节拍能**无缝**接进正式训练
+     * （不重启 → 不会有一声重复、也不会停顿半拍）。
+     */
+    private fun updateGuide() {
+        if (!running || paused) {
+            stopGuide()
+            return
+        }
+        val idx = guideTargetIndex()
+        if (idx < 0) {
+            stopGuide()
+            return
+        }
+        val r = roundAt(idx) ?: return
+        val mode = if (guidePerBeat) Metronome.MODE_QUARTER else Metronome.MODE_LUNZHI
+        if (guideRound == idx && guideBpm == r.bpm && guideMode == mode &&
+            metronome.isRunning
+        ) {
+            return
+        }
+        if (guideRound >= 0 && (guideBpm != r.bpm || guideMode != mode)) {
+            metronome.stop()          // 速度/模式变了才重启
+        }
+        guideRound = idx
+        guideBpm = r.bpm
+        guideMode = mode
+        metronome.setAccentFirst(accentFirst)
+        metronome.setMode(mode)
+        metronome.setBpm(r.bpmD)
+        // 遮蔽周期与目标一致：提前起的这几拍也要被挡掉，否则会被当成真实起音
+        analyzer?.setMetronomeBeat(if (guidePerBeat) 60.0 / r.bpmD else 60.0 / (r.bpmD * 5))
         metronome.start()
+    }
+
+    private fun stopGuide() {
+        if (guideRound >= 0 || metronome.isRunning) {
+            metronome.stop()
+            analyzer?.clearMetronomeClicks()
+        }
+        guideRound = -1
+        guideBpm = -1
+        guideMode = -1
     }
 
     private fun paint(st: TrainingPlan.Stage) {
@@ -596,11 +661,14 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
                     )
                     b.nextSpeed.text = getString(R.string.strength_next_work, st.roundIndex + 1, r.bpm)
                 }
-                // 休息最后 3 秒轻响提示，准备起手
-                val left = ceil(st.remainingSec).toInt()
-                if (left in 1..3 && left != lastRestTick) {
-                    lastRestTick = left
-                    tone.play(REST_TICK_HZ, 0.09)
+                // 休息最后几秒的节拍由 updateGuide() 提前起；没开提前起拍时，
+                // 仍然用 3 声轻响提示准备起手（两者不会同时响）。
+                if (plan.preroll(elapsedMs / 1000.0) == null) {
+                    val left = ceil(st.remainingSec).toInt()
+                    if (left in 1..3 && left != lastRestTick) {
+                        lastRestTick = left
+                        tone.play(REST_TICK_HZ, 0.09)
+                    }
                 }
             }
             TrainingPlan.Phase.DONE -> return
@@ -617,11 +685,9 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         if (!running) return
         paused = !paused
         if (paused) {
-            metronome.stop()
-            analyzer?.clearMetronomeClicks()
+            stopGuide()
         } else {
             anchorMs = SystemClock.elapsedRealtime()
-            if (currentPhase == TrainingPlan.Phase.WORK) startGuideFor(phaseRound)
         }
         b.btnPause.setText(if (paused) R.string.strength_resume else R.string.strength_pause)
         render()
@@ -762,6 +828,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         running = false
         paused = false
         handler.removeCallbacks(ticker)
+        stopGuide()
         try { metronome.stop() } catch (_: Throwable) {}
         try { tone.stop() } catch (_: Throwable) {}
         stopMic()

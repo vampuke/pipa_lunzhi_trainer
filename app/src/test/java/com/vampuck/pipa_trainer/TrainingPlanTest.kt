@@ -192,4 +192,86 @@ class TrainingPlanTest {
         assertEquals(0, p.totalSec)
         assertEquals(0.0, p.stageEndSec(0.0), 1e-9)
     }
+
+    // ---------------- 提前起节拍（倒数/休息的最后几秒） ----------------
+
+    /** [TrainingPlan.preroll] 返回的「接下来要练的第几次」，没到窗口时是 -1。 */
+    private fun prerollAt(p: TrainingPlan, t: Double): Int = p.preroll(t) ?: -1
+
+    @Test
+    fun `preroll is on by default and covers the whole countdown`() {
+        assertEquals(TrainingPlan.DEFAULT_PREROLL_SEC, TrainingPlan().prerollSec)
+        val p = plan(listOf(60 to 120, 60 to 120), rest = 30, lead = 5)
+
+        assertEquals(0, prerollAt(p, 0.0))            // 倒数一开始就响
+        assertEquals(0, prerollAt(p, 4.9))
+        assertEquals(60, p.rounds[0].bpm)            // 确认第 1 次的速度就是 60
+        assertEquals(-1, prerollAt(p, 5.0))          // 进入训练：交给正常引导音
+        assertEquals(-1, prerollAt(p, 60.0))
+    }
+
+    @Test
+    fun `preroll starts only in the last seconds of a rest`() {
+        val p = plan(listOf(60 to 120, 72 to 60), rest = 30, lead = 5)
+        // 休息 125.0 ～ 155.0；提前窗口 = 5 拍 × 1.0s = 5.0s
+        assertEquals(-1, prerollAt(p, 125.0))
+        assertEquals(-1, prerollAt(p, 149.9))
+        assertEquals(1, prerollAt(p, 150.0))         // 剩下正好 5 秒
+        assertEquals(1, prerollAt(p, 154.9))         // 预告的是即将开始的第 2 次
+        assertEquals(-1, prerollAt(p, 155.0))        // 开始训练
+    }
+
+    @Test
+    fun `preroll window is a whole number of beats of the upcoming round`() {
+        // 60 BPM → 1 拍 1 秒 → 窗口正好 5 秒
+        assertEquals(5.0, plan(listOf(60 to 120)).prerollWindowSec(0), 1e-9)
+        // 72 BPM → 1 拍 0.8333 秒 → 正好 6 拍 = 5.0 秒
+        assertEquals(5.0, plan(listOf(72 to 60)).prerollWindowSec(0), 1e-9)
+        // 100 BPM → 1 拍 0.6 秒 → 8 拍 = 4.8 秒（第 9 拍会超，所以取 8）
+        assertEquals(4.8, plan(listOf(100 to 60)).prerollWindowSec(0), 1e-9)
+        // 20 BPM → 1 拍 3 秒 → 只有 1 拍
+        assertEquals(3.0, plan(listOf(20 to 60)).prerollWindowSec(0), 1e-9)
+        // 240 BPM → 1 拍 0.25 秒 → 20 拍
+        assertEquals(5.0, plan(listOf(240 to 60)).prerollWindowSec(0), 1e-9)
+    }
+
+    @Test
+    fun `preroll honours the per-round speed of the upcoming round`() {
+        // 第 2 次很快（240 BPM → 窗口 5.0s），第 3 次很慢（20 BPM → 窗口 3.0s）
+        val p = plan(listOf(60 to 120, 240 to 60, 20 to 60), rest = 30, lead = 5)
+        // 第 1 次结束 125.0，休息到 155.0：最后 5 秒起 240 BPM 的节拍
+        assertEquals(-1, prerollAt(p, 149.9))
+        assertEquals(1, prerollAt(p, 150.0))
+        // 第 2 次 155.0 ～ 215.0，休息到 245.0：第 3 次很慢（20 BPM），窗口只有 3 秒
+        assertEquals(-1, prerollAt(p, 241.9))
+        assertEquals(2, prerollAt(p, 242.0))
+    }
+
+    @Test
+    fun `preroll can be switched off`() {
+        val p = plan(listOf(60 to 120, 60 to 120), rest = 30, lead = 5)
+        p.prerollSec = 0
+        assertEquals(-1, prerollAt(p, 0.0))
+        assertEquals(-1, prerollAt(p, 152.0))
+        assertEquals(0.0, p.prerollWindowSec(0), 1e-9)
+    }
+
+    @Test
+    fun `preroll never fires on a single round outside the countdown`() {
+        val p = plan(listOf(60 to 120))
+        assertEquals(0, prerollAt(p, 0.0))
+        assertEquals(-1, prerollAt(p, 5.0))
+        assertEquals(-1, prerollAt(p, 124.0))
+        assertEquals(-1, prerollAt(p, 125.0))
+    }
+
+    @Test
+    fun `preroll follows a round added while resting`() {
+        val p = plan(listOf(60 to 120, 60 to 120), rest = 30, lead = 5)
+        assertEquals(1, prerollAt(p, 152.0))         // 预告的还是第 2 次
+        p.addRound(bpm = 120, durationSec = 60)      // 追加在最后，不影响当前预告
+        assertEquals(3, p.size)
+        assertEquals(1, prerollAt(p, 152.0))
+        assertEquals(60, p.rounds[0].bpm)            // 已排好的计划没被打乱
+    }
 }

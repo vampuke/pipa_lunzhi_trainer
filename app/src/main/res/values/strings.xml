@@ -201,7 +201,7 @@
     <string name="strength_mic_off_hint">关：只按时间与引导音训练，不做统计。</string>
     <string name="strength_summary">共 %1$d 次 · 训练 %2$s · 休息 %3$s · 合计 %4$s</string>
     <string name="strength_start">开始训练</string>
-    <string name="strength_footer">点「开始训练」后倒数 5 秒进入第一次训练，之后每两次之间自动休息。训练中可暂停、跳过当前阶段，也可随时追加或取消还没开始的次数。</string>
+    <string name="strength_footer">点右下角「开始训练」后倒数 5 秒进入第一次训练，之后每两次之间自动休息。倒数与每段休息的最后几秒会提前响起下一轮的节拍，让你先把动作对上节奏。</string>
     <string name="strength_leadin_label">倒数结束就开始，准备好起手</string>
     <string name="strength_remaining">本次剩余</string>
     <string name="strength_rest_remaining">休息剩余</string>
