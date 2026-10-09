@@ -123,14 +123,15 @@ class TrainingPlan(
             else -> return null
         }
         val r = rounds.getOrNull(next) ?: return null
-        if (st.remainingSec > prerollWindowSec(r.bpm)) return null
+        // 注意传的是**下标** next（不是 r.bpm）：窗口是按「下一轮」的拍长整拍对齐的。
+        if (st.remainingSec > prerollWindowSec(next)) return null
         return next
     }
 
-    /** 第 [index] 次训练实际提前多少秒起节拍（整拍对齐后 ≤ [prerollSec]）。 */
-    fun prerollWindowSec(index: Int): Double {
+    /** 第 [roundIndex] 次训练实际提前多少秒起节拍（整拍对齐后 ≤ [prerollSec]）。 */
+    fun prerollWindowSec(roundIndex: Int): Double {
         if (prerollSec <= 0) return 0.0
-        val bpm = rounds.getOrNull(index)?.bpm ?: return 0.0
+        val bpm = rounds.getOrNull(roundIndex)?.bpm ?: return 0.0
         val beat = 60.0 / bpm
         val beats = (prerollSec / beat).toInt()
         return if (beats < 1) 0.0 else beats * beat

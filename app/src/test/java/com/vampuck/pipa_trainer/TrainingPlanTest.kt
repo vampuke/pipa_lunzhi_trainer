@@ -236,6 +236,33 @@ class TrainingPlanTest {
     }
 
     @Test
+    fun `preroll window takes a round index not a bpm`() {
+        // 第 0 次 60 BPM（窗口 5s）、第 1 次 240 BPM（窗口 5s）、第 2 次 20 BPM（窗口 3s）。
+        // 这条锁死「传下标」：若误传这一轮的 BPM 当参数，60 会被当成「第 60 次」取不到 →
+        // 窗口 0 → 永远不起拍（v1.20.0 首跑就是这么挂的 5 条测试）。
+        val p = plan(listOf(60 to 120, 240 to 60, 20 to 60))
+        assertEquals(5.0, p.prerollWindowSec(0), 1e-9)
+        assertEquals(5.0, p.prerollWindowSec(1), 1e-9)
+        assertEquals(3.0, p.prerollWindowSec(2), 1e-9)
+        // 越界下标（如把 BPM 当参数传进来）返回 0，而不是抛异常
+        assertEquals(0.0, p.prerollWindowSec(60), 1e-9)
+        assertEquals(0.0, p.prerollWindowSec(9), 1e-9)
+    }
+
+    @Test
+    fun `preroll turns on exactly one window before the next round starts`() {
+        // 不写死 150/152，直接由窗口推边界：起拍时刻 = 本轮开始 − 窗口(下一轮)
+        val p = plan(listOf(60 to 120, 72 to 60), rest = 30, lead = 5)
+        val w = p.prerollWindowSec(1)                    // 72 BPM → 5.0s
+        val boundary = p.roundStartSec(1) - w            // 155.0 - 5.0 = 150.0
+        assertEquals(150.0, boundary, 1e-9)
+        assertEquals(-1, prerollAt(p, boundary - 0.01))
+        assertEquals(1, prerollAt(p, boundary))
+        assertEquals(1, prerollAt(p, p.roundStartSec(1) - 1e-6))
+        assertEquals(-1, prerollAt(p, p.roundStartSec(1)))
+    }
+
+    @Test
     fun `preroll honours the per-round speed of the upcoming round`() {
         // 第 2 次很快（240 BPM → 窗口 5.0s），第 3 次很慢（20 BPM → 窗口 3.0s）
         val p = plan(listOf(60 to 120, 240 to 60, 20 to 60), rest = 30, lead = 5)
