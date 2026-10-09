@@ -13,7 +13,6 @@ import android.text.InputType
 import android.text.TextUtils
 import android.view.View
 import android.view.WindowManager
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -23,6 +22,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.updatePadding
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.vampuck.pipa_trainer.audio.Metronome
 import com.vampuck.pipa_trainer.audio.TonePlayer
 import com.vampuck.pipa_trainer.data.TrainingConfigStore
@@ -303,17 +304,13 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun askBpm(i: Int) {
         val r = roundAt(i) ?: return
-        val input = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER
-            setText(r.bpm.toString())
-            setSelection(text.length)
-        }
+        val field = numberField(r.bpm, R.string.strength_bpm_field)
         AlertDialog.Builder(this)
             .setTitle(R.string.strength_bpm_dialog)
-            .setView(input)
+            .setView(field.root)
             .setNegativeButton(R.string.strength_cancel, null)
             .setPositiveButton(R.string.strength_ok) { _, _ ->
-                val v = input.text.toString().trim().toIntOrNull()
+                val v = field.text.toIntOrNull()
                 if (v == null) {
                     toast(R.string.strength_bad_number)
                 } else {
@@ -326,17 +323,13 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun askDur(i: Int) {
         val r = roundAt(i) ?: return
-        val input = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER
-            setText(r.durationSec.toString())
-            setSelection(text.length)
-        }
+        val field = numberField(r.durationSec, R.string.strength_dur_field)
         AlertDialog.Builder(this)
             .setTitle(R.string.strength_dur_dialog)
-            .setView(input)
+            .setView(field.root)
             .setNegativeButton(R.string.strength_cancel, null)
             .setPositiveButton(R.string.strength_ok) { _, _ ->
-                val v = input.text.toString().trim().toIntOrNull()
+                val v = field.text.toIntOrNull()
                 if (v == null) {
                     toast(R.string.strength_bad_number)
                 } else {
@@ -425,16 +418,13 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun askSaveConfig() {
         val auto = autoConfigName()
-        val input = EditText(this).apply {
-            setText(auto)
-            setSelection(text.length)
-        }
+        val field = textField(auto, R.string.strength_config_name_field)
         AlertDialog.Builder(this)
             .setTitle(R.string.strength_config_name_title)
-            .setView(input)
+            .setView(field.root)
             .setNegativeButton(R.string.strength_cancel, null)
             .setPositiveButton(R.string.strength_ok) { _, _ ->
-                val name = TrainingConfig.sanitize(input.text.toString()).ifBlank { auto }
+                val name = TrainingConfig.sanitize(field.text).ifBlank { auto }
                 TrainingConfigStore.put(this, currentConfig(name))
                 renderConfigs()
                 toast(getString(R.string.strength_config_saved, name))
@@ -905,6 +895,35 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     }
 
     // ---------------- 小工具 ----------------
+
+    /**
+     * 弹窗里的输入框。原来是裸 EditText：没有边框、没有内边距、字号偏小，看着像一行
+     * 「浮」在弹窗上的字。现在改成 inflate [R.layout.dialog_field]，与页面里的输入框
+     * 共用同一套样式（App.TextField / App.TextInput）：圆角描边、聚焦转红木主色、
+     * 提示浮到边框上，两处外观完全一致。
+     */
+    private class DialogField(val root: View, val input: TextInputEditText) {
+        /** 去掉首尾空白的输入内容。 */
+        val text: String get() = input.text?.toString()?.trim().orEmpty()
+        fun toIntOrNull(): Int? = text.toIntOrNull()
+    }
+
+    private fun textField(initial: String, hintRes: Int): DialogField =
+        buildField(initial, hintRes, InputType.TYPE_CLASS_TEXT)
+
+    private fun numberField(initial: Int, hintRes: Int): DialogField =
+        buildField(initial.toString(), hintRes, InputType.TYPE_CLASS_NUMBER)
+
+    private fun buildField(initial: String, hintRes: Int, inputType: Int): DialogField {
+        val v = layoutInflater.inflate(R.layout.dialog_field, null)
+        val til = v.findViewById<TextInputLayout>(R.id.fieldLayout)
+        val et = v.findViewById<TextInputEditText>(R.id.fieldInput)
+        til.hint = getString(hintRes)
+        et.inputType = inputType
+        et.setText(initial)
+        et.setSelection(et.text.length)
+        return DialogField(v, et)
+    }
 
     private fun toast(res: Int) = Toast.makeText(this, res, Toast.LENGTH_SHORT).show()
 

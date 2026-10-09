@@ -22,7 +22,9 @@ class ImportActivity : AppCompatActivity() {
         b = ActivityImportBinding.inflate(layoutInflater)
         setContentView(b.root)
 
-        b.inputJson.hint = JScoreJson.TEMPLATE_HINT
+        // 长格式说明放输入框的 placeholder（输入后自动消失），label 位置保持短标题。
+        b.jsonLabel.hint = getString(R.string.import_json_label)
+        b.jsonLabel.placeholderText = JScoreJson.TEMPLATE_HINT
 
         b.btnImport.setOnClickListener {
             val text = b.inputJson.text?.toString()?.trim().orEmpty()

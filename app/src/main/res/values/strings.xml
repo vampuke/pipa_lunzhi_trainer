@@ -123,6 +123,7 @@
     <string name="import_title">导入简谱</string>
     <string name="import_entry">导入我的简谱 (JSON)</string>
     <string name="import_hint">把一首曲子的简谱按 JSON 格式粘贴进来，即可加入「名曲跟练」列表、看着谱子跟练。点「填入模板」看格式示例，照着改成你的谱子。</string>
+    <string name="import_json_label">简谱 JSON</string>
     <string name="import_fill_template">填入模板示例</string>
     <string name="import_do">导入</string>
     <string name="import_empty">请先粘贴简谱 JSON</string>
@@ -175,6 +176,7 @@
     <string name="strength_configs_hint">点一下载入 · 长按删除 · 上次编辑的计划会自动恢复</string>
     <string name="strength_save_config">＋ 保存当前配置</string>
     <string name="strength_config_name_title">配置名称</string>
+    <string name="strength_config_name_field">给这套配置起个名字</string>
     <string name="strength_config_saved">已保存「%1$s」</string>
     <string name="strength_config_loaded">已载入「%1$s」</string>
     <string name="strength_config_delete_title">删除配置？</string>
@@ -226,7 +228,9 @@
     <string name="strength_live_detail">已击 %1$d 击 · 均匀度 ≈ %2$d%%</string>
     <string name="strength_no_stroke">还没检测到击弦：把手机放近琴身、环境安静些。</string>
     <string name="strength_bpm_dialog">训练速度（BPM）</string>
+    <string name="strength_bpm_field">速度（BPM）</string>
     <string name="strength_dur_dialog">本次时长（秒）</string>
+    <string name="strength_dur_field">时长（秒）</string>
     <string name="strength_ok">确定</string>
     <string name="strength_cancel">取消</string>
     <string name="strength_bad_number">请输入数字</string>

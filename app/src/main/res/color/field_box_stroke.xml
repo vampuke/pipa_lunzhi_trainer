@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 输入框描边：聚焦/悬停时用红木主色（与卡片的中性描边区分开，让人一眼看出「这里可输入」）。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/pipa_primary" android:state_focused="true" />
+    <item android:color="@color/pipa_primary" android:state_hovered="true" />
+    <item android:color="@color/outline" />
+</selector>

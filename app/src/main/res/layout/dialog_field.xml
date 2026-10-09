@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 弹窗里的输入框：与页面里的输入框共用 App.TextField / App.TextInput 两套样式，
+     外面留出边距（AlertDialog 不会给自定义视图加内边距，不加就会贴着弹窗边缘）。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingLeft="20dp"
+    android:paddingRight="20dp"
+    android:paddingTop="14dp">
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/fieldLayout"
+        style="@style/App.TextField"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/fieldInput"
+            style="@style/App.TextInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+</FrameLayout>
