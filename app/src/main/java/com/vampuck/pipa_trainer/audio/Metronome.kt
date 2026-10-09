@@ -4,6 +4,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import java.util.Arrays
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 import kotlin.math.exp
 import kotlin.math.sin
@@ -39,6 +40,9 @@ class Metronome {
 
     interface Listener {
         /**
+         * 注意：回调运行在节拍器的**工作线程**上，不是主线程——回调里碰 UI 必须
+         * 自己 post 到主线程（[onBeat] 同理）。
+         *
          * @param beatIndex   0-based counter over every audible click
          * @param audibleNanos System.nanoTime()-based estimate of when the click
          *                     reaches the speaker (scheduled time + output latency)
@@ -70,6 +74,13 @@ class Metronome {
     private var worker: Thread? = null
 
     /**
+     * 每次 start() 自增。工作线程退出时只有在「自己仍是当前这一代」的情况下才允许
+     * 把 [running] 清零——否则上一轮线程的收尾会掐断刚起播的新一轮（与 TonePlayer
+     * 曾经踩过的坑同一类）。
+     */
+    private val generation = AtomicLong(0)
+
+    /**
      * 上一次的工作线程。stop() 只把 [track] 停下来，真正 release 是工作线程在做，
      * 那要花几到几十毫秒；这段时间里如果直接开新一轮，两个 AudioTrack 会重叠一小会儿，
      * 听感上就是开头多出一下。所以 start() 前先等它退干净（不在锁内 join，
@@ -92,8 +103,14 @@ class Metronome {
         lastWorker?.let { w ->
             if (w.isAlive) {
                 w.interrupt()
-                try { w.join(400) } catch (_: InterruptedException) {
-                    Thread.currentThread().interrupt()
+                // 两段等待：正常收尾（release 一个 AudioTrack）在几十毫秒内完成，
+                // 400ms 还没退说明音频设备卡住了，再等一段以免两个 track 重叠。
+                for (budget in intArrayOf(400, 600)) {
+                    try { w.join(budget.toLong()) } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        break
+                    }
+                    if (!w.isAlive) break
                 }
             }
         }
@@ -101,13 +118,15 @@ class Metronome {
         synchronized(this) {
             if (running) return
             running = true
-            worker = thread(name = "metronome", isDaemon = true) { run() }
+            val gen = generation.incrementAndGet()
+            worker = thread(name = "metronome", isDaemon = true) { run(gen) }
         }
     }
 
     @Synchronized
     fun stop() {
         running = false
+        generation.incrementAndGet()
         val w = worker
         worker = null
         lastWorker = w
@@ -145,7 +164,7 @@ class Metronome {
         val slotIndex: Int, val slotCount: Int, val accent: Boolean
     ) { var uiFired = false }
 
-    private fun run() {
+    private fun run(gen: Long) {
         val sr = 44100
 
         // normal: identical to the original single click (3200/6400, ~0.75 peak)
@@ -181,7 +200,7 @@ class Metronome {
                 .setBufferSizeInBytes(bufBytes)
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .build()
-        } catch (_: Throwable) { return }
+        } catch (_: Throwable) { if (generation.get() == gen) running = false; return }
         track = at
 
         // conservative estimate of the output path latency (buffer half-fill)
@@ -284,10 +303,16 @@ class Metronome {
             }
         } catch (_: Throwable) {
             // interrupted / device error -> exit
+        } finally {
+            try { at.stop() } catch (_: Throwable) {}
+            try { at.release() } catch (_: Throwable) {}
+            if (track === at) track = null
+            // 工作线程也可能自己退出（设备出错、write() <= 0）。这里必须把 running
+            // 复位，否则 isRunning 永久为 true，下一次 start() 会卡在
+            // `if (running) return` 上——界面显示在响、实际没有声音。用 generation
+            // 兜住：上一轮线程不能把新一轮的标志清掉。
+            if (generation.get() == gen) running = false
         }
-        try { at.stop() } catch (_: Throwable) {}
-        try { at.release() } catch (_: Throwable) {}
-        if (track === at) track = null
     }
 
     private fun scheduleClick(

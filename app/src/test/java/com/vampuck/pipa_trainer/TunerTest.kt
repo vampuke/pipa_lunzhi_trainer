@@ -3,6 +3,7 @@ package com.vampuck.pipa_trainer
 import com.vampuck.pipa_trainer.dsp.Tuner
 import com.vampuck.pipa_trainer.dsp.Tuning
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -196,6 +197,24 @@ class TunerTest {
             assertNotNull(r)
             assertEquals("${s.label}", s.number, r!!.string.string.number)
         }
+    }
+
+    /**
+     * 一弦高整整一个全音时（246.94Hz 正好是 B3），**绝对音名**的音分≈0 —— 界面原来
+     * 就是拿这个报「准了」，于是屏幕显示「B3 准了」：用户以为一弦的音名是 B3，
+     * 也看不出弦该松。所以「准不准/偏高偏低/指针」必须相对**最近的弦**算
+     * （TunerActivity.show 现在一律用 reading.string）。
+     */
+    @Test
+    fun aWholeToneSharpStringIsNotReportedAsInTune() {
+        val b3 = Tuning.hzOf(Tuning.midiOf(220.0) + 2.0)
+        val r = feed(Tuner(sr), tone(1.0, b3))
+        assertNotNull(r)
+        assertEquals("B3", r!!.note.label)                                  // 绝对音名确实是 B3
+        assertTrue("note cents=${r.note.cents}", abs(r.note.cents) < 5.0)   // 旧逻辑据此报「准了」
+        assertEquals(1, r.string.string.number)                             // 最近的弦是一弦
+        assertTrue("string cents=${r.string.cents}", r.string.cents > 195.0)
+        assertFalse("一弦高一个全音不能算准", r.string.inTune)
     }
 
     // ---------------- 门限 ----------------

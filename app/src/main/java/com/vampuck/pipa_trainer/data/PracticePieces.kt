@@ -27,7 +27,15 @@ data class PracticePiece(
     val sections: List<PieceSection>
 ) {
     val totalBeats: Int get() = sections.sumOf { it.beats }
-    fun totalSeconds(bpm: Int): Int = (totalBeats * 60.0 / bpm).toInt()
+
+    /**
+     * 按参考速度估算时长（秒）。bpm 兜到至少 1：导入曲目的 refBpm 可能是 0，
+     * 那会算出 Infinity → `toInt()` = Int.MAX_VALUE，界面时长直接爆表。
+     */
+    fun totalSeconds(bpm: Int): Int {
+        val s = totalBeats * 60.0 / bpm.coerceAtLeast(1)
+        return if (s.isFinite()) s.toInt().coerceIn(0, 24 * 3600) else 0
+    }
 }
 
 object PracticePieces {

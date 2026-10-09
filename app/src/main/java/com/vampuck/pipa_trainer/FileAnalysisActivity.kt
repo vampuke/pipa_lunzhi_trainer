@@ -284,7 +284,8 @@ class FileAnalysisActivity : AppCompatActivity() {
                     if (t >= segEnd) { mp.pause(); b.btnPlay.text = "▶ 播放" }
                 }
             } catch (_: Throwable) {}
-            handler.postDelayed(this, 200)
+            // 只有真正在播时才续期：暂停后原来仍每 200ms 唤醒一次主线程，纯耗电。
+            if (mp.isPlaying) handler.postDelayed(this, 200)
         }
     }
 

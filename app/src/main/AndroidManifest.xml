@@ -2,13 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
     <!-- 自更新：联网拉清单+下载 APK，并调起系统安装器 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
+        选文件走的是 SAF（ActivityResultContracts.OpenDocument），不需要任何媒体库
+        读取权限：原来声明的 READ_MEDIA_AUDIO / READ_MEDIA_VIDEO / READ_EXTERNAL_STORAGE
+        既没有运行时申请代码，也用不上（还会引起隐私审核和权限弹窗的疑虑）。
+    -->
 
     <application
         android:allowBackup="true"
@@ -27,15 +29,48 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".FileAnalysisActivity" android:exported="false" />
-        <activity android:name=".LiveActivity" android:exported="false" />
-        <activity android:name=".StrengthTrainingActivity" android:exported="false" />
-        <activity android:name=".TunerActivity" android:exported="false" />
-        <activity android:name=".MetronomeActivity" android:exported="false" />
-        <activity android:name=".PlayAlongActivity" android:exported="false" />
-        <activity android:name=".PiecePlayerActivity" android:exported="false" />
-        <activity android:name=".ImportActivity" android:exported="false" />
-        <activity android:name=".ScoreEditorActivity" android:exported="false" />
+        <!--
+            所有页面都自己兜住旋转/分屏/字号变化：
+            App 没有 onSaveInstanceState，重建就等于「正在录入的简谱归零、分析结果
+            丢失、训练中断」。声明 configChanges 后系统不会重建 Activity，界面保持
+            当前方向，用户的操作不丢。
+        -->
+        <activity
+            android:name=".FileAnalysisActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".LiveActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".StrengthTrainingActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".TunerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".MetronomeActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".PlayAlongActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".PiecePlayerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".ImportActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".ScoreEditorActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

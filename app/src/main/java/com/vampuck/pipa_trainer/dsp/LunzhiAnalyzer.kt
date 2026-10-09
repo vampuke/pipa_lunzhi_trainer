@@ -2,7 +2,6 @@ package com.vampuck.pipa_trainer.dsp
 
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.ln
 import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min
@@ -84,10 +83,18 @@ object LunzhiAnalyzer {
     )
 
     // ---------- FFT ----------
-    private val hannCache = HashMap<Int, DoubleArray>()
-    private fun hann(n: Int): DoubleArray = hannCache.getOrPut(n) {
-        DoubleArray(n) { 0.5 - 0.5 * cos(2.0 * Math.PI * it / (n - 1)) }
+    /**
+     * Hann window per size. This is an `object`, so a *mutable* cache was shared
+     * state across threads: two concurrent `analyze()` calls (the analysis
+     * screen can be re-entered while the previous one runs) could corrupt the
+     * map. [WIN] is the only size ever requested, so build it eagerly and keep
+     * the fallback for any other size pure.
+     */
+    private val hannWindows = HashMap<Int, DoubleArray>().apply {
+        put(WIN, DoubleArray(WIN) { 0.5 - 0.5 * cos(2.0 * Math.PI * it / (WIN - 1)) })
     }
+    private fun hann(n: Int): DoubleArray = hannWindows[n]
+        ?: DoubleArray(n) { 0.5 - 0.5 * cos(2.0 * Math.PI * it / (n - 1).coerceAtLeast(1)) }
 
     private fun rfftMag(re0: DoubleArray): DoubleArray {
         val n = re0.size
@@ -174,6 +181,11 @@ object LunzhiAnalyzer {
             tone[i] = Timbre.harmonicity(mag, sampleRate, WIN)
             prev = mag
         }
+        // 按最大值归一化。曾经改成按 99 分位归一化（想让一个突发巨响不再把整曲
+        // 压低），但那会把整体尺度抬高，让按最大值标定好的**绝对**阈值
+        // （+0.02、prominence 0.04）全部失效：同一段房间噪声的误报从 12 击/20s
+        // 涨到 30 击/20s（TimbreClassificationTest 抓到的）。要改口径，必须把
+        // 整条链路（阈值、prominence、timbre 门）一起重标定，不能只改归一化。
         var fmax = 1e-9
         for (v in flux) if (v > fmax) fmax = v
         for (i in flux.indices) flux[i] = flux[i] / fmax
@@ -196,6 +208,10 @@ object LunzhiAnalyzer {
         val minGap = (MIN_ONSET_GAP * fps).toInt().coerceAtLeast(1)
         val w = (0.12 * fps).toInt().coerceAtLeast(1)
         val cand = ArrayList<Int>()
+        // 候选阶段就吃掉最小间距：让被 prominence/timbre 否掉的噪声峰也占用间距。
+        // 试过改成「只对保留的峰计间距」（想和实时模式对齐），实测房间噪声误报
+        // 12 → 30 击/20s；而轮指最快约 12 击/秒、相邻击间隔 83ms，远大于 40ms 的
+        // 间距，所以那个对齐带来的收益是假想的、代价是真的。要改先重标定整条链路。
         var last = -minGap
         for (i in 1 until flux.size - 1) {
             val thr = med[i] * 1.2 + 0.02
