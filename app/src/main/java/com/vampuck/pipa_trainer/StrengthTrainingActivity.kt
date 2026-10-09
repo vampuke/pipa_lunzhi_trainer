@@ -921,7 +921,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         til.hint = getString(hintRes)
         et.inputType = inputType
         et.setText(initial)
-        et.setSelection(et.text.length)
+        et.setSelection(initial.length)
         return DialogField(v, et)
     }
 
