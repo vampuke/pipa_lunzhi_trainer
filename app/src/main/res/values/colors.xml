@@ -9,6 +9,17 @@
     <color name="pipa_accent">#FFC8973F</color>
     <color name="pipa_accent_dark">#FF9A6E26</color>
 
+    <!--
+        品牌色分「用途」两份，深浅模式各自取合适的明度：
+        pipa_primary* 当**填充**（头部渐变、主按钮、图表柱子），上面压白字；
+        brand_text*   当**文字/图标**（标题、数值、强调），要保证压在页面底色上可读。
+        两者在浅色模式同值，深色模式必须分开——同一个值没法既当深底填充又当浅色文字。
+    -->
+    <color name="brand_text">#FF8C3A2B</color>
+    <color name="brand_text_strong">#FF5E271E</color>
+    <!-- 金色胶囊里的文字 -->
+    <color name="accent_chip_text">#FF9A6E26</color>
+
     <!-- Material 3 容器 / 表面 token（暖木 + 宣纸米白） -->
     <color name="primary_container">#FFF7DED4</color>
     <color name="on_primary_container">#FF3A1710</color>
@@ -24,6 +35,13 @@
     <color name="warn">#FF8A6400</color>
     <color name="bad">#FFC62F2F</color>
     <color name="chart_line">#FF2255CC</color>
+    <!-- 起音散点 -->
+    <color name="chart_onset">#FF9933DD</color>
 
     <color name="bg">#FFF6F1EA</color>
+
+    <!-- 开始前倒数覆盖层（半透明，盖在谱面上） -->
+    <color name="countdown_scrim">#F2FFFBF8</color>
+    <!-- 节拍器熄灭的指示圆点 -->
+    <color name="metro_dot_off">#FFE0D2C6</color>
 </resources>

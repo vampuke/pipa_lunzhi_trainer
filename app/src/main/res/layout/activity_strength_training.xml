@@ -176,7 +176,7 @@
                             android:layout_height="wrap_content"
                             android:gravity="center"
                             android:text="30 秒"
-                            android:textColor="@color/pipa_primary_dark"
+                            android:textColor="@color/brand_text_strong"
                             android:textSize="16sp"
                             android:textStyle="bold" />
 
@@ -355,7 +355,7 @@
                     android:id="@+id/runPhaseLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/pipa_primary"
+                    android:textColor="@color/brand_text"
                     android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -380,7 +380,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="5"
-                        android:textColor="@color/pipa_primary_dark"
+                        android:textColor="@color/brand_text_strong"
                         android:textSize="72sp"
                         android:textStyle="bold" />
 
@@ -440,7 +440,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/strength_live_placeholder"
-                        android:textColor="@color/pipa_primary_dark"
+                        android:textColor="@color/brand_text_strong"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 

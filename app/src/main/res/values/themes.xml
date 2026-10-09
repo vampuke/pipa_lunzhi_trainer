@@ -26,6 +26,16 @@
         <item name="android:navigationBarColor">@color/bg</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
 
+        <!--
+            弹窗（AlertDialog.Builder / MaterialAlertDialogBuilder 都走这一支）单独套一层：
+            否则它会用框架的 colorSurfaceContainerHigh 当容器色——手机开深色模式时这个
+            token 会翻成深色，而我们自己的文字色仍是浅色底用的近黑色，结果就是
+            「深底 + 近黑字」，看不清。这里把容器与文字显式绑回本应用的 token，
+            浅色深色都跟着 colors.xml / values-night 走。
+        -->
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Pipa.Dialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.Pipa.Dialog</item>
+
         <!-- 组件默认样式 -->
         <item name="materialButtonStyle">@style/App.Button</item>
         <item name="materialCardViewStyle">@style/App.Card</item>
@@ -55,7 +65,7 @@
         <item name="boxCornerRadiusTopEnd">14dp</item>
         <item name="boxCornerRadiusBottomStart">14dp</item>
         <item name="boxCornerRadiusBottomEnd">14dp</item>
-        <item name="hintTextColor">@color/pipa_primary</item>
+        <item name="hintTextColor">@color/brand_text</item>
         <item name="android:textColorHint">@color/text_secondary</item>
         <item name="errorTextColor">@color/bad</item>
     </style>
@@ -64,6 +74,24 @@
     <style name="App.TextInput" parent="Widget.Material3.TextInputEditText.OutlinedBox">
         <item name="android:textColor">@color/text_primary</item>
         <item name="android:textSize">14sp</item>
+    </style>
+
+    <!--
+        弹窗外观：容器 / 文字 / 分隔线全部绑本应用的 token，不用框架的
+        colorSurfaceContainerHigh（那个在深色模式下会翻成深色，与本应用的文字色打架）。
+    -->
+    <style name="ThemeOverlay.Pipa.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorSurfaceContainerHigh">@color/surface</item>
+        <item name="colorSurfaceContainer">@color/surface</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorPrimary">@color/pipa_primary</item>
+        <item name="colorError">@color/bad</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:textColorHint">@color/text_secondary</item>
+        <item name="android:colorBackground">@color/surface</item>
     </style>
 
     <!-- 统一卡片外观：四边均匀的细描边。

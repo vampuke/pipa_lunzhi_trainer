@@ -88,7 +88,7 @@
                     android:text="@string/editor_octave" />
                 <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
                 <com.google.android.material.button.MaterialButton android:id="@+id/octDown" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="48dp" android:layout_height="48dp" android:text="−" android:textSize="20sp" android:insetTop="0dp" android:insetBottom="0dp" android:padding="0dp" />
-                <TextView android:id="@+id/octLabel" android:layout_width="44dp" android:layout_height="wrap_content" android:gravity="center" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/pipa_primary_dark" />
+                <TextView android:id="@+id/octLabel" android:layout_width="44dp" android:layout_height="wrap_content" android:gravity="center" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/brand_text_strong" />
                 <com.google.android.material.button.MaterialButton android:id="@+id/octUp" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="48dp" android:layout_height="48dp" android:text="+" android:textSize="20sp" android:insetTop="0dp" android:insetBottom="0dp" android:padding="0dp" />
             </LinearLayout>
 

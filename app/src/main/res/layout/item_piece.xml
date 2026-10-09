@@ -71,6 +71,6 @@
             android:layout_marginTop="10dp"
             android:text="参考速度 · 段落 · 时长"
             android:textSize="12sp"
-            android:textColor="@color/pipa_primary" />
+            android:textColor="@color/brand_text" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

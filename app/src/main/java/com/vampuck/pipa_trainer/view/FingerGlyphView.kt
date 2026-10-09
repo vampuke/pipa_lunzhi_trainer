@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.util.AttributeSet
 import android.view.View
+import com.vampuck.pipa_trainer.R
 
 /**
  * 单个指法符号的小预览控件：用 FingerSymbols 绘制，与谱面完全一致。
@@ -16,7 +17,8 @@ class FingerGlyphView @JvmOverloads constructor(
     private val density = resources.displayMetrics.density
     var code: String = ""
         set(value) { field = value; invalidate() }
-    var glyphColor: Int = 0xFF231A16.toInt()
+    /** 默认取正文色资源（深浅模式各一份），调用方也可覆盖。 */
+    var glyphColor: Int = context.getColor(R.color.text_primary)
         set(value) { field = value; invalidate() }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

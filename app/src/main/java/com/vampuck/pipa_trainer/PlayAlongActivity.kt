@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.vampuck.pipa_trainer.data.PracticePieces
 import com.vampuck.pipa_trainer.databinding.ActivityPlayAlongBinding
 import com.vampuck.pipa_trainer.databinding.ItemPieceBinding
@@ -69,7 +70,7 @@ class PlayAlongActivity : AppCompatActivity() {
             getString(R.string.play_edit),
             getString(R.string.play_delete)
         )
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(title)
             .setItems(options) { _, which ->
                 when (which) {
@@ -84,7 +85,7 @@ class PlayAlongActivity : AppCompatActivity() {
     }
 
     private fun confirmDelete(id: String, title: String) {
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setMessage(getString(R.string.play_delete_confirm, title))
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 PracticePieces.removeImported(id)

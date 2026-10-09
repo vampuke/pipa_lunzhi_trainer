@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import com.vampuck.pipa_trainer.R
 import com.vampuck.pipa_trainer.data.JNote
 import com.vampuck.pipa_trainer.data.JScore
 import kotlin.math.max
@@ -45,12 +46,14 @@ class JianpuView @JvmOverloads constructor(
     private val hlPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = dp(13f); isFakeBoldText = true }
 
-    private val colText = 0xFF231A16.toInt()
-    private val colSecondary = 0xFF7A6A60.toInt()
-    private val colPrimary = 0xFF8C3A2B.toInt()
-    private val colAccent = 0xFFC8973F.toInt()
-    private val colHl = 0x33C8973F         // 丝弦金高亮底（半透明）
-    private val colBar = 0xFFC9BBAE.toInt()
+    // 颜色取资源配置（values / values-night 各一份），深色模式下自动换成暖白，
+    // 否则这些写死的近黑色会在深色底上糊成一片。
+    private val colText = context.getColor(R.color.text_primary)
+    private val colSecondary = context.getColor(R.color.text_secondary)
+    private val colPrimary = context.getColor(R.color.brand_text)
+    private val colAccent = context.getColor(R.color.pipa_accent)
+    private val colHl = 0x33C8973F         // 丝弦金高亮底（半透明，深浅都可用）
+    private val colBar = context.getColor(R.color.outline)
 
     private var score: JScore? = null
     private var sectionStarts: List<Int> = emptyList()
