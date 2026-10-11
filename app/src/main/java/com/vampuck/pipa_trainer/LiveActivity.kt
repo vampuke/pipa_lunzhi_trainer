@@ -49,6 +49,9 @@ class LiveActivity : AppCompatActivity(), Metronome.Listener {
         b.btnToggle.setOnClickListener { if (recording) stop() else ensurePermThenStart() }
 
         metronome.listener = this
+        metronome.onError = { msg ->
+            runOnUiThread { Toast.makeText(this, "节拍器无法播放：$msg", Toast.LENGTH_LONG).show() }
+        }
         b.switchMetro.setOnCheckedChangeListener { _, on ->
             if (recording) { if (on) metronome.start() else metronome.stop() }
         }

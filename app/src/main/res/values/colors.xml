@@ -34,6 +34,11 @@
     <color name="good">#FF1C7D45</color>
     <color name="warn">#FF8A6400</color>
     <color name="bad">#FFC62F2F</color>
+    <!-- 评价色「填充块」版：用于底色上压白字（评分卡、维度徽标）。两种模式都保持
+         足够深，白字对比度 ≥4.5。深色模式不要用提亮版，否则白字在亮底上糊成一片。 -->
+    <color name="good_fill">#FF1C7D45</color>
+    <color name="warn_fill">#FF8A6400</color>
+    <color name="bad_fill">#FFC62F2F</color>
     <color name="chart_line">#FF2255CC</color>
     <!-- 起音散点 -->
     <color name="chart_onset">#FF9933DD</color>

@@ -37,6 +37,11 @@
     <color name="good">#FF5CBE84</color>
     <color name="warn">#FFD9A93C</color>
     <color name="bad">#FFFF8A80</color>
+    <!-- 评价色「填充块」版：底色压白字，深色下**不提亮**（提亮会让白字糊在亮底上），
+         沿用深底版保证白字对比度 ≥4.5。 -->
+    <color name="good_fill">#FF1C7D45</color>
+    <color name="warn_fill">#FF8A6400</color>
+    <color name="bad_fill">#FFC62F2F</color>
     <color name="chart_line">#FF7FA6FF</color>
     <!-- 起音散点（深色下提亮） -->
     <color name="chart_onset">#FFC08CF0</color>

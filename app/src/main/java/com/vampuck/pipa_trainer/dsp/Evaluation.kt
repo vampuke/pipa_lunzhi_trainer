@@ -485,4 +485,15 @@ object Evaluation {
         2 -> R.color.bad
         else -> R.color.text_secondary   // 仅参考
     }
+
+    /**
+     * 评价色的「填充块」版：用于底色上压**白字**（评分卡、维度徽标）。深色模式下
+     * good/warn/bad 会被提亮，白字压在亮底上对比度不足；填充块一律用深底版。
+     */
+    fun levelFillColorRes(level: Int): Int = when (level) {
+        0 -> R.color.good_fill
+        1 -> R.color.warn_fill
+        2 -> R.color.bad_fill
+        else -> R.color.text_secondary   // 仅参考
+    }
 }

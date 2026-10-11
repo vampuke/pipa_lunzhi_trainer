@@ -98,6 +98,9 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private var phaseRound = -1
     private var roundStartMs = 0L
     private var roundPausedMs = 0L
+    // 「跳过本次训练」时记下这一轮已真实弹奏的毫秒数：阶段切换结算该轮时用它，
+    // 否则会用 null（= 打满整轮）把被跳过的半截轮按整轮算、实测速度被低估成完整。
+    private var skipWorkOverrideMs: Long? = null
     private var lastRestTick = -1
 
     // ---- 引导音状态：当前在按哪一轮的速度响（-1 = 没响）----
@@ -146,10 +149,12 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         metronome.listener = this
         metronome.setAccentFirst(accentFirst)
         metronome.setMode(Metronome.MODE_QUARTER)
+        metronome.onError = { msg -> runOnUiThread { toast("节拍器无法播放：$msg") } }
+        tone.onError = { msg -> runOnUiThread { toast(msg) } }
 
         b.accentGroup.check(if (accentFirst) R.id.btnAccentFirst else R.id.btnAccentSame)
         b.accentGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
+            if (!isChecked || syncingSwitches) return@addOnButtonCheckedListener
             accentFirst = checkedId == R.id.btnAccentFirst
             metronome.setAccentFirst(accentFirst)   // 立即生效，训练中改也听得见
             persistDraft()
@@ -254,6 +259,9 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     override fun onDestroy() {
         super.onDestroy()
         stopEverything()
+        // 与 Live/Metronome 两页一致：销毁后清掉监听者，别让节拍器工作线程的回调
+        // 打到已销毁的 Activity/binding（stopEverything 只 stop()，不置空，以便 onStop 后能重开）。
+        metronome.listener = null
     }
 
     // ---------------- 计划编辑（设置页） ----------------
@@ -853,8 +861,11 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             currentPhase = st.phase
             phaseRound = st.roundIndex
             if (prevPhase == TrainingPlan.Phase.WORK && prevRound >= 0) {
-                captureRoundResult(prevRound, null)
+                // 正常跑完一轮 → null（打满整轮）；被「跳过」提前离开 → 用实际弹奏时长，
+                // 否则半截轮按整轮算、实测速度被低估成完整。
+                captureRoundResult(prevRound, skipWorkOverrideMs)
             }
+            skipWorkOverrideMs = null
             onEnter(st)
             if (!running) return          // 收尾（总结弹窗）已接管
         }
@@ -1021,6 +1032,11 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun skipStage() {
         if (!running || paused) return
         val sec = elapsedMs / 1000.0
+        // 若正跳过一轮 WORK，记下它已真实弹奏的时长，供下一 tick 结算该轮时用——
+        // 不记就会用 null（打满整轮）把半截轮按整轮算、实测速度被低估成完整。
+        if (currentPhase == TrainingPlan.Phase.WORK && phaseRound >= 0) {
+            skipWorkOverrideMs = (elapsedMs - roundStartMs).coerceAtLeast(1000L)
+        }
         val end = plan.stageEndSec(sec)
         elapsedMs = (end * 1000).toLong()
         render()

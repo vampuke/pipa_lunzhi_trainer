@@ -55,8 +55,11 @@ class TunerActivity : AppCompatActivity() {
      * 捕获的那个 Tuner，界面用 [tuner] 做一次身份校验，丢掉换表瞬间还在飞的旧读数。
      */
     @Volatile private var tuner: Tuner? = null
-    private val tonePlayer = TonePlayer()
-    private var lastLevel = 0.0
+    private val tonePlayer = TonePlayer().apply {
+        onError = { msg -> runOnUiThread { Toast.makeText(this@TunerActivity, msg, Toast.LENGTH_LONG).show() } }
+    }
+    // 录音线程写（:205）、UI 线程读（:257）：标 @Volatile 保证可见性。
+    @Volatile private var lastLevel = 0.0
 
     /** 状态行里显示的实际采样率，出「音高整体偏移」类问题时一眼能看出来。 */
     private var rateText = "44.1 kHz"

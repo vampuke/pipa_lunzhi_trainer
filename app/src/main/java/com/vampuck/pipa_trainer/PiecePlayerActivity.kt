@@ -6,6 +6,7 @@ import android.os.SystemClock
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.SeekBar
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.vampuck.pipa_trainer.audio.Metronome
@@ -78,6 +79,11 @@ class PiecePlayerActivity : AppCompatActivity() {
         b.jianpu.setScore(score, score.sections.map { it.name })
 
         dots = listOf(b.dot0, b.dot1, b.dot2, b.dot3)
+        // 底部拍灯数要跟曲目拍号：3/4 曲目只亮 3 个，别让第 4 个灯空闪、与重音错位。
+        metronome.setBeatsPerBar(bpb)
+        for ((i, d) in dots.withIndex()) {
+            d.visibility = if (i < bpb) View.VISIBLE else View.GONE
+        }
         resetDots()
 
         b.seekBpm.max = MAX_BPM - MIN_BPM
@@ -103,6 +109,9 @@ class PiecePlayerActivity : AppCompatActivity() {
 
         metronome.onBeat = { slotIndex, _, accent ->
             runOnUiThread { flashBeat(slotIndex, accent) }
+        }
+        metronome.onError = { msg ->
+            runOnUiThread { Toast.makeText(this, "节拍器无法播放：$msg", Toast.LENGTH_LONG).show() }
         }
 
         applyBpm(bpm)
