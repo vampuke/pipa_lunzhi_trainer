@@ -36,11 +36,23 @@ object TrainingConfigStore {
      * 收录一套配置：同名或同计划（[TrainingConfig.samePlanAs]）的先去掉，
      * 再插到最前面——所以「开始过的配置」会自然出现在快捷列表里，且不会重复。
      */
-    fun put(ctx: Context, config: TrainingConfig): List<TrainingConfig> {
-        val list = saved(ctx).toMutableList()
-        list.removeAll { it.name == config.name || it.samePlanAs(config) }
-        list.add(0, config)
-        while (list.size > MAX_SAVED) list.removeAt(list.size - 1)
+    fun put(ctx: Context, config: TrainingConfig): List<TrainingConfig> =
+        insert(ctx, config, dedupeByPlan = true)
+
+    /**
+     * 收录**不去重同计划**的一套（只按名字去重）。
+     *
+     * 「复制为新的」用这个：复制出来的那套在用户改之前与原计划完全相同，
+     * 若按 [TrainingConfig.samePlanAs] 去重，就会把**原来那套顶掉**——用户会
+     * 看到自己刚复制的东西把原件吃了。所以复制走这里。
+     */
+    fun putDistinct(ctx: Context, config: TrainingConfig): List<TrainingConfig> =
+        insert(ctx, config, dedupeByPlan = false)
+
+    private fun insert(
+        ctx: Context, config: TrainingConfig, dedupeByPlan: Boolean
+    ): List<TrainingConfig> {
+        val list = TrainingConfig.mergeSaved(saved(ctx), config, dedupeByPlan, MAX_SAVED)
         persist(ctx, list)
         return list
     }
