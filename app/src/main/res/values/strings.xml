@@ -165,15 +165,18 @@
     <string name="editor_self_made">自录简谱</string>
     <string name="editor_saved">已保存《%1$s》，可在列表里找到并跟练</string>
 
-    <!-- 指力训练 -->
-    <string name="feat_strength_title">指力训练</string>
+    <!-- 基本功 -->
+    <string name="feat_strength_title">基本功</string>
     <string name="feat_strength_sub">分次定时训练轮指，每次独立速度、自动休息</string>
-    <string name="strength_title">指力训练</string>
+    <string name="strength_title">基本功</string>
     <string name="strength_subtitle">逐次设定速度与时长，训练与休息自动衔接</string>
     <string name="strength_plan">训练计划</string>
     <string name="strength_configs">常用配置</string>
     <string name="strength_configs_empty">这里会列出你保存过的配置。点末尾「＋ 新建」从头排一份，或直接改下面的计划——改完点「保存配置」即可留存。</string>
     <string name="strength_configs_hint">点一下载入 · 长按可「编辑 / 复制 / 删除」· 末尾「＋ 新建」重置成一份新计划</string>
+    <string name="strength_current_config">当前配置：%1$s</string>
+    <string name="strength_current_config_editing">正在编辑：%1$s</string>
+    <string name="strength_current_config_new">当前：新计划（未保存）</string>
     <string name="strength_save_config">＋ 保存配置</string>
     <string name="strength_save_overwrite">覆盖「%1$s」</string>
     <string name="strength_save_as_new">另存为新配置（不动原来那套）</string>
