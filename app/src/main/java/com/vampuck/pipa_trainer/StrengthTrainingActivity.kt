@@ -82,6 +82,11 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
      * 点胶囊载入或长按进入编辑时设置；保存/删除后清空。
      */
     private var editingName: String? = null
+    /**
+     * 当前计划是从哪套配置载入/复制来的。保存时据此问「另存为新配置 / 覆盖原配置」。
+     * 显式进入编辑（长按→编辑这套）会把 [editingName] 设上，走另一条路径。
+     */
+    private var loadedFrom: String? = null
 
     // ---- 运行状态 ----
     private val handler = Handler(Looper.getMainLooper())
@@ -383,6 +388,9 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
      */
     private fun persistDraft() {
         TrainingConfigStore.saveLast(this, currentConfig(displayName()))
+        // 「上一次编辑的配置」也进列表：否则刚进页面时常用配置是空的，用户会以为
+        // 这里没东西、不知道怎么新增。显式保存过的那套会被标记成「已定名」，不再被覆盖。
+        TrainingConfigStore.recordDraft(this, currentConfig(displayName()))
     }
 
     /** 当前这套计划的名字：定过就用它，没定过用按计划现算的自动名。 */
@@ -404,6 +412,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun applyConfig(c: TrainingConfig, announce: Boolean) {
         c.applyTo(plan)
         planName = c.name          // 名字随配置一起载入，下次进来还是这个名字
+        loadedFrom = null          // 由 loadConfig/beginEditConfig 按需设置
         guidePerBeat = c.guidePerBeat
         accentFirst = c.accentFirst
         useMic = c.useMic
@@ -425,11 +434,10 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun renderConfigs() {
         val list = TrainingConfigStore.saved(this)
         b.configList.removeAllViews()
-        if (list.isEmpty()) {
-            b.configHint.setText(R.string.strength_configs_empty)
-            return
-        }
-        b.configHint.setText(R.string.strength_configs_hint)
+        // 即使一条配置都没有，也要把这个「＋ 新建」画出来（否则空页面没有任何入口）
+        b.configHint.setText(
+            if (list.isEmpty()) R.string.strength_configs_empty else R.string.strength_configs_hint
+        )
         val density = resources.displayMetrics.density
         val padH = (14 * density).toInt()
         val padV = (8 * density).toInt()
@@ -445,8 +453,11 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
         var row = newConfigRow()
         var used = 0
-        for (c in list) {
-            val chip = buildConfigChip(c, padH, padV, chipColor)
+        // 最后放一个「＋ 新建」：明确给出「新增一套」的入口（而不是让人猜要先改再存）
+        val entries: List<TrainingConfig?> = list + listOf(null)
+        for (c in entries) {
+            val chip = if (c == null) buildNewChip(padH, padV, chipColor)
+                       else buildConfigChip(c, padH, padV, chipColor)
             // 单个名字过长时也不越界：限量宽度，超出用省略号
             if (avail > 0) chip.maxWidth = avail
             // 先量一次拿到真实宽度（文字长度 + 内边距）
@@ -498,10 +509,59 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         setOnLongClickListener { configMenu(c); true }
     }
 
-    /** 点胶囊：把这套配置载入当前计划（只载入，不进入编辑态）。 */
+    /** 列表最后的「＋ 新建」：把计划重置成默认的一份，开始配新的。 */
+    private fun buildNewChip(padH: Int, padV: Int, chipColor: Int): TextView = TextView(this).apply {
+        text = getString(R.string.strength_config_new)
+        textSize = 13f
+        maxLines = 1
+        setTextColor(chipColor)
+        // 用虚线描边区分「这是一件事，不是一个配置」
+        setBackgroundResource(R.drawable.bg_chip_new)
+        setPadding(padH, padV, padH, padV)
+        isClickable = true
+        setOnClickListener { newConfig() }
+    }
+
+    /**
+     * 新建一套：把计划重置为默认的一份（此时还没有名字，下次改动/保存时自动取名）。
+     * 不再处于「编辑某套」状态，所以随后的保存会新增，而不是覆盖。
+     */
+    private fun newConfig() {
+        plan.rounds.clear()
+        plan.rounds.add(TrainingPlan.Round())
+        plan.restSec = TrainingPlan.DEFAULT_REST_SEC
+        plan.leadInSec = TrainingPlan.DEFAULT_LEAD_IN_SEC
+        guidePerBeat = true
+        accentFirst = true
+        useMic = true
+        planName = ""
+        syncingSwitches = true
+        b.guideGroup.check(R.id.btnGuideBeat)
+        b.accentGroup.check(R.id.btnAccentFirst)
+        b.switchMic.isChecked = true
+        syncingSwitches = false
+        metronome.setAccentFirst(accentFirst)
+        b.restValue.text = getString(R.string.strength_rest_value, plan.restSec)
+        updateGuideHint()
+        updateMicHint()
+        rebuildRoundRows()
+        endEditConfig()
+        renderConfigs()
+        scrollToPlan()
+        toast(R.string.strength_config_new_done)
+    }
+
+    /**
+     * 点胶囊：把这套配置载入当前计划。
+     *
+     * 载入后**不进入**编辑态——用户接下来按「保存」多半是想存成新的一套（拿这套当
+     * 起点改一改）。所以记下「当前是基于哪套改的」，保存时弹窗让用户选
+     * 「另存为新配置 / 覆盖原配置」，避免又出现「一保存就把原配置吃掉/覆盖」。
+     */
     private fun loadConfig(c: TrainingConfig) {
         applyConfig(c, announce = true)
         endEditConfig()
+        loadedFrom = c.name
     }
 
     /**
@@ -536,10 +596,65 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         b.setupGroup.post { b.setupGroup.smoothScrollTo(0, b.planLabel.top) }
     }
 
+    /**
+     * 「保存」按钮。
+     *
+     * 三种情况分得很清楚，避免互相覆盖：
+     *  - 正在编辑某套（长按→编辑）→ 直接覆盖它（可改名）；
+     *  - 刚载入过某套、没有动过名字 → 弹窗问「另存为新配置 / 覆盖原配置」；
+     *  - 其它 → 新增一套。
+     */
     private fun askSaveConfig() {
         val editing = editingName
-        val suggestion = TrainingConfig.sanitize(planName)
-            .ifBlank { editing ?: autoConfigName() }
+        val loaded = loadedFrom
+        if (editing == null && loaded != null && loaded == planName) {
+            askSaveLoadedChoice(loaded)
+            return
+        }
+        askSaveName(defaultSuggestion = editing ?: autoConfigName(), editing = editing)
+    }
+
+    /** 刚载入的那套还没改名：问清楚是「存成新的一套」还是「覆盖原来那套」。 */
+    private fun askSaveLoadedChoice(loaded: String) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.strength_save_choice_title, loaded))
+            .setItems(
+                arrayOf(
+                    getString(R.string.strength_save_as_new),
+                    getString(R.string.strength_save_overwrite, loaded)
+                )
+            ) { _, which ->
+                if (which == 0) {
+                    // 另存：名字加「副本」，预设选中方便直接改
+                    val root = loaded.substringBefore(kDuplicateSuffix).trim().ifBlank { loaded }
+                    val taken = TrainingConfigStore.saved(this).map { it.name }.toSet()
+                    val base = TrainingConfig.sanitize(
+                        getString(R.string.strength_config_copy_suffix, root)
+                    )
+                    var suggest = base; var n = 2
+                    while (suggest in taken) {
+                        suggest = TrainingConfig.sanitize(
+                            getString(R.string.strength_config_copy_suffix_n, root, n)
+                        ); n++
+                    }
+                    askSaveName(defaultSuggestion = suggest, editing = null)
+                } else {
+                    // 覆盖原配置：名字不变，直接存回它
+                    planName = loaded
+                    TrainingConfigStore.putDistinct(this, currentConfig(loaded))
+                    persistDraft()
+                    loadedFrom = null
+                    endEditConfig()
+                    renderConfigs()
+                    toast(getString(R.string.strength_config_saved, loaded))
+                }
+            }
+            .show()
+    }
+
+    /** 起名并保存。editing != null 表示是「覆盖这一套」（改名会删掉旧名条目）。 */
+    private fun askSaveName(defaultSuggestion: String, editing: String?) {
+        val suggestion = TrainingConfig.sanitize(planName).ifBlank { defaultSuggestion }
         val field = textField(suggestion, R.string.strength_config_name_field)
         MaterialAlertDialogBuilder(this)
             .setTitle(
@@ -555,8 +670,11 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
                     TrainingConfigStore.delete(this, editing)
                 }
                 planName = name
-                TrainingConfigStore.put(this, currentConfig(name))
+                // 用 putDistinct（只按名字去重）：按名字存，绝不因为「计划恰好相同」
+                // 把**另一套**配置顶掉——复制/载入后再保存曾把原件吃掉就是这个原因。
+                TrainingConfigStore.putDistinct(this, currentConfig(name))
                 persistDraft()      // 「上次编辑的配置」也要跟着改名，否则马上退出会看到旧名字
+                loadedFrom = null
                 endEditConfig()
                 renderConfigs()
                 toast(getString(R.string.strength_config_saved, name))
@@ -564,21 +682,38 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             .show()
     }
 
-    /** 长按胶囊：编辑这套 / 复制另存 / 删除。 */
+    /**
+     * 长按胶囊。
+     *
+     * 分两种：用户保存过的配置可以「编辑 / 复制 / 删除」；而进页面时自动记下的那份
+     * **草稿**（还没定名）由程序自己管理——它随当前计划变化，不给删除（删了下次编辑
+     * 又会回来），只给「编辑」和「另存为新配置」。
+     */
     private fun configMenu(c: TrainingConfig) {
+        val isDraft = !TrainingConfigStore.isNamed(this, c.name)
+        val items = if (isDraft) {
+            arrayOf(
+                getString(R.string.strength_config_edit),
+                getString(R.string.strength_config_save_as_new)
+            )
+        } else {
+            arrayOf(
+                getString(R.string.strength_config_edit),
+                getString(R.string.strength_config_duplicate),
+                getString(R.string.strength_config_delete_ok)
+            )
+        }
         MaterialAlertDialogBuilder(this)
             .setTitle(c.name)
-            .setItems(
-                arrayOf(
-                    getString(R.string.strength_config_edit),
-                    getString(R.string.strength_config_duplicate),
-                    getString(R.string.strength_config_delete_ok)
-                )
-            ) { _, which ->
-                when (which) {
-                    0 -> beginEditConfig(c)
-                    1 -> duplicateConfig(c)
-                    2 -> confirmDeleteConfig(c)
+            .setItems(items) { _, which ->
+                if (isDraft) {
+                    if (which == 0) beginEditConfig(c) else askSaveName(autoConfigName(), null)
+                } else {
+                    when (which) {
+                        0 -> beginEditConfig(c)
+                        1 -> duplicateConfig(c)
+                        2 -> confirmDeleteConfig(c)
+                    }
                 }
             }
             .show()

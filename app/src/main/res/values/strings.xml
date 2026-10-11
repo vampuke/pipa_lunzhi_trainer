@@ -172,9 +172,14 @@
     <string name="strength_subtitle">逐次设定速度与时长，训练与休息自动衔接</string>
     <string name="strength_plan">训练计划</string>
     <string name="strength_configs">常用配置</string>
-    <string name="strength_configs_empty">还没有保存的配置：改好计划后点下面「保存配置」，或直接开始训练——开始过的配置会自动出现在这里，下次进来可以直接选。名字会被记住。</string>
-    <string name="strength_configs_hint">点一下载入 · 长按可「编辑 / 复制 / 删除」· 编辑中改完点「保存修改」覆盖这套</string>
+    <string name="strength_configs_empty">这里会列出你保存过的配置。点末尾「＋ 新建」从头排一份，或直接改下面的计划——改完点「保存配置」即可留存。</string>
+    <string name="strength_configs_hint">点一下载入 · 长按可「编辑 / 复制 / 删除」· 末尾「＋ 新建」重置成一份新计划</string>
     <string name="strength_save_config">＋ 保存配置</string>
+    <string name="strength_save_overwrite">覆盖「%1$s」</string>
+    <string name="strength_save_as_new">另存为新配置（不动原来那套）</string>
+    <string name="strength_save_choice_title">「%1$s」要怎么保存？</string>
+    <string name="strength_config_new_done">已重置为一份新的训练计划</string>
+    <string name="strength_config_new">＋ 新建</string>
     <string name="strength_save_config_update">✓ 保存修改</string>
     <string name="strength_config_edit">编辑这套配置</string>
     <string name="strength_config_editing">正在编辑「%1$s」，改完点「保存修改」</string>
@@ -187,6 +192,7 @@
     <string name="strength_config_delete_msg">确定删除「%1$s」？</string>
     <string name="strength_config_delete_ok">删除</string>
     <string name="strength_config_duplicate">复制为新的</string>
+    <string name="strength_config_save_as_new">另存为新配置</string>
     <string name="strength_config_copy_suffix">%1$s 副本</string>
     <string name="strength_config_copy_suffix_n">%1$s 副本 %2$d</string>
     <string name="strength_restored">已恢复上次的配置「%1$s」</string>
