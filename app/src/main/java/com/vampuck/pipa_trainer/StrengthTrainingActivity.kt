@@ -464,7 +464,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             chip.layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { marginEnd = gap; marginBottom = gap }
+            ).apply { marginEnd = gap; bottomMargin = gap }
             row.addView(chip)
             used += cw + gap
         }
