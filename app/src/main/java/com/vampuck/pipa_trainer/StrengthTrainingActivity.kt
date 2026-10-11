@@ -208,6 +208,14 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         rebuildRoundRows()
         renderConfigs()
         reserveFabSpace()
+        // 旋转/分屏后可用宽度变了要重新换行（本页声明了 configChanges，系统不会重建）
+        b.configList.addOnLayoutChangeListener { v, l, _, r, _, _, _, _, _ ->
+            val w = r - l
+            if (w > 0 && w != configRowWidth) {
+                configRowWidth = w
+                renderConfigs()
+            }
+        }
     }
 
     /**
@@ -416,7 +424,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun renderConfigs() {
         val list = TrainingConfigStore.saved(this)
-        b.configRow.removeAllViews()
+        b.configList.removeAllViews()
         if (list.isEmpty()) {
             b.configHint.setText(R.string.strength_configs_empty)
             return
@@ -425,28 +433,69 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         val density = resources.displayMetrics.density
         val padH = (14 * density).toInt()
         val padV = (8 * density).toInt()
+        val gap = (8 * density).toInt()
         val chipColor = getColor(R.color.accent_chip_text)
+
+        // 按可用宽度贪心换行：把每个胶囊量出真实宽度，排满一行就另起一行。
+        // 原来是一行横向滑动，后来几条在手机上永远看不到（也没有可滑的提示）。
+        val avail = (
+            configRowWidth.takeIf { it > 0 }
+                ?: (resources.displayMetrics.widthPixels - (36 * density).toInt())
+            ) - b.configList.paddingStart - b.configList.paddingEnd
+
+        var row = newConfigRow()
+        var used = 0
         for (c in list) {
-            val chip = TextView(this).apply {
-                text = c.name
-                textSize = 13f
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-                setTextColor(chipColor)
-                setBackgroundResource(R.drawable.bg_chip_accent)
-                setPadding(padH, padV, padH, padV)
-                isClickable = true
-                isLongClickable = true
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { marginEnd = (8 * density).toInt() }
-                // 点 = 载入这套；长按 = 「编辑 / 删除」
-                setOnClickListener { loadConfig(c) }
-                setOnLongClickListener { configMenu(c); true }
+            val chip = buildConfigChip(c, padH, padV, chipColor)
+            // 单个名字过长时也不越界：限量宽度，超出用省略号
+            if (avail > 0) chip.maxWidth = avail
+            // 先量一次拿到真实宽度（文字长度 + 内边距）
+            chip.measure(
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            )
+            val cw = chip.measuredWidth
+            // 放不下且这一行已经有东西 -> 换行（单个再长也强塞一行，避免死循环）
+            if (used > 0 && used + cw > avail) {
+                b.configList.addView(row)
+                row = newConfigRow()
+                used = 0
             }
-            b.configRow.addView(chip)
+            chip.layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = gap; marginBottom = gap }
+            row.addView(chip)
+            used += cw + gap
         }
+        if (row.childCount > 0) b.configList.addView(row)
+    }
+
+    /** 上一次排布时用的宽度：宽度变了（旋转/分屏）要重新换行。 */
+    private var configRowWidth = 0
+
+    private fun newConfigRow() = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+    }
+
+    /** 一个配置胶囊：点=载入，长按=「编辑 / 复制 / 删除」。 */
+    private fun buildConfigChip(
+        c: TrainingConfig, padH: Int, padV: Int, chipColor: Int
+    ): TextView = TextView(this).apply {
+        text = c.name
+        textSize = 13f
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+        setTextColor(chipColor)
+        setBackgroundResource(R.drawable.bg_chip_accent)
+        setPadding(padH, padV, padH, padV)
+        isClickable = true
+        isLongClickable = true
+        setOnClickListener { loadConfig(c) }
+        setOnLongClickListener { configMenu(c); true }
     }
 
     /** 点胶囊：把这套配置载入当前计划（只载入，不进入编辑态）。 */
