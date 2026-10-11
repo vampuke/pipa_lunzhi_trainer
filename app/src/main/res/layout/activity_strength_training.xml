@@ -63,18 +63,19 @@
                 android:layout_height="wrap_content"
                 android:text="@string/strength_configs" />
 
-            <HorizontalScrollView
+            <!--
+                常用配置：按可用宽度**自动换行**排布。
+                以前是一行横向滑动的胶囊，手机上一屏只放得下 4~5 个，后面的既看不到
+                也没有「还能滑」的提示。改成多行（在 renderConfigs() 里量好每个胶囊
+                的宽度后贪心换行），全部配置一眼可见；页面本身是纵向 ScrollView，
+                不用再和它抢手势。
+            -->
+            <LinearLayout
+                android:id="@+id/configList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:scrollbars="none">
-
-                <LinearLayout
-                    android:id="@+id/configRow"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal" />
-            </HorizontalScrollView>
+                android:orientation="vertical" />
 
             <TextView
                 android:id="@+id/configHint"

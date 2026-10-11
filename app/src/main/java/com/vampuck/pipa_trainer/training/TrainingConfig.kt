@@ -69,6 +69,27 @@ data class TrainingConfig(
             useMic = useMic
         )
 
+        /**
+         * 把 [incoming] 收录进已保存的 [current] 列表（最近的排前面），纯函数便于单测。
+         *
+         * [dedupeByPlan] = true 时，同名**或同计划**的旧条目会被替换——「开始过的配置」
+         * 应该只留一条。= false 时只按名字去重，用于「复制为新的」：复制出来的那套在
+         * 用户改之前与原计划完全相同，若也按计划去重，就会把原件顶掉。
+         */
+        fun mergeSaved(
+            current: List<TrainingConfig>,
+            incoming: TrainingConfig,
+            dedupeByPlan: Boolean,
+            max: Int
+        ): List<TrainingConfig> {
+            val out = current.filterNot {
+                it.name == incoming.name || (dedupeByPlan && it.samePlanAs(incoming))
+            }.toMutableList()
+            out.add(0, incoming)
+            while (out.size > max) out.removeAt(out.size - 1)
+            return out
+        }
+
         fun decode(text: String): TrainingConfig? {
             val parts = text.split('|', limit = 4)
             if (parts.size < 4) return null

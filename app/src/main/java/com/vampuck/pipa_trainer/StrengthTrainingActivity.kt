@@ -67,6 +67,22 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private var useMic = true
     private var syncingSwitches = false
 
+    /**
+     * 当前这套计划的名字。
+     *
+     * 以前这里没有名字，[persistDraft] 每次都拿 [autoConfigName] 现算一个名字存进去，
+     * 于是用户「保存配置」时起的名字在下次进入时必然被自动名覆盖——这就是
+     * 「保存好名字、下次进来又变回默认名」的原因。现在名字是一份状态：
+     * 载入 / 保存 / 重命名都会更新它，[persistDraft] 存的就是它；只有从未定过名
+     * （空串）时才回落到自动名。
+     */
+    private var planName: String = ""
+    /**
+     * 正在编辑的那套已保存配置的名字（null = 没在编辑，按「保存」会新增一套）。
+     * 点胶囊载入或长按进入编辑时设置；保存/删除后清空。
+     */
+    private var editingName: String? = null
+
     // ---- 运行状态 ----
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
@@ -192,6 +208,14 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         rebuildRoundRows()
         renderConfigs()
         reserveFabSpace()
+        // 旋转/分屏后可用宽度变了要重新换行（本页声明了 configChanges，系统不会重建）
+        b.configList.addOnLayoutChangeListener { v, l, _, r, _, _, _, _, _ ->
+            val w = r - l
+            if (w > 0 && w != configRowWidth) {
+                configRowWidth = w
+                renderConfigs()
+            }
+        }
     }
 
     /**
@@ -213,6 +237,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             b.runGroup.visibility = View.GONE
             b.btnStartTraining.visibility = View.VISIBLE
             rebuildRoundRows()
+            updateSaveConfigButton()
         }
     }
 
@@ -350,20 +375,35 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun currentConfig(name: String): TrainingConfig =
         TrainingConfig.of(plan, name, guidePerBeat, accentFirst, useMic)
 
-    /** 每次改动都存一份「上一次编辑的配置」，下次进来自动恢复。 */
+    /**
+     * 每次改动都存一份「上一次编辑的配置」，下次进来自动恢复。
+     *
+     * 存的是 [planName]（用户起过/载入过的名字），**不再**用自动名覆盖——否则保存的
+     * 名字永远留不下来。名字为空（从未定名）时才用自动名。
+     */
     private fun persistDraft() {
-        TrainingConfigStore.saveLast(this, currentConfig(autoConfigName()))
+        TrainingConfigStore.saveLast(this, currentConfig(displayName()))
+    }
+
+    /** 当前这套计划的名字：定过就用它，没定过用按计划现算的自动名。 */
+    private fun displayName(): String {
+        val custom = TrainingConfig.sanitize(planName)
+        return custom.ifBlank { autoConfigName() }
     }
 
     private fun restoreLastConfig() {
         val c = TrainingConfigStore.last(this) ?: return
         applyConfig(c, announce = false)
-        toast(getString(R.string.strength_restored, c.name))
+        // 名字随上次一起恢复：保存/载入过的名字要一直带着，不能下次进来变回自动名。
+        planName = c.name
+        persistDraft()
+        toast(getString(R.string.strength_restored, displayName()))
     }
 
     /** 把一套配置灌进当前计划与开关（不触发监听器，避免互相覆盖）。 */
     private fun applyConfig(c: TrainingConfig, announce: Boolean) {
         c.applyTo(plan)
+        planName = c.name          // 名字随配置一起载入，下次进来还是这个名字
         guidePerBeat = c.guidePerBeat
         accentFirst = c.accentFirst
         useMic = c.useMic
@@ -384,7 +424,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun renderConfigs() {
         val list = TrainingConfigStore.saved(this)
-        b.configRow.removeAllViews()
+        b.configList.removeAllViews()
         if (list.isEmpty()) {
             b.configHint.setText(R.string.strength_configs_empty)
             return
@@ -393,43 +433,173 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         val density = resources.displayMetrics.density
         val padH = (14 * density).toInt()
         val padV = (8 * density).toInt()
+        val gap = (8 * density).toInt()
         val chipColor = getColor(R.color.accent_chip_text)
+
+        // 按可用宽度贪心换行：把每个胶囊量出真实宽度，排满一行就另起一行。
+        // 原来是一行横向滑动，后来几条在手机上永远看不到（也没有可滑的提示）。
+        val avail = (
+            configRowWidth.takeIf { it > 0 }
+                ?: (resources.displayMetrics.widthPixels - (36 * density).toInt())
+            ) - b.configList.paddingStart - b.configList.paddingEnd
+
+        var row = newConfigRow()
+        var used = 0
         for (c in list) {
-            val chip = TextView(this).apply {
-                text = c.name
-                textSize = 13f
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-                setTextColor(chipColor)
-                setBackgroundResource(R.drawable.bg_chip_accent)
-                setPadding(padH, padV, padH, padV)
-                isClickable = true
-                isLongClickable = true
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { marginEnd = (8 * density).toInt() }
-                setOnClickListener { applyConfig(c, announce = true) }
-                setOnLongClickListener { confirmDeleteConfig(c); true }
+            val chip = buildConfigChip(c, padH, padV, chipColor)
+            // 单个名字过长时也不越界：限量宽度，超出用省略号
+            if (avail > 0) chip.maxWidth = avail
+            // 先量一次拿到真实宽度（文字长度 + 内边距）
+            chip.measure(
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            )
+            val cw = chip.measuredWidth
+            // 放不下且这一行已经有东西 -> 换行（单个再长也强塞一行，避免死循环）
+            if (used > 0 && used + cw > avail) {
+                b.configList.addView(row)
+                row = newConfigRow()
+                used = 0
             }
-            b.configRow.addView(chip)
+            chip.layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = gap; bottomMargin = gap }
+            row.addView(chip)
+            used += cw + gap
         }
+        if (row.childCount > 0) b.configList.addView(row)
+    }
+
+    /** 上一次排布时用的宽度：宽度变了（旋转/分屏）要重新换行。 */
+    private var configRowWidth = 0
+
+    private fun newConfigRow() = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+    }
+
+    /** 一个配置胶囊：点=载入，长按=「编辑 / 复制 / 删除」。 */
+    private fun buildConfigChip(
+        c: TrainingConfig, padH: Int, padV: Int, chipColor: Int
+    ): TextView = TextView(this).apply {
+        text = c.name
+        textSize = 13f
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+        setTextColor(chipColor)
+        setBackgroundResource(R.drawable.bg_chip_accent)
+        setPadding(padH, padV, padH, padV)
+        isClickable = true
+        isLongClickable = true
+        setOnClickListener { loadConfig(c) }
+        setOnLongClickListener { configMenu(c); true }
+    }
+
+    /** 点胶囊：把这套配置载入当前计划（只载入，不进入编辑态）。 */
+    private fun loadConfig(c: TrainingConfig) {
+        applyConfig(c, announce = true)
+        endEditConfig()
+    }
+
+    /**
+     * 编辑一套已保存的配置。
+     *
+     * 进入编辑后，底部按钮变成「保存修改」；用户改完计划/开关、再按它时，
+     * 会**更新原来那一套**（先删旧的、再按新名字存回去），而不是多出一套。
+     */
+    private fun beginEditConfig(c: TrainingConfig) {
+        applyConfig(c, announce = false)
+        editingName = c.name
+        updateSaveConfigButton()
+        scrollToPlan()
+        toast(getString(R.string.strength_config_editing, c.name))
+    }
+
+    /** 退出编辑态（存好/删掉/重新载入别的配置时都要回到普通状态）。 */
+    private fun endEditConfig() {
+        editingName = null
+        updateSaveConfigButton()
+    }
+
+    private fun updateSaveConfigButton() {
+        b.btnSaveConfig.setText(
+            if (editingName != null) R.string.strength_save_config_update
+            else R.string.strength_save_config
+        )
+    }
+
+    /** 进入编辑/载入后把设置页滚到「计划」那里，省得用户自己找。 */
+    private fun scrollToPlan() {
+        b.setupGroup.post { b.setupGroup.smoothScrollTo(0, b.planLabel.top) }
     }
 
     private fun askSaveConfig() {
-        val auto = autoConfigName()
-        val field = textField(auto, R.string.strength_config_name_field)
+        val editing = editingName
+        val suggestion = TrainingConfig.sanitize(planName)
+            .ifBlank { editing ?: autoConfigName() }
+        val field = textField(suggestion, R.string.strength_config_name_field)
         MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.strength_config_name_title)
+            .setTitle(
+                if (editing != null) R.string.strength_config_rename_title
+                else R.string.strength_config_name_title
+            )
             .setView(field.root)
             .setNegativeButton(R.string.strength_cancel, null)
             .setPositiveButton(R.string.strength_ok) { _, _ ->
-                val name = TrainingConfig.sanitize(field.text).ifBlank { auto }
+                val name = TrainingConfig.sanitize(field.text).ifBlank { suggestion }
+                if (editing != null && editing != name) {
+                    // 改了名字：先删掉旧名字那一条，免得留下一个同计划的旧配置
+                    TrainingConfigStore.delete(this, editing)
+                }
+                planName = name
                 TrainingConfigStore.put(this, currentConfig(name))
+                persistDraft()      // 「上次编辑的配置」也要跟着改名，否则马上退出会看到旧名字
+                endEditConfig()
                 renderConfigs()
                 toast(getString(R.string.strength_config_saved, name))
             }
             .show()
+    }
+
+    /** 长按胶囊：编辑这套 / 复制另存 / 删除。 */
+    private fun configMenu(c: TrainingConfig) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(c.name)
+            .setItems(
+                arrayOf(
+                    getString(R.string.strength_config_edit),
+                    getString(R.string.strength_config_duplicate),
+                    getString(R.string.strength_config_delete_ok)
+                )
+            ) { _, which ->
+                when (which) {
+                    0 -> beginEditConfig(c)
+                    1 -> duplicateConfig(c)
+                    2 -> confirmDeleteConfig(c)
+                }
+            }
+            .show()
+    }
+
+    /** 复制一套配置为新的（「<原名> 副本」，再复制时递增序号），随后刷新列表。 */
+    private fun duplicateConfig(c: TrainingConfig) {
+        // 从「原名」算，而不是在副本上再叠副本，免得出现「X 副本 副本」
+        // 用 substringBefore：对「X 副本 2」也能拿回「X」，不会越滚越长。
+        val root = c.name.substringBefore(kDuplicateSuffix).trim().ifBlank { c.name }
+        val base = TrainingConfig.sanitize(getString(R.string.strength_config_copy_suffix, root))
+        val taken = TrainingConfigStore.saved(this).map { it.name }.toSet()
+        var name = base
+        var n = 2
+        while (name in taken) {
+            name = TrainingConfig.sanitize(getString(R.string.strength_config_copy_suffix_n, root, n))
+            n++
+        }
+        TrainingConfigStore.putDistinct(this, c.copy(name = name))
+        renderConfigs()
+        toast(getString(R.string.strength_config_saved, name))
     }
 
     private fun confirmDeleteConfig(c: TrainingConfig) {
@@ -439,6 +609,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             .setNegativeButton(R.string.strength_cancel, null)
             .setPositiveButton(R.string.strength_config_delete_ok) { _, _ ->
                 TrainingConfigStore.delete(this, c.name)
+                if (editingName == c.name) endEditConfig()
                 renderConfigs()
             }
             .show()
@@ -483,8 +654,10 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         b.btnPause.setText(R.string.strength_pause)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // 记下这次实际开跑的配置：下次进来能在「常用配置」里直接选
-        TrainingConfigStore.put(this, currentConfig(autoConfigName()))
+        // 记下这次实际开跑的配置：下次进来能在「常用配置」里直接选。
+        // 用 displayName()（用户定过的名字）——这里原来传的是自动名，会把用户
+        // 起好的名字又覆盖掉。
+        TrainingConfigStore.put(this, currentConfig(displayName()))
         renderConfigs()
 
         if (useMic) startMic()
@@ -890,8 +1063,22 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             .setTitle(if (early) R.string.strength_end_title else R.string.strength_done_title)
             .setMessage(sb.toString())
             .setCancelable(false)
-            .setPositiveButton(R.string.strength_done_btn) { _, _ -> finish() }
+            // 结束后留在本页回到设置界面（而不是直接退回首页），方便接着再来一组
+            .setPositiveButton(R.string.strength_done_btn) { _, _ -> returnToSetup() }
             .show()
+    }
+
+    /** 训练收尾后：停在指力训练页的设置界面，重置按钮与计时状态。 */
+    private fun returnToSetup() {
+        if (isFinishing || isDestroyed) return
+        b.runGroup.visibility = View.GONE
+        b.setupGroup.visibility = View.VISIBLE
+        b.btnStartTraining.visibility = View.VISIBLE
+        b.btnPause.setText(R.string.strength_pause)
+        b.countdownValue.text = ""
+        b.runProgress.progress = 0
+        rebuildRoundRows()
+        renderConfigs()
     }
 
     // ---------------- 小工具 ----------------
@@ -945,6 +1132,8 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     )
 
     private companion object {
+        /** 复制配置时加的后缀（也用来识别「这本就是副本」，避免副本上叠副本）。 */
+        const val kDuplicateSuffix = " 副本"
         const val TICK_MS = 100L
         const val BPM_STEP = 5
         const val DUR_STEP = 30
