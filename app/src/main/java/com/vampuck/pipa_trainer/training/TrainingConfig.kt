@@ -90,6 +90,33 @@ data class TrainingConfig(
             return out
         }
 
+        /**
+         * 「草稿版」的收录规则（纯函数，供单测）：进页面自动记的那一份怎么进列表。
+         *
+         * @param namedNames 已经定名（用户显式保存/复制过）的名字集合
+         * @return 新列表；返回值与 [current] 相同表示不需要改动
+         */
+        fun mergeDraft(
+            current: List<TrainingConfig>,
+            draft: TrainingConfig,
+            namedNames: Set<String>,
+            max: Int
+        ): List<TrainingConfig> {
+            val same = current.firstOrNull { it.name == draft.name }
+            if (same != null) {
+                // 同名条目：已定名的不能被草稿覆盖；旧草稿则就地更新
+                if (draft.name in namedNames) return current
+                if (same.samePlanAs(draft)) return current
+                return current.map { if (it.name == draft.name) draft else it }
+            }
+            // 没有同名：列表里已有同样计划的那条就别再插一条
+            if (current.any { it.samePlanAs(draft) }) return current
+            val out = current.toMutableList()
+            out.add(0, draft)
+            while (out.size > max) out.removeAt(out.size - 1)
+            return out
+        }
+
         fun decode(text: String): TrainingConfig? {
             val parts = text.split('|', limit = 4)
             if (parts.size < 4) return null

@@ -155,4 +155,56 @@ class TrainingConfigTest {
         assertEquals("配置11", list[0].name)
         assertEquals("配置4", list[7].name)
     }
+
+    // ---------------- 草稿（进页面自动记的那份）的收录规则 ----------------
+
+    private fun twoRounds() = listOf(TrainingPlan.Round(60, 120), TrainingPlan.Round(84, 60))
+    private fun oneRound(bpm: Int) = listOf(TrainingPlan.Round(bpm, 60))
+
+    @Test
+    fun `draft is inserted into an empty list so the section is never blank`() {
+        // 进页面时列表为空，草稿要出现在「常用配置」里，否则用户以为这里没东西
+        val out = TrainingConfig.mergeDraft(emptyList(), cfg("草稿"), emptySet(), 8)
+        assertEquals(1, out.size)
+        assertEquals("草稿", out[0].name)
+    }
+
+    @Test
+    fun `draft cannot overwrite a config the user explicitly saved`() {
+        val saved = listOf(cfg("我的练习"))
+        val out = TrainingConfig.mergeDraft(
+            saved, cfg("我的练习").copy(rounds = oneRound(120)), setOf("我的练习"), 8
+        )
+        assertTrue(out === saved)                                   // 原样返回，没被草稿改掉
+        assertEquals(twoRounds(), out[0].rounds)
+    }
+
+    @Test
+    fun `draft is skipped when another entry already has the same plan`() {
+        val saved = listOf(cfg("我的练习"))
+        val out = TrainingConfig.mergeDraft(
+            saved, cfg("别的名字"), setOf("我的练习"), 8
+        )
+        assertTrue(out === saved)                                   // 不会出现两条同计划的
+    }
+
+    @Test
+    fun `unnamed draft updates in place when its plan changes`() {
+        val saved = listOf(cfg("草稿"))
+        val out = TrainingConfig.mergeDraft(
+            saved, cfg("草稿").copy(rounds = oneRound(120)), emptySet(), 8
+        )
+        assertEquals(1, out.size)
+        assertEquals(oneRound(120), out[0].rounds)
+    }
+
+    @Test
+    fun `draft with a different plan is added at the front`() {
+        val saved = listOf(cfg("我的练习"))
+        val out = TrainingConfig.mergeDraft(
+            saved, cfg("新计划").copy(rounds = oneRound(120)), setOf("我的练习"), 8
+        )
+        assertEquals(2, out.size)
+        assertEquals("新计划", out[0].name)
+    }
 }
