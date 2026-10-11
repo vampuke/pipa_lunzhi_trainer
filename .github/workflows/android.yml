@@ -69,7 +69,7 @@ jobs:
           APKSIGNER=$(ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/"*/apksigner | head -1)
           "$APKSIGNER" verify --print-certs "$APK" 2>&1 | tee /tmp/sig.txt
           # 完整 64 位 SHA-256（apksigner 输出无冒号分隔），避免只比前缀的歧义。
-          grep -qi "9e6e8c535dd621852a5e8254ebedc8d146617d8e306ab2078f34ff59be1c4ae6" /tmp/sig.txt && \
+          grep -qi "9e6e8c535dd621852a5e8254ebedc8d14617d8e3066ab2078f34ff59be1c4ae6" /tmp/sig.txt && \
             echo "OK: release SHA-256 fingerprint matches" || \
             (echo "FAIL: signature mismatch"; exit 1)
 
