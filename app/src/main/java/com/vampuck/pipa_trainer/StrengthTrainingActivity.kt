@@ -213,12 +213,16 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         rebuildRoundRows()
         renderConfigs()
         reserveFabSpace()
-        // 旋转/分屏后可用宽度变了要重新换行（本页声明了 configChanges，系统不会重建）
+        // 旋转/分屏后可用宽度变了要重新换行（本页声明了 configChanges，系统不会重建）。
+        // 注意：**绝不能在 layout 回调里直接重建子视图**——在 layout 过程中
+        // removeAllViews()/addView() 会让新加进去的胶囊拿不到 layout，结果是
+        // 整块区域高度为 0（用户看到的就是「常用配置」下面一片空白）。
+        // 所以这里只记下宽度，重建 post 到 layout 之后再做。
         b.configList.addOnLayoutChangeListener { v, l, _, r, _, _, _, _, _ ->
             val w = r - l
             if (w > 0 && w != configRowWidth) {
                 configRowWidth = w
-                renderConfigs()
+                v.post { if (!isFinishing && !isDestroyed) renderConfigs() }
             }
         }
     }
@@ -791,8 +795,9 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
         // 记下这次实际开跑的配置：下次进来能在「常用配置」里直接选。
         // 用 displayName()（用户定过的名字）——这里原来传的是自动名，会把用户
-        // 起好的名字又覆盖掉。
-        TrainingConfigStore.put(this, currentConfig(displayName()))
+        // 起好的名字又覆盖掉。也不能用按「同计划」去重的 put()，否则开跑一次
+        // 就会把另一套计划相同的配置顶掉（副本场景）。
+        TrainingConfigStore.putDistinct(this, currentConfig(displayName()))
         renderConfigs()
 
         if (useMic) startMic()

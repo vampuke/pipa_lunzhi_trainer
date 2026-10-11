@@ -72,19 +72,15 @@ data class TrainingConfig(
         /**
          * 把 [incoming] 收录进已保存的 [current] 列表（最近的排前面），纯函数便于单测。
          *
-         * [dedupeByPlan] = true 时，同名**或同计划**的旧条目会被替换——「开始过的配置」
-         * 应该只留一条。= false 时只按名字去重，用于「复制为新的」：复制出来的那套在
-         * 用户改之前与原计划完全相同，若也按计划去重，就会把原件顶掉。
+         * **只按名字去重**：不按「同计划」去重——复制出来的那套在用户改之前与原计划
+         * 完全相同，按计划去重会把原件顶掉。「同计划不重复」由 [mergeDraft] 负责。
          */
         fun mergeSaved(
             current: List<TrainingConfig>,
             incoming: TrainingConfig,
-            dedupeByPlan: Boolean,
             max: Int
         ): List<TrainingConfig> {
-            val out = current.filterNot {
-                it.name == incoming.name || (dedupeByPlan && it.samePlanAs(incoming))
-            }.toMutableList()
+            val out = current.filterNot { it.name == incoming.name }.toMutableList()
             out.add(0, incoming)
             while (out.size > max) out.removeAt(out.size - 1)
             return out

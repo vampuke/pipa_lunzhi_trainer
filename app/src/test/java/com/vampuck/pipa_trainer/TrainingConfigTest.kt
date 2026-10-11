@@ -118,28 +118,27 @@ class TrainingConfigTest {
     // ---------------- 保存列表的去重规则 ----------------
 
     @Test
-    fun `mergeSaved replaces same name or same plan`() {
+    fun `mergeSaved replaces an entry with the same name`() {
         val list = listOf(cfg("甲"), cfg("乙").copy(rounds = listOf(TrainingPlan.Round(100, 60))))
-        // 同名 -> 替换
-        val afterName = TrainingConfig.mergeSaved(list, cfg("乙").copy(restSec = 45), true, 8)
-        assertEquals(2, afterName.size)
-        assertEquals(45, afterName[0].restSec)
-        // 同计划（名字不同）-> 旧的同计划那条被替换掉，仍然不重复
-        val afterPlan = TrainingConfig.mergeSaved(list, cfg("丙"), true, 8)
-        assertEquals(2, afterPlan.size)
-        assertEquals("丙", afterPlan[0].name)      // 丙 与 甲 同计划 → 甲 被它替换
-        assertEquals("乙", afterPlan[1].name)
+        val after = TrainingConfig.mergeSaved(list, cfg("乙").copy(restSec = 45), 8)
+        assertEquals(2, after.size)
+        assertEquals(45, after[0].restSec)
+        assertEquals("乙", after[0].name)
     }
 
     @Test
-    fun `mergeSaved keeps a distinct copy that shares the same plan`() {
-        // 「复制为新的」：计划还没改，与原计划完全相同，但**不能**把原件顶掉
+    fun `mergeSaved never drops an entry just because its plan matches`() {
+        // 关键回归：以前按「同计划」去重，复制/载入后再保存会把**原件**顶掉。
+        // 现在只按名字去重，同计划的两套（原件 + 副本）必须都在。
         val original = listOf(cfg("进阶练习"))
-        val copy = cfg("进阶练习 副本")
-        val after = TrainingConfig.mergeSaved(original, copy, dedupeByPlan = false, max = 8)
+        val copy = cfg("进阶练习 副本")             // 计划完全相同
+        val after = TrainingConfig.mergeSaved(original, copy, 8)
         assertEquals(2, after.size)
         assertEquals("进阶练习 副本", after[0].name)
         assertEquals("进阶练习", after[1].name)
+        // 就算名字也不一样、计划也一样，仍然保留两条（合并只认名字）
+        val samePlan = TrainingConfig.mergeSaved(after, cfg("又一套"), 8)
+        assertEquals(3, samePlan.size)
     }
 
     @Test
@@ -147,8 +146,7 @@ class TrainingConfigTest {
         var list = emptyList<TrainingConfig>()
         for (i in 0 until 12) {
             list = TrainingConfig.mergeSaved(
-                list, cfg("配置$i").copy(rounds = listOf(TrainingPlan.Round(60 + i, 60))),
-                dedupeByPlan = true, max = 8
+                list, cfg("配置$i").copy(rounds = listOf(TrainingPlan.Round(60 + i, 60))), 8
             )
         }
         assertEquals(8, list.size)
