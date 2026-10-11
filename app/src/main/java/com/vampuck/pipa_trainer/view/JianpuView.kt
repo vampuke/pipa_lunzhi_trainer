@@ -69,7 +69,21 @@ class JianpuView @JvmOverloads constructor(
             if (currentTop < 0 || g.lineTop < currentTop) currentTop = g.lineTop
             if (g.lineBottom > currentBottom) currentBottom = g.lineBottom
         }
+        // 预算高亮底的矩形，别在 onDraw 里每帧 filter/groupBy/new RectF（跟练播放持续重绘）。
+        hlRects.clear()
+        if (highlightBar >= 0) {
+            val byRow = glyphs.filter { it.barIndex == highlightBar }.groupBy { it.lineTop }
+            for ((_, rowGlyphs) in byRow) {
+                val left = rowGlyphs.minOf { it.cellLeft } - dp(3f)
+                val right = rowGlyphs.maxOf { it.cellRight } + dp(3f)
+                val cy = rowGlyphs.first().cy
+                hlRects.add(RectF(left, cy - dp(28f), right, cy + dp(22f)))
+            }
+        }
     }
+
+    /** 高亮底矩形缓存：随 highlightBar / 布局变化重算，onDraw 只读。 */
+    private val hlRects = ArrayList<RectF>()
 
     /** 当前高亮音符的纵向范围（px），布局完成后有效；-1 表示未知。 */
     var currentTop: Float = -1f; private set
@@ -192,19 +206,10 @@ class JianpuView @JvmOverloads constructor(
             canvas.drawLine(bx, bcy - dp(14f), bx, bcy + dp(14f), barPaint)
         }
 
-        // 整小节高亮：按行把当前小节的字块合并成一条连续底，而非每个音符一个框
-        if (highlightBar >= 0) {
+        // 整小节高亮：用布局阶段预算好的矩形缓存（onDraw 不再 filter/groupBy/new RectF）
+        if (highlightBar >= 0 && hlRects.isNotEmpty()) {
             hlPaint.color = colHl
-            // 同一小节可能跨行，按 (rowTop) 分组，每行画一条连续圆角底
-            val barGlyphs = glyphs.filter { it.barIndex == highlightBar }
-            val byRow = barGlyphs.groupBy { it.lineTop }
-            for ((_, rowGlyphs) in byRow) {
-                val left = rowGlyphs.minOf { it.cellLeft } - dp(3f)
-                val right = rowGlyphs.maxOf { it.cellRight } + dp(3f)
-                val cy = rowGlyphs.first().cy
-                val r = RectF(left, cy - dp(28f), right, cy + dp(22f))
-                canvas.drawRoundRect(r, dp(8f), dp(8f), hlPaint)
-            }
+            for (r in hlRects) canvas.drawRoundRect(r, dp(8f), dp(8f), hlPaint)
         }
 
         for (g in glyphs) {

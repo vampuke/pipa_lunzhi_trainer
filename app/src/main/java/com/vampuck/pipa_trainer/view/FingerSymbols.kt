@@ -12,20 +12,26 @@ import android.graphics.Path
  */
 object FingerSymbols {
 
+    // 复用 Paint，避免被 onDraw 逐音符调用时每次 new（一屏 N 个指法音符 → 每帧 2N 个 Paint）。
+    // 只读/绘制都在 UI 线程，单例安全；每次 draw() 刷新 color 与随 u 变化的 strokeWidth。
+    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val path1 = Path()
+    private val path2 = Path()
+
     /**
      * @param code  指法 code（见 Fingerings）
      * @param cx,cy 中心坐标（px）
      * @param u     单位长度（px），符号整体按它缩放（谱面传 density*dp 后的基准）
      */
     fun draw(canvas: Canvas, code: String, cx: Float, cy: Float, u: Float, color: Int) {
-        val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            style = Paint.Style.STROKE
-            strokeWidth = u * 0.14f
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
+        stroke.color = color
+        stroke.strokeWidth = u * 0.14f
+        fill.color = color
         val w = u * 0.5f
         val h = u * 0.5f
 
@@ -44,14 +50,14 @@ object FingerSymbols {
             "fen" -> slash(0f)                            // 分：/（同挑向）
 
             "zhe" -> { // 摭：一对左右相对的弧「（ ）」
-                val p1 = Path()
-                p1.moveTo(cx - u * 0.05f, cy - u * 0.55f)
-                p1.quadTo(cx - u * 0.55f, cy, cx - u * 0.05f, cy + u * 0.55f)
-                canvas.drawPath(p1, stroke)
-                val p2 = Path()
-                p2.moveTo(cx + u * 0.05f, cy - u * 0.55f)
-                p2.quadTo(cx + u * 0.55f, cy, cx + u * 0.05f, cy + u * 0.55f)
-                canvas.drawPath(p2, stroke)
+                path1.reset()
+                path1.moveTo(cx - u * 0.05f, cy - u * 0.55f)
+                path1.quadTo(cx - u * 0.55f, cy, cx - u * 0.05f, cy + u * 0.55f)
+                canvas.drawPath(path1, stroke)
+                path2.reset()
+                path2.moveTo(cx + u * 0.05f, cy - u * 0.55f)
+                path2.quadTo(cx + u * 0.55f, cy, cx + u * 0.05f, cy + u * 0.55f)
+                canvas.drawPath(path2, stroke)
             }
 
             "sao" -> { // 扫：\ 主线 + 2 条短横穿线（羽状）
@@ -84,11 +90,11 @@ object FingerSymbols {
             }
 
             "gou" -> { // 勾：横折带下钩「勹」
-                val p = Path()
-                p.moveTo(cx - u * 0.4f, cy - u * 0.45f)
-                p.lineTo(cx + u * 0.4f, cy - u * 0.45f)
-                p.quadTo(cx + u * 0.6f, cy, cx, cy + u * 0.5f)
-                canvas.drawPath(p, stroke)
+                path1.reset()
+                path1.moveTo(cx - u * 0.4f, cy - u * 0.45f)
+                path1.lineTo(cx + u * 0.4f, cy - u * 0.45f)
+                path1.quadTo(cx + u * 0.6f, cy, cx, cy + u * 0.5f)
+                canvas.drawPath(path1, stroke)
             }
             "mo" -> canvas.drawLine(cx - w, cy, cx + w, cy, stroke)   // 抹：横线
             "fan" -> canvas.drawCircle(cx, cy, u * 0.4f, stroke)      // 泛：○

@@ -40,11 +40,19 @@ object AudioDecoder {
         val containerDurationSec: Double
     )
 
-    private class FloatList(initial: Int) {
+    private class FloatList(initial: Int, private val cap: Int = Int.MAX_VALUE) {
         var arr = FloatArray(initial.coerceAtLeast(1024))
         var size = 0
         fun add(v: Float) {
-            if (size == arr.size) arr = arr.copyOf(arr.size shl 1)
+            if (size == arr.size) {
+                // Doubling peaks at old+new held together; near the 30-min cap that
+                // is ~128MB + ~256MB ≈ 384MB transient. Clamp the next capacity to
+                // the known hard cap (+small headroom) so the final grow does not
+                // overshoot into territory we will never fill.
+                val want = arr.size.toLong() shl 1
+                val next = want.coerceAtMost((cap + 1024).toLong()).toInt().coerceAtLeast(arr.size + 1)
+                arr = arr.copyOf(next)
+            }
             arr[size++] = v
         }
         /**
@@ -115,7 +123,7 @@ object AudioDecoder {
             var dataStarted = false
             // 30 min at the effective rate: ~40 M floats. Grow from a 60 s seed
             // rather than reserving the cap up front (that would be ~160 MB).
-            val out = FloatList(minOf(maxOut, effectiveRate(outRate, factor) * 60))
+            val out = FloatList(minOf(maxOut, effectiveRate(outRate, factor) * 60), maxOut)
             val info = MediaCodec.BufferInfo()
             var sawInputEOS = false
             var sawOutputEOS = false

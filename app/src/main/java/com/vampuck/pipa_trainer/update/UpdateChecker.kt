@@ -34,6 +34,9 @@ object UpdateChecker {
 
     private val MD5_RE = Regex("[0-9a-fA-F]{32}")
 
+    /** md5 是否是合法的 32 位十六进制（供单测）。 */
+    internal fun isValidMd5(s: String): Boolean = MD5_RE.matches(s)
+
     private const val DAY_MS = 24L * 60 * 60 * 1000
 
     data class Manifest(
@@ -55,7 +58,16 @@ object UpdateChecker {
                 setRequestProperty("Cache-Control", "no-cache")
             }
             conn.inputStream.use { ins ->
-                val text = ins.readBytes().toString(Charsets.UTF_8)
+                // 清单正常只有几百字节；设 64KB 上限，别让异常/被劫持的巨大响应吃光内存。
+                // 不用 readNBytes（API 33+），手动限长读以兼容 minSdk 24。
+                val cap = 64 * 1024
+                val bos = java.io.ByteArrayOutputStream()
+                val buf = ByteArray(8 * 1024)
+                var read: Int
+                while (ins.read(buf).also { read = it } != -1 && bos.size() < cap) {
+                    bos.write(buf, 0, minOf(read, cap - bos.size()))
+                }
+                val text = bos.toString("UTF-8")
                 val o = JSONObject(text)
                 Manifest(
                     versionCode = o.getInt("versionCode"),
@@ -108,18 +120,24 @@ object UpdateChecker {
             if (conn.responseCode !in 200..299) return@withContext null
             val total = conn.contentLength
             val md = MessageDigest.getInstance("MD5")
-            conn.inputStream.use { ins ->
-                out.outputStream().use { os ->
-                    val buf = ByteArray(16 * 1024)
-                    var read: Int
-                    var done = 0L
-                    while (ins.read(buf).also { read = it } != -1) {
-                        os.write(buf, 0, read)
-                        md.update(buf, 0, read)
-                        done += read
-                        onProgress(if (total > 0) ((done * 100) / total).toInt() else -1)
+            try {
+                conn.inputStream.use { ins ->
+                    out.outputStream().use { os ->
+                        val buf = ByteArray(16 * 1024)
+                        var read: Int
+                        var done = 0L
+                        while (ins.read(buf).also { read = it } != -1) {
+                            os.write(buf, 0, read)
+                            md.update(buf, 0, read)
+                            done += read
+                            onProgress(if (total > 0) ((done * 100) / total).toInt() else -1)
+                        }
                     }
                 }
+            } catch (t: Throwable) {
+                // 中途断流：删掉半截文件，别留个损坏包等着被 md5 放过/被安装器怼。
+                out.delete()
+                throw t
             }
 
             val got = BigInteger(1, md.digest()).toString(16).padStart(32, '0')
@@ -147,6 +165,9 @@ object UpdateChecker {
     } catch (_: Throwable) {
         false
     }
+
+    /** [allowedUrl] 的可测别名（纯逻辑，无 Android 依赖）。 */
+    internal fun isAllowedUrl(url: String): Boolean = allowedUrl(url)
 
     /**
      * 下载到的 APK 是否是「同一个 App、同一个签名」。

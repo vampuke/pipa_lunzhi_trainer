@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.SeekBar
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.vampuck.pipa_trainer.audio.Metronome
 import com.vampuck.pipa_trainer.databinding.ActivityMetronomeBinding
@@ -53,6 +54,10 @@ class MetronomeActivity : AppCompatActivity() {
 
         dots = emptyList()
         rebuildDots(4)
+
+        metronome.onError = { msg ->
+            runOnUiThread { Toast.makeText(this, "节拍器无法播放：$msg", Toast.LENGTH_LONG).show() }
+        }
 
         // ---- 速度：SeekBar 粗调 (progress 0..180 -> 20..200) ----
         b.seekBpm.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {

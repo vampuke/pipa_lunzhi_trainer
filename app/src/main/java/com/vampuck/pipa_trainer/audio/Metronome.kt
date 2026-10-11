@@ -67,8 +67,9 @@ class Metronome {
     /** 是否强调每小节第一拍；false = 每拍相同（整拍/分拍模式下不强调任何拍）。 */
     @Volatile private var accentFirst: Boolean = false
 
-    /** 每小节拍数，固定 4（四声）。 */
-    private val beatsPerBar: Int = 4
+    /** 每小节拍数，默认 4；跟练非 4/4 曲目时可改成 3 等。 */
+    @Volatile private var beatsPerBar: Int = 4
+    fun setBeatsPerBar(n: Int) { beatsPerBar = n.coerceIn(1, 16) }
 
     @Volatile private var running = false
     private var worker: Thread? = null
@@ -89,6 +90,12 @@ class Metronome {
     @Volatile private var lastWorker: Thread? = null
     @Volatile private var track: AudioTrack? = null
     @Volatile var listener: Listener? = null
+
+    /**
+     * 可选错误回调：当 AudioTrack 构建失败（设备被占用、机型不接受该采样率等）时触发，
+     * 让调用方能提示用户「没声音」而不是静默无声。回调在工作线程上，碰 UI 要自己 post。
+     */
+    @Volatile var onError: ((String) -> Unit)? = null
 
     val isRunning: Boolean get() = running
 
@@ -200,7 +207,11 @@ class Metronome {
                 .setBufferSizeInBytes(bufBytes)
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .build()
-        } catch (_: Throwable) { if (generation.get() == gen) running = false; return }
+        } catch (t: Throwable) {
+            if (generation.get() == gen) running = false
+            onError?.invoke(t.message ?: "AudioTrack 初始化失败")
+            return
+        }
         track = at
 
         // conservative estimate of the output path latency (buffer half-fill)
@@ -231,22 +242,21 @@ class Metronome {
                     val beatInBar = (beatIndex % beatsPerBar).toInt()
                     when (m) {
                         MODE_QUARTER -> {
-                            // 4 indicators. Accent only beat 0 when accentFirst; else every beat identical.
+                            // beatsPerBar 个指示器。Accent only beat 0 when accentFirst; else every beat identical.
                             val accent = accentOn && beatInBar == 0
                             scheduleClick(scheduled, nextBeat, if (accent) 0 else 1,
-                                beatInBar, 4, accent, startNs, sr, latencyNs, clickIndex)
+                                beatInBar, beatsPerBar, accent, startNs, sr, latencyNs, clickIndex)
                             clickIndex++
                         }
                         MODE_EIGHTH -> {
-                            // 8 响（每拍 2 个）。「每拍相同」八响同一个声音，不再有弱音；
-                            // 「强调首拍」只有整小节的第 1 响用重音，其余七响相同。
+                            // 每拍 2 响。「每拍相同」同一个声音；「强调首拍」只有整小节第 1 响重音。
                             val slot = beatInBar * 2
                             val accent = accentOn && beatInBar == 0
                             scheduleClick(scheduled, nextBeat, if (accent) 0 else 1,
-                                slot, 8, accent, startNs, sr, latencyNs, clickIndex)
+                                slot, beatsPerBar * 2, accent, startNs, sr, latencyNs, clickIndex)
                             clickIndex++
                             val sSample = nextBeat + beatSamples / 2
-                            scheduleClick(scheduled, sSample, 1, slot + 1, 8, false,
+                            scheduleClick(scheduled, sSample, 1, slot + 1, beatsPerBar * 2, false,
                                 startNs, sr, latencyNs, clickIndex)
                             clickIndex++
                         }

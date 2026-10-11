@@ -52,8 +52,11 @@ object TrainingConfigStore {
      * 当前这份草稿也放进去。**已定名**的那套（用户显式保存过的）不会被草稿覆盖。
      */
     fun recordDraft(ctx: Context, draft: TrainingConfig): List<TrainingConfig> {
-        val out = TrainingConfig.mergeDraft(saved(ctx), draft, named(ctx), MAX_SAVED)
-        if (out !== saved(ctx)) persist(ctx, out)
+        val current = saved(ctx)
+        val out = TrainingConfig.mergeDraft(current, draft, named(ctx), MAX_SAVED)
+        // mergeDraft 无需改动时按引用返回传入的 current；用同一个 current 比较，
+        // 不要再调一次 saved(ctx)（那会生成新 List 让 !== 恒真，每次都白写一遍盘）。
+        if (out !== current) persist(ctx, out)
         return out
     }
 

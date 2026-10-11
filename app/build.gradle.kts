@@ -69,4 +69,7 @@ dependencies {
     // Charting
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     testImplementation("junit:junit:4.13.2")
+    // 让纯逻辑单测能用 org.json（JScoreJson.parse）——Android 的 org.json 在单测里是
+    // 抛异常的桩，补一个真实现。
+    testImplementation("org.json:json:20240303")
 }

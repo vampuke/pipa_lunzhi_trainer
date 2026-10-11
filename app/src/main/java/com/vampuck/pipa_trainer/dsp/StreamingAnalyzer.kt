@@ -35,7 +35,11 @@ class StreamingAnalyzer(private val sampleRate: Int) {
     private var ringFill = 0
 
     private var frameIndex = 0L
-    private var lastPeakFrame = -100000L
+    // 候选阶段的「上一个被接受为候选的峰」。与 LunzhiAnalyzer 的 `last` 对齐：
+    // 文件路径在「阈值+局部极大」通过后就占用最小间距窗（即便该峰随后被
+    // prominence/timbre 否掉），实时路径原来只在完全通过后才更新，等于用了文件
+    // 注释里实测会把噪声误报翻倍的那个变体 → 实时 onset/CV 系统性偏高。
+    private var lastCandidateFrame = -100000L
 
     /**
      * 相邻起音最小距离。与 [LunzhiAnalyzer] 保持一致：原来是 40ms，正好卡在轮指
@@ -305,6 +309,12 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         }
         val med = if (cnt > 0) acc / cnt else 0.0
         if (cv <= med * 1.2 + 0.02) return
+        // 最小间距：与文件路径对齐——「阈值+局部极大」一通过就占用间距窗，并立即
+        // 推进 lastCandidateFrame，使随后被 prominence/timbre 否掉的峰也挡住紧邻的
+        // 下一个峰。原来放在所有检查之后、只对完全接受的峰计距，是文件注释实测会把
+        // 房间噪声误报翻倍的那个变体。
+        if (c - lastCandidateFrame < minGapFrames) return
+        lastCandidateFrame = c
         // prominence within +/- W
         val lo = max(0L, c - W); val hi = min(c + W, latest)
         var lm = cv; var i = c - 1
@@ -312,8 +322,6 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         var rm = cv; var j = c + 1
         while (j <= hi && nfRing[slot(j)] <= cv) { rm = min(rm, nfRing[slot(j)]); j++ }
         if (cv - max(lm, rm) < PROMINENCE) return
-        // min distance
-        if (c - lastPeakFrame < minGapFrames) return
         // energy gate at the peak (use the louder of this frame and the previous)
         val g = gateValue()
         currentGate = g
@@ -324,16 +332,41 @@ class StreamingAnalyzer(private val sampleRate: Int) {
         val tone = onsetTone(c, latest)
         if (minTone > 0.0 && tone < minTone) return
 
+        // 逐击力度：取起音后 ~45ms 窗的能量 RMS，与文件路径 LunzhiAnalyzer 的
+        // strokeAmp 口径一致（原来直接拿归一化 flux 峰值 cv 当力度，与文件模式的
+        // 45ms RMS 不是同一种量，导致 28% 力度均衡分两路不可比）。look-ahead 已有
+        // W=0.12s，45ms 窗完全落在 ring 内。
+        val amp = onsetAmp(c, latest)
+
         // Reads happen on other threads too (the final report runs on the UI
         // thread after a join that can time out), so appends and snapshots share
         // one lock.
         synchronized(listLock) {
             onsetTimes.add(frameTime(c))
-            strokeAmp.add(cv)
+            strokeAmp.add(amp)
             onsetTone.add(tone)
         }
-        lastStrokeAmp = cv
-        lastPeakFrame = c
+        lastStrokeAmp = amp
+    }
+
+    /**
+     * 起音后 ~45ms 窗的能量 RMS（文件路径 [LunzhiAnalyzer] strokeAmp 的同口径实时版）。
+     * 用 [rmsRing] 里每帧 RMS 的均方根近似该窗的 RMS；窗口 c..c+45ms 落在 look-ahead 内。
+     * 力度均衡分看的是一个 5 击周期里各位力度的相对形状（CV，尺度无关），所以无需像文件
+     * 路径那样按全局峰归一化。
+     */
+    private fun onsetAmp(c: Long, latest: Long): Double {
+        val halfWin = (0.045 * fps).toLong().coerceAtLeast(1L)
+        var acc = 0.0
+        var cnt = 0
+        var k = c
+        val kHi = min(c + halfWin, latest)
+        while (k <= kHi) {
+            val r = rmsRing[slot(k)]
+            acc += r * r; cnt++
+            k++
+        }
+        return if (cnt > 0) sqrt(acc / cnt) else 0.0
     }
 
     /**

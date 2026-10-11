@@ -106,6 +106,8 @@ class FileAnalysisActivity : AppCompatActivity() {
                 render(res)
             } catch (oom: OutOfMemoryError) {
                 b.status.text = "分析失败：文件太长，内存不足。请截取较短的音频/视频再试。"
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c   // 页面销毁取消协程时必须让它继续传播，别吞掉也别往已销毁的视图写
             } catch (t: Throwable) {
                 b.status.text = "分析失败：${t.message ?: t.javaClass.simpleName}"
             }
@@ -123,7 +125,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         b.scoreGrade.text = rep.grade
         b.headline.text = rep.headline
         (b.scoreCard.getChildAt(0) as LinearLayout).background =
-            GradientDrawable().apply { setColor(getColor(Evaluation.levelColorRes(rep.level))) }
+            GradientDrawable().apply { setColor(getColor(Evaluation.levelFillColorRes(rep.level))) }
 
         b.dimRow.removeAllViews()
         for (d in rep.dimensions) {
@@ -132,7 +134,7 @@ class FileAnalysisActivity : AppCompatActivity() {
             item.dimValue.text = d.valueText
             item.dimGrade.text = d.grade
             item.dimGrade.background = GradientDrawable().apply {
-                cornerRadius = 24f; setColor(getColor(Evaluation.levelColorRes(d.level)))
+                cornerRadius = 24f; setColor(getColor(Evaluation.levelFillColorRes(d.level)))
             }
             item.dimSub.text = d.subText
             b.dimRow.addView(item.root)
@@ -343,7 +345,7 @@ class FileAnalysisActivity : AppCompatActivity() {
         val entries = ArrayList<Entry>()
         val step = maxOf(1, res.fluxEnvelope.size / 4000)
         var i = 0
-        while (i < res.fluxEnvelope.size) {
+        while (i < res.fluxEnvelope.size && i < res.fluxTimes.size) {
             val t = res.fluxTimes[i]
             if (t in s..e) entries.add(Entry(t.toFloat(), res.fluxEnvelope[i]))
             i += step

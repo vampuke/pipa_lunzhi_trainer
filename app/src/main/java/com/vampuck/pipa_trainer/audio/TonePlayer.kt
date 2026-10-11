@@ -27,6 +27,12 @@ class TonePlayer {
     @Volatile private var track: AudioTrack? = null
     private var worker: Thread? = null
 
+    /**
+     * 可选错误回调：AudioTrack 构建失败时触发，让调用方能提示用户参考音没响。
+     * 回调在工作线程上，碰 UI 要自己 post。
+     */
+    @Volatile var onError: ((String) -> Unit)? = null
+
     fun play(hz: Double, seconds: Double = 1.8) {
         stop()
         val gen = generation.incrementAndGet()
@@ -59,7 +65,7 @@ class TonePlayer {
                     .setBufferSizeInBytes(maxOf(minBuf, 4096))
                     .setTransferMode(AudioTrack.MODE_STREAM)
                     .build()
-            } catch (_: Throwable) { return@thread }
+            } catch (_: Throwable) { onError?.invoke("参考音播放失败"); return@thread }
             if (gen != generation.get()) {
                 // A newer play()/stop() already superseded us — never publish it.
                 try { at.release() } catch (_: Throwable) {}
