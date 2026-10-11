@@ -210,6 +210,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         updateMicHint()
         b.btnSaveConfig.setOnClickListener { askSaveConfig() }
         restoreLastConfig()
+        updateCurrentConfigBanner()   // 无「上次配置」时也要显示「新计划」横幅
         rebuildRoundRows()
         renderConfigs()
         reserveFabSpace()
@@ -395,6 +396,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         // 「上一次编辑的配置」也进列表：否则刚进页面时常用配置是空的，用户会以为
         // 这里没东西、不知道怎么新增。显式保存过的那套会被标记成「已定名」，不再被覆盖。
         TrainingConfigStore.recordDraft(this, currentConfig(displayName()))
+        updateCurrentConfigBanner()
     }
 
     /** 当前这套计划的名字：定过就用它，没定过用按计划现算的自动名。 */
@@ -593,6 +595,25 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             if (editingName != null) R.string.strength_save_config_update
             else R.string.strength_save_config
         )
+        updateCurrentConfigBanner()
+    }
+
+    /**
+     * 显著横幅：告诉用户现在在编/练哪一套配置。
+     *  - 正在编辑某套 -> 「正在编辑：X」
+     *  - 已载入/定名的一套 -> 「当前配置：X」
+     *  - 还没名字（刚新建的草稿）-> 「当前：新计划（未保存）」
+     */
+    private fun updateCurrentConfigBanner() {
+        val custom = TrainingConfig.sanitize(planName)
+        b.currentConfigBanner.text = when {
+            editingName != null ->
+                getString(R.string.strength_current_config_editing, editingName)
+            custom.isNotBlank() ->
+                getString(R.string.strength_current_config, custom)
+            else -> getString(R.string.strength_current_config_new)
+        }
+        b.currentConfigBanner.visibility = View.VISIBLE
     }
 
     /** 进入编辑/载入后把设置页滚到「计划」那里，省得用户自己找。 */

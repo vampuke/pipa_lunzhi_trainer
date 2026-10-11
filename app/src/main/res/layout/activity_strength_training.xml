@@ -3,6 +3,7 @@
      这样不管计划列表滚到哪里都能一指点到，不用先滑到页面最底部。 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg">
@@ -55,6 +56,22 @@
             android:paddingHorizontal="18dp"
             android:paddingTop="16dp"
             android:paddingBottom="24dp">
+
+            <!-- 当前加载的配置：显著横幅，让人一眼看出现在在编/练哪一套 -->
+            <TextView
+                android:id="@+id/currentConfigBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/bg_current_config"
+                android:drawablePadding="8dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="12dp"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:text="当前配置：进阶练习" />
 
             <!-- 常用配置（上次编辑的会自动恢复，保存过的可快捷载入） -->
             <TextView
