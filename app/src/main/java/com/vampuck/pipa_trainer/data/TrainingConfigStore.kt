@@ -92,6 +92,9 @@ object TrainingConfigStore {
         if (isNamed(ctx, name)) {
             prefs(ctx).edit().putStringSet(KEY_NAMED, named(ctx) - name).apply()
         }
+        // 「上一次编辑的配置」如果就是被删的这套，也要一起清掉：否则下次进页面
+        // restoreLastConfig() 会把它恢复出来、再录进列表——用户删掉的配置自己回来了。
+        if (last(ctx)?.name == name) prefs(ctx).edit().remove(KEY_LAST).apply()
         return list
     }
 

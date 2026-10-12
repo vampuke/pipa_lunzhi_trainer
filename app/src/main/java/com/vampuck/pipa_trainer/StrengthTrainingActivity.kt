@@ -30,6 +30,7 @@ import com.vampuck.pipa_trainer.data.TrainingConfigStore
 import com.vampuck.pipa_trainer.databinding.ActivityStrengthTrainingBinding
 import com.vampuck.pipa_trainer.databinding.ItemRoundPlanBinding
 import com.vampuck.pipa_trainer.dsp.StreamingAnalyzer
+import com.vampuck.pipa_trainer.training.RoundTiming
 import com.vampuck.pipa_trainer.training.TrainingConfig
 import com.vampuck.pipa_trainer.training.TrainingPlan
 import kotlin.concurrent.thread
@@ -97,7 +98,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private var currentPhase: TrainingPlan.Phase? = null
     private var phaseRound = -1
     private var roundStartMs = 0L
-    private var roundPausedMs = 0L
     // 「跳过本次训练」时记下这一轮已真实弹奏的毫秒数：阶段切换结算该轮时用它，
     // 否则会用 null（= 打满整轮）把被跳过的半截轮按整轮算、实测速度被低估成完整。
     private var skipWorkOverrideMs: Long? = null
@@ -778,7 +778,11 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             .setPositiveButton(R.string.strength_config_delete_ok) { _, _ ->
                 TrainingConfigStore.delete(this, c.name)
                 if (editingName == c.name) endEditConfig()
+                // 正在编的就是这套：把名字也一起放下。否则接着动一下速度，
+                // persistDraft() 会拿这个名字把刚删掉的配置又录回来。
+                if (TrainingConfig.sanitize(planName) == c.name) planName = ""
                 renderConfigs()
+                updateCurrentConfigBanner()
             }
             .show()
     }
@@ -840,11 +844,9 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             val now = SystemClock.elapsedRealtime()
             val delta = now - anchorMs
             anchorMs = now
-            if (paused) {
-                if (currentPhase == TrainingPlan.Phase.WORK) roundPausedMs += delta
-            } else {
-                elapsedMs += delta
-            }
+            // 暂停时**不**累加 elapsedMs：整条时间轴停在原地（恢复时重新锚定 anchorMs），
+            // 所以轮次结算的分母就是这一轮的时长本身，不需要另外记暂停时长。
+            if (!paused) elapsedMs += delta
             render()
             handler.postDelayed(this, TICK_MS)
         }
@@ -881,7 +883,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
                 roundLiveJitSum = 0.0
                 roundLiveSamples = 0
                 roundStartMs = elapsedMs
-                roundPausedMs = 0L
             }
             TrainingPlan.Phase.REST -> {
                 lastRestTick = -1
@@ -1179,8 +1180,10 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     private fun captureRoundResult(index: Int, playedMsOverride: Long?) {
         val r = roundAt(index) ?: return
-        val playedMs = playedMsOverride
-            ?: (r.durationSec * 1000L - roundPausedMs).coerceAtLeast(1L)
+        // 分母只认真实弹奏时长：暂停期间 elapsedMs 本来就不累加，所以跑满一轮时
+        // 就是这一轮的时长本身；旧代码又减一次「暂停累计」，等于扣了两遍 →
+        // 实测速度虚高（120s 轮次暂停 20s，5.0 音/秒会显示成 6.0）。见 RoundTiming。
+        val playedMs = RoundTiming.playedMs(r.durationSec, playedMsOverride)
         val strokes = if (useMic) (lastStrokes - roundStartStrokes).coerceAtLeast(0) else 0
         val measured = if (useMic && playedMs > 0) strokes * 1000.0 / playedMs else 0.0
         val jitter = if (roundLiveSamples > 0) roundLiveJitSum / roundLiveSamples else 0.0
@@ -1195,8 +1198,8 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun finishTraining(early: Boolean = false) {
         // 还没做完的那一次也计入小结（按已经弹过的时间算）
         if (running && early && currentPhase == TrainingPlan.Phase.WORK && phaseRound >= 0) {
-            // elapsedMs 在暂停时本来就不累加，再减 roundPausedMs 等于把暂停时间
-            // 扣了两次 → played 偏小 → 实测速度偏高。
+            // elapsedMs 在暂停时本来就不累加（暂停时长不在这一轮里），所以
+            // played 就取实弹时长；旧代码这里多减一次暂停累计会让速度虚高。
             val played = (elapsedMs - roundStartMs).coerceAtLeast(1000L)
             captureRoundResult(phaseRound, played)
         }

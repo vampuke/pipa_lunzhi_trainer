@@ -24,7 +24,7 @@
         <!-- 系统栏 -->
         <item name="android:statusBarColor">@color/pipa_primary_dark</item>
         <item name="android:navigationBarColor">@color/bg</item>
-        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">@bool/light_navigation_bar</item>
 
         <!--
             弹窗（AlertDialog.Builder / MaterialAlertDialogBuilder 都走这一支）单独套一层：

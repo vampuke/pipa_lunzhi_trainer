@@ -89,6 +89,11 @@ data class TrainingConfig(
         /**
          * 「草稿版」的收录规则（纯函数，供单测）：进页面自动记的那一份怎么进列表。
          *
+         * 关键约束：**未定名的草稿始终只占一条**。用户只是调速度/时长时，自动名
+         * （「1 次 · 60 BPM · 3 分」）会跟着变，如果每次改动都当新条目插入，连点 8 次
+         * 「速度 +」就把 8 条上限占满、把用户真正保存过的配置挤出列表——现象就是
+         * 「常用配置里全是 60/65/70…BPM，我自己存的不见了」。所以草稿据其下标就地替换。
+         *
          * @param namedNames 已经定名（用户显式保存/复制过）的名字集合
          * @return 新列表；返回值与 [current] 相同表示不需要改动
          */
@@ -105,8 +110,18 @@ data class TrainingConfig(
                 if (same.samePlanAs(draft)) return current
                 return current.map { if (it.name == draft.name) draft else it }
             }
-            // 没有同名：列表里已有同样计划的那条就别再插一条
+            // 没有同名的：列表里已有同样计划的那条就别再插一条
             if (current.any { it.samePlanAs(draft) }) return current
+            // 已有「未定名的草稿」（自动名随计划变，所以名字对不上）→ 就地把那一条换掉，
+            // 而不是新增。草稿永远只有一条。
+            val draftIdx = current.indexOfFirst { it.name !in namedNames }
+            if (draftIdx >= 0) {
+                return current.mapIndexed { i, c -> if (i == draftIdx) draft else c }
+            }
+            // 走到这里说明列表里全是用户显式保存的配置。名额满了就**不记**这条草稿——
+            // 宁可草稿不进列表，也不能把用户存好的配置挤掉（当前计划已经存在
+            // last_config 里，不会丢）。
+            if (current.count { it.name in namedNames } >= max) return current
             val out = current.toMutableList()
             out.add(0, draft)
             while (out.size > max) out.removeAt(out.size - 1)

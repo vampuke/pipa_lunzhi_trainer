@@ -205,4 +205,56 @@ class TrainingConfigTest {
         assertEquals(2, out.size)
         assertEquals("新计划", out[0].name)
     }
+
+    @Test
+    fun `only one unnamed draft is ever kept`() {
+        // 关键回归：未定名的草稿永远只占一条。用户调速度时自动名会跟着变
+        // （60→65→70 BPM…），旧规则每次当新条目插入，8 次就把上限占满、把用户
+        // 真正保存过的配置挤出列表。
+        var list = listOf(cfg("我的练习"))
+        var bpm = 60
+        for (i in 0 until 12) {
+            bpm += 5
+            val draft = cfg("1 次 · $bpm BPM · 3 分").copy(rounds = oneRound(bpm))
+            list = TrainingConfig.mergeDraft(list, draft, setOf("我的练习"), 8)
+        }
+        assertEquals(2, list.size)                                   // 用户那套 + 一条草稿
+        assertEquals("我的练习", list[1].name)                        // 没有被挤出列表
+        assertEquals("1 次 · 120 BPM · 3 分", list[0].name)           // 草稿是最新计划
+        assertEquals(oneRound(120), list[0].rounds)
+    }
+
+    @Test
+    fun `a second draft replaces the first even when it is not at index 0`() {
+        val list = listOf(cfg("甲").copy(rounds = oneRound(60)), cfg("乙").copy(rounds = oneRound(72)))
+        // 两条都未定名：只替换**第一条**草稿（列表里草稿本来最多一条，这条是脏数据兜底）
+        val out = TrainingConfig.mergeDraft(list, cfg("丙").copy(rounds = oneRound(90)), emptySet(), 8)
+        assertEquals(2, out.size)
+        assertEquals("丙", out[0].name)
+        assertEquals("乙", out[1].name)
+    }
+
+    @Test
+    fun `a named config is never treated as the draft slot`() {
+        val list = listOf(cfg("我的练习"), cfg("草稿").copy(rounds = oneRound(60)))
+        val out = TrainingConfig.mergeDraft(
+            list, cfg("草稿").copy(rounds = oneRound(96)), setOf("我的练习"), 8
+        )
+        assertEquals(2, out.size)
+        assertEquals("我的练习", out[0].name)
+        assertEquals(oneRound(96), out[1].rounds)                    // 还是就地更新
+    }
+
+    @Test
+    fun `a draft never evicts a saved config when the list is full`() {
+        // 8 条都已定名 → 草稿不进列表（当前计划存在 last_config 里，丢不了），
+        // 而不是把最旧的那套挤出去
+        val full = (0 until 8).map { cfg("配置$it").copy(rounds = oneRound(60 + it)) }
+        val out = TrainingConfig.mergeDraft(
+            full, cfg("新草稿").copy(rounds = oneRound(200)), full.map { it.name }.toSet(), 8
+        )
+        assertTrue(out === full)
+        assertEquals(8, out.size)
+        assertEquals("配置0", out[0].name)
+    }
 }
