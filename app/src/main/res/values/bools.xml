@@ -1,0 +1,11 @@
+<resources>
+    <!--
+        系统栏图标的明暗：
+        - 浅色模式导航栏底色是宣纸米白（@color/bg），要用**深色**图标；
+        - 深色模式导航栏底色是暖黑 #1A1614，深色图标压上去等于看不见，
+          必须切成浅色图标。
+        原来只在 values/themes.xml 里写死 true，于是深色模式下导航栏的三个键
+        几乎是黑的（对比度 ≈1.03:1）。用 bool 资源按模式分别取值。
+    -->
+    <bool name="light_navigation_bar">true</bool>
+</resources>

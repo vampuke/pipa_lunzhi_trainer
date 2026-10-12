@@ -18,7 +18,7 @@
     <color name="brand_text">#FF8C3A2B</color>
     <color name="brand_text_strong">#FF5E271E</color>
     <!-- 金色胶囊里的文字 -->
-    <color name="accent_chip_text">#FF9A6E26</color>
+    <color name="accent_chip_text">#FF7A5417</color>
 
     <!-- Material 3 容器 / 表面 token（暖木 + 宣纸米白） -->
     <color name="primary_container">#FFF7DED4</color>

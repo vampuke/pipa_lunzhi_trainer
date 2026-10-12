@@ -1,0 +1,4 @@
+<resources>
+    <!-- 深色模式：导航栏是暖黑底，用浅色图标（见 values/bools.xml 的说明）。 -->
+    <bool name="light_navigation_bar">false</bool>
+</resources>
