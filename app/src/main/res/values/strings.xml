@@ -173,6 +173,9 @@
     <string name="strength_restored">已恢复上次的配置「%1$s」</string>
     <string name="strength_plan_hint">每一次训练可以单独设定速度与时长（默认 2 分钟、60 BPM），点速度或时长可直接输入。次数随时可增可减。</string>
     <string name="strength_round_n">第 %1$d 次训练</string>
+    <string name="strength_round_speed">速度</string>
+    <string name="strength_round_duration">时长</string>
+    <string name="strength_round_remove">移除</string>
     <string name="strength_bpm_value">%1$d BPM</string>
     <string name="strength_bpm_sub">= %1$.1f 音/秒 · %2$d 音/分</string>
     <string name="strength_add_round">＋ 添加一次训练</string>
@@ -183,8 +186,8 @@
     <string name="strength_guide">引导音</string>
     <string name="strength_guide_beat">每拍一轮</string>
     <string name="strength_guide_stroke">每击一响</string>
-    <string name="strength_guide_hint_beat">每拍响一下（1 拍 = 1 轮 = 5 个音），先把整体节奏稳住。</string>
-    <string name="strength_guide_hint_stroke">引导音按目标速度逐音提示（每拍 5 响），适合卡速度、把每一击都对齐。</string>
+    <string name="strength_guide_hint_beat">每拍响一下（1 拍 = 1 轮 = 5 个音）。跟着它练整轮的律动：轮与轮之间的间隔稳不稳、起手有没有抢或拖——速度感由它带。</string>
+    <string name="strength_guide_hint_stroke">按目标速度逐音提示（每拍 5 响）。每一击都有参照，适合抠轮内落指的间距与力度是不是平均。</string>
     <string name="strength_accent">节拍重音</string>
     <string name="strength_summary">共 %1$d 次 · 训练 %2$s · 休息 %3$s · 合计 %4$s</string>
     <string name="strength_start">开始训练</string>
@@ -200,7 +203,7 @@
     <string name="strength_target">目标 %1$d BPM · %2$.1f 音/秒 · ≈ %3$d 音/分</string>
     <string name="strength_next_rest">做完休息 %1$d 秒，接着第 %2$d 次（%3$d BPM）</string>
     <string name="strength_next_last">这是最后一次训练，做完即结束</string>
-    <string name="strength_next_work">接下来第 %1$d 次 · %2$d BPM</string>
+    <string name="strength_rest_target">下一轮 第 %1$d 次 · 目标 %2$d BPM · %3$.1f 音/秒</string>
     <string name="strength_pause">暂停</string>
     <string name="strength_resume">继续</string>
     <string name="strength_skip">跳过当前阶段</string>
@@ -219,7 +222,7 @@
     <string name="strength_cannot_drop">正在进行的这一次不能取消</string>
     <string name="strength_dropped">已取消最后一次训练</string>
     <string name="strength_added">已追加一次训练</string>
-    <string name="strength_interrupted">训练已中断</string>
+    <string name="strength_paused_background">已自动暂停，回来点「继续」接着练</string>
     <string name="strength_quit_title">结束训练？</string>
     <string name="strength_quit_msg">确定要结束当前训练吗？</string>
     <string name="strength_quit_yes">结束</string>
@@ -227,6 +230,7 @@
     <string name="strength_done_title">训练完成</string>
     <string name="strength_end_title">训练结束</string>
     <string name="strength_summary_head">%1$s共完成 %2$d 次训练 · 用时 %3$s</string>
+    <string name="strength_summary_partial">（%1$d 次中途停下）</string>
     <string name="strength_summary_early">【提前结束】</string>
     <string name="strength_summary_round">第 %1$d 次 · 目标 %2$d BPM · %3$s</string>
     <string name="strength_summary_short"> · 实练 %1$s（提前结束）</string>

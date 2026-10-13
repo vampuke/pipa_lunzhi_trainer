@@ -90,6 +90,8 @@ class StrengthTrainingActivity : AppCompatActivity() {
     // 否则会用 null（= 打满整轮）把被跳过的半截轮按整轮算，小结里的实练时长就偏长。
     private var skipWorkOverrideMs: Long? = null
     private var lastRestTick = -1
+    /** [paused] 是被 [onStop] 切后台自动按下的（用来在回来时提示一句，而不是静默停下）。 */
+    private var pausedByBackground = false
 
     // ---- 引导音状态：当前在按哪一轮的速度响（-1 = 没响）----
     // 用来判断「要不要重启节拍器」：阶段切换时如果目标一样就不重启，
@@ -182,16 +184,39 @@ class StrengthTrainingActivity : AppCompatActivity() {
         v.updatePadding(bottom = v.paddingBottom + resources.getDimensionPixelSize(R.dimen.fab_clearance))
     }
 
+    /**
+     * 切后台（来电、切应用、锁屏）不再把整组训练作废——一组排下来可能 20 多分钟，
+     * 接个电话全没了代价太大。改成**自动暂停**：elapsedMs 原地不动，回来点「继续」
+     * 接着练。同时把 ticker 停掉，后台不必每 100ms 空转；屏幕也允许正常熄灭。
+     *
+     * 真正丢掉会话只剩一种情况：Activity 被销毁（进程回收 / 退到首页）——那需要
+     * 前台服务才能救，不在这次范围内。
+     */
     override fun onStop() {
         super.onStop()
-        if (running) {
-            Toast.makeText(this, R.string.strength_interrupted, Toast.LENGTH_LONG).show()
-            stopEverything()
-            b.setupGroup.visibility = View.VISIBLE
-            b.runGroup.visibility = View.GONE
-            b.btnStartTraining.visibility = View.VISIBLE
-            rebuildRoundRows()
-            updateSaveConfigButton()
+        if (running && !paused) {
+            paused = true
+            pausedByBackground = true
+            stopGuide()
+            b.btnPause.setText(R.string.strength_resume)
+            render()
+        }
+        handler.removeCallbacks(ticker)
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!running) return
+        // 重新锚定：后台那段时间不该算进训练。暂停中也不累加，所以两条路径都安全。
+        anchorMs = SystemClock.elapsedRealtime()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        handler.removeCallbacks(ticker)
+        handler.post(ticker)
+        render()
+        if (pausedByBackground) {
+            pausedByBackground = false
+            Toast.makeText(this, R.string.strength_paused_background, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -323,12 +348,14 @@ class StrengthTrainingActivity : AppCompatActivity() {
      *
      * 存的是 [planName]（用户起过/载入过的名字），**不再**用自动名覆盖——否则保存的
      * 名字永远留不下来。名字为空（从未定名）时才用自动名。
+     *
+     * 「上一次编辑的配置」本身也进常用列表：否则刚进页面时列表是空的，用户会以为
+     * 这里没东西、不知道怎么新增。显式保存过的那套被标记成「已定名」，草稿覆盖不了它。
+     * 两件事合成一次写盘（见 [TrainingConfigStore.saveLastAndRecordDraft]）。
      */
     private fun persistDraft() {
-        TrainingConfigStore.saveLast(this, currentConfig(displayName()))
-        // 「上一次编辑的配置」也进列表：否则刚进页面时常用配置是空的，用户会以为
-        // 这里没东西、不知道怎么新增。显式保存过的那套会被标记成「已定名」，不再被覆盖。
-        TrainingConfigStore.recordDraft(this, currentConfig(displayName()))
+        val cfg = currentConfig(displayName())
+        TrainingConfigStore.saveLastAndRecordDraft(this, cfg)
         updateCurrentConfigBanner()
     }
 
@@ -562,7 +589,12 @@ class StrengthTrainingActivity : AppCompatActivity() {
             askSaveLoadedChoice(loaded)
             return
         }
-        askSaveName(defaultSuggestion = editing ?: autoConfigName(), editing = editing)
+        // 这里（而不是 askSaveName 内部）决定「保留当前名字」：正在编辑时 editing 就是
+        // planName，等价；非编辑态优先沿用 planName，避免「再存一次」变成新增。
+        askSaveName(
+            suggestedName = TrainingConfig.sanitize(planName).ifBlank { editing ?: autoConfigName() },
+            editing = editing
+        )
     }
 
     /** 刚载入的那套还没改名：问清楚是「存成新的一套」还是「覆盖原来那套」。 */
@@ -588,7 +620,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
                             getString(R.string.strength_config_copy_suffix_n, root, n)
                         ); n++
                     }
-                    askSaveName(defaultSuggestion = suggest, editing = null)
+                    askSaveName(suggestedName = suggest, editing = null)
                 } else {
                     // 覆盖原配置：名字不变，直接存回它
                     planName = loaded
@@ -603,9 +635,16 @@ class StrengthTrainingActivity : AppCompatActivity() {
             .show()
     }
 
-    /** 起名并保存。editing != null 表示是「覆盖这一套」（改名会删掉旧名条目）。 */
-    private fun askSaveName(defaultSuggestion: String, editing: String?) {
-        val suggestion = TrainingConfig.sanitize(planName).ifBlank { defaultSuggestion }
+    /**
+     * 起名并保存。[editing] != null 表示是「覆盖这一套」（改名会删掉旧名条目）。
+     *
+     * [suggestedName] 就是弹窗里**预填**的名字，调用方说了算——这里不再回落 [planName]。
+     * 原来那版写的是 `sanitize(planName).ifBlank { defaultSuggestion }`，于是「另存为
+     * 新配置」传进来的「X 副本」被丢掉、预填成刚载入的「X」，用户直接点确定就把原配置
+     * 覆盖了（按钮上写的却是「不动原来那套」）。谁想要「沿用当前名字」就自己传。
+     */
+    private fun askSaveName(suggestedName: String, editing: String?) {
+        val suggestion = TrainingConfig.sanitize(suggestedName).ifBlank { autoConfigName() }
         val field = textField(suggestion, R.string.strength_config_name_field)
         MaterialAlertDialogBuilder(this)
             .setTitle(
@@ -714,6 +753,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
         results.clear()
         running = true
         paused = false
+        pausedByBackground = false
         elapsedMs = 0L
         anchorMs = SystemClock.elapsedRealtime()
         currentPhase = null
@@ -885,13 +925,16 @@ class StrengthTrainingActivity : AppCompatActivity() {
                 b.countdownValue.text = mmss(st.remainingSec)
                 b.countdownLabel.setText(R.string.strength_rest_remaining)
                 b.runProgress.progress = progressOf(st)
+                // 休息时只讲**即将开始**的那一轮（第几次 + 目标速度）。原来这里
+                // targetSpeed 与 nextSpeed 都在说同一轮，大字号那句又容易被读成
+                // 「刚才那次」；「第 N / M 次」在上面的 runRoundLabel 里已经有了。
                 val r = roundAt(st.roundIndex)
                 if (r != null) {
                     b.targetSpeed.text = getString(
-                        R.string.strength_target, r.bpm, r.cps, r.strokesPerMin.roundToInt()
+                        R.string.strength_rest_target, st.roundIndex + 1, r.bpm, r.cps
                     )
-                    b.nextSpeed.text = getString(R.string.strength_next_work, st.roundIndex + 1, r.bpm)
                 }
+                b.nextSpeed.text = ""
                 // 休息最后几秒的节拍由 updateGuide() 提前起；没开提前起拍时，
                 // 仍然用 3 声轻响提示准备起手（两者不会同时响）。
                 if (plan.preroll(elapsedMs / 1000.0) == null) {
@@ -915,6 +958,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
     private fun togglePause() {
         if (!running) return
         paused = !paused
+        pausedByBackground = false
         if (paused) {
             stopGuide()
         } else {
@@ -965,6 +1009,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
     private fun stopEverything() {
         running = false
         paused = false
+        pausedByBackground = false
         handler.removeCallbacks(ticker)
         stopGuide()
         try { metronome.stop() } catch (_: Throwable) {}
@@ -1002,13 +1047,18 @@ class StrengthTrainingActivity : AppCompatActivity() {
         stopEverything()
 
         val sb = StringBuilder()
+        // 「共完成 N 次」只数**打满整轮**的：提前结束时那半截轮也进了 results，
+        // 但它写的是「实练 0:05（提前结束）」，跟「完成」并排放自相矛盾。
+        val done = results.count { it.full }
+        val partial = results.size - done
         sb.append(
             getString(
                 R.string.strength_summary_head,
                 if (early) getString(R.string.strength_summary_early) else "",
-                results.size, mmss(usedMs / 1000.0)
+                done, mmss(usedMs / 1000.0)
             )
         )
+        if (partial > 0) sb.append(getString(R.string.strength_summary_partial, partial))
         sb.append('\n')
         results.forEach { r ->
             sb.append('\n')
