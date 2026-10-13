@@ -1,7 +1,7 @@
 package com.vampuck.pipa_trainer.training
 
 /**
- * 指力训练的分次计划与时间轴（纯 Kotlin，无 Android 依赖，便于单元测试）。
+ * 基本功的分次计划与时间轴（纯 Kotlin，无 Android 依赖，便于单元测试）。
  *
  * 时间轴：
  *   倒数 5 秒 → 第 1 次训练 → 休息 30 秒 → 第 2 次训练 → 休息 30 秒 → … → 第 N 次训练 → 完成

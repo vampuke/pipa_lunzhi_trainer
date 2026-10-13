@@ -13,7 +13,7 @@
         android:layout_height="48dp"
         android:background="@drawable/bg_icon_circle"
         android:padding="12dp"
-        android:src="@drawable/ic_file"
+        android:src="@drawable/ic_strength"
         android:scaleType="fitCenter"
         android:contentDescription="@null" />
 
@@ -28,7 +28,7 @@
             android:id="@+id/featTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/feat_file_title"
+            android:text="@string/feat_strength_title"
             android:textSize="17sp"
             android:textStyle="bold"
             android:textColor="@color/text_primary" />
@@ -38,7 +38,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
-            android:text="@string/feat_file_sub"
+            android:text="@string/feat_strength_sub"
             android:textSize="13sp"
             android:textColor="@color/text_secondary" />
     </LinearLayout>

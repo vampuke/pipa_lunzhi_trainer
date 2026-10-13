@@ -1,10 +1,5 @@
 package com.vampuck.pipa_trainer
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,9 +12,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.view.updatePadding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
@@ -29,32 +22,28 @@ import com.vampuck.pipa_trainer.audio.TonePlayer
 import com.vampuck.pipa_trainer.data.TrainingConfigStore
 import com.vampuck.pipa_trainer.databinding.ActivityStrengthTrainingBinding
 import com.vampuck.pipa_trainer.databinding.ItemRoundPlanBinding
-import com.vampuck.pipa_trainer.dsp.StreamingAnalyzer
 import com.vampuck.pipa_trainer.training.RoundTiming
 import com.vampuck.pipa_trainer.training.TrainingConfig
 import com.vampuck.pipa_trainer.training.TrainingPlan
-import kotlin.concurrent.thread
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
- * 指力训练：分次练习轮指。
+ * 基本功：分次练习轮指。
  *
- * 开始前先排好计划——每次训练有**独立的速度**（音/秒）与时长（默认 2:00），
+ * 开始前先排好计划——每次训练有**独立的速度**（BPM）与时长（默认 2:00），
  * 次数可任意增删；每次之间自动休息 30 秒（可调）。点「开始训练」后倒数 5 秒
  * 进入第一次，之后「训练 → 休息 → 训练 → …」自动衔接。
  *
  * 训练中：
  *  - 引导音按目标速度走（[guidePerBeat]：每拍一轮 / 每击一响），训练开始自动响、休息自动停；
- *  - 开麦时可以实时看到自己**实际**的速度与均匀度（复用 [StreamingAnalyzer]，
- *    引导音用时间遮蔽剔除，与「实时练习」同一套规则）；
  *  - 可随时暂停 / 跳过当前阶段 / 追加一次 / 取消还没开始的次数 / 结束训练。
  *
  * 时间轴交给纯逻辑的 [TrainingPlan]（有单元测试），界面每次 tick 用
  * [SystemClock.elapsedRealtime] 重算已过去的秒数并映射到阶段，因此暂停、跳过、
  * 增删次数都不会让计时漂移或错位。
  */
-class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
+class StrengthTrainingActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityStrengthTrainingBinding
 
@@ -65,7 +54,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     // ---- 设置项 ----
     private var guidePerBeat = true      // true = 每拍一轮（整拍）；false = 每击一响（轮指模式）
     private var accentFirst = true       // true = 强调每小节首拍；false = 每拍相同
-    private var useMic = true
     private var syncingSwitches = false
 
     /**
@@ -99,7 +87,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private var phaseRound = -1
     private var roundStartMs = 0L
     // 「跳过本次训练」时记下这一轮已真实弹奏的毫秒数：阶段切换结算该轮时用它，
-    // 否则会用 null（= 打满整轮）把被跳过的半截轮按整轮算、实测速度被低估成完整。
+    // 否则会用 null（= 打满整轮）把被跳过的半截轮按整轮算，小结里的实练时长就偏长。
     private var skipWorkOverrideMs: Long? = null
     private var lastRestTick = -1
 
@@ -110,34 +98,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private var guideBpm = -1
     private var guideMode = -1
 
-    // ---- 环境声统计 ----
-    private val sampleRate = 44100
-    @Volatile private var recording = false
-    private var recordThread: Thread? = null
-    @Volatile private var analyzer: StreamingAnalyzer? = null
-    @Volatile private var recorder: AudioRecord? = null
-    private var lastStrokes = 0
-    private var roundStartStrokes = 0
-    private var roundLiveCpsSum = 0.0
-    private var roundLiveJitSum = 0.0
-    private var roundLiveSamples = 0
-
     private val results = ArrayList<RoundResult>()
-
-    private var pendingStart = false
-
-    private val micPerm = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (!pendingStart) return@registerForActivityResult
-        pendingStart = false
-        if (!granted) {
-            useMic = false
-            syncMicSwitch()
-            Toast.makeText(this, R.string.need_mic, Toast.LENGTH_LONG).show()
-        }
-        beginTraining()
-    }
 
     // ---------------- 生命周期 ----------------
 
@@ -146,7 +107,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         b = ActivityStrengthTrainingBinding.inflate(layoutInflater)
         setContentView(b.root)
 
-        metronome.listener = this
+        // 引导音只负责发声：不再有麦克风统计，所以不需要注册节拍回调。
         metronome.setAccentFirst(accentFirst)
         metronome.setMode(Metronome.MODE_QUARTER)
         metronome.onError = { msg -> runOnUiThread { toast("节拍器无法播放：$msg") } }
@@ -167,32 +128,12 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         b.guideGroup.check(if (guidePerBeat) R.id.btnGuideBeat else R.id.btnGuideStroke)
         b.guideGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked || syncingSwitches) return@addOnButtonCheckedListener
-            val beat = checkedId == R.id.btnGuideBeat
-            if (!beat && useMic) {
-                // 每击一响的引导音与击弦同频，遮蔽窗会吃掉大量真实起音，统计必然失真。
-                useMic = false
-                syncMicSwitch()
-                Toast.makeText(this, R.string.strength_mic_off_for_stroke, Toast.LENGTH_LONG).show()
-            }
-            guidePerBeat = beat
+            guidePerBeat = checkedId == R.id.btnGuideBeat
             updateGuideHint()
             persistDraft()
         }
 
-        b.switchMic.setOnCheckedChangeListener { _, on ->
-            if (syncingSwitches) return@setOnCheckedChangeListener
-            if (on && !guidePerBeat) {
-                guidePerBeat = true
-                b.guideGroup.check(R.id.btnGuideBeat)
-                updateGuideHint()
-                Toast.makeText(this, R.string.strength_guide_switched, Toast.LENGTH_LONG).show()
-            }
-            useMic = on
-            updateMicHint()
-            persistDraft()
-        }
-
-        b.btnStartTraining.setOnClickListener { onStartTraining() }
+        b.btnStartTraining.setOnClickListener { beginTraining() }
 
         b.btnPause.setOnClickListener { togglePause() }
         b.btnSkip.setOnClickListener { skipStage() }
@@ -210,9 +151,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             }
         })
 
-        syncMicSwitch()
         updateGuideHint()
-        updateMicHint()
         b.btnSaveConfig.setOnClickListener { askSaveConfig() }
         restoreLastConfig()
         updateCurrentConfigBanner()   // 无「上次配置」时也要显示「新计划」横幅
@@ -259,9 +198,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     override fun onDestroy() {
         super.onDestroy()
         stopEverything()
-        // 与 Live/Metronome 两页一致：销毁后清掉监听者，别让节拍器工作线程的回调
-        // 打到已销毁的 Activity/binding（stopEverything 只 stop()，不置空，以便 onStop 后能重开）。
-        metronome.listener = null
     }
 
     // ---------------- 计划编辑（设置页） ----------------
@@ -302,17 +238,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         b.guideHint.setText(
             if (guidePerBeat) R.string.strength_guide_hint_beat else R.string.strength_guide_hint_stroke
         )
-    }
-
-    private fun updateMicHint() {
-        b.micHint.setText(if (useMic) R.string.strength_mic_hint else R.string.strength_mic_off_hint)
-    }
-
-    private fun syncMicSwitch() {
-        syncingSwitches = true
-        b.switchMic.isChecked = useMic
-        syncingSwitches = false
-        updateMicHint()
     }
 
     private fun roundAt(i: Int): TrainingPlan.Round? = plan.rounds.getOrNull(i)
@@ -391,7 +316,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         TrainingConfig.autoName(plan.rounds, plan.restSec, plan.leadInSec)
 
     private fun currentConfig(name: String): TrainingConfig =
-        TrainingConfig.of(plan, name, guidePerBeat, accentFirst, useMic)
+        TrainingConfig.of(plan, name, guidePerBeat, accentFirst)
 
     /**
      * 每次改动都存一份「上一次编辑的配置」，下次进来自动恢复。
@@ -429,17 +354,13 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         loadedFrom = null          // 由 loadConfig/beginEditConfig 按需设置
         guidePerBeat = c.guidePerBeat
         accentFirst = c.accentFirst
-        useMic = c.useMic
-        if (!guidePerBeat && useMic) useMic = false      // 与手动切换同一条规则
         syncingSwitches = true
         b.guideGroup.check(if (guidePerBeat) R.id.btnGuideBeat else R.id.btnGuideStroke)
         b.accentGroup.check(if (accentFirst) R.id.btnAccentFirst else R.id.btnAccentSame)
-        b.switchMic.isChecked = useMic
         syncingSwitches = false
         metronome.setAccentFirst(accentFirst)
         b.restValue.text = getString(R.string.strength_rest_value, plan.restSec)
         updateGuideHint()
-        updateMicHint()
         rebuildRoundRows()
         persistDraft()
         if (announce) toast(getString(R.string.strength_config_loaded, c.name))
@@ -547,17 +468,14 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         plan.leadInSec = TrainingPlan.DEFAULT_LEAD_IN_SEC
         guidePerBeat = true
         accentFirst = true
-        useMic = true
         planName = ""
         syncingSwitches = true
         b.guideGroup.check(R.id.btnGuideBeat)
         b.accentGroup.check(R.id.btnAccentFirst)
-        b.switchMic.isChecked = true
         syncingSwitches = false
         metronome.setAccentFirst(accentFirst)
         b.restValue.text = getString(R.string.strength_rest_value, plan.restSec)
         updateGuideHint()
-        updateMicHint()
         rebuildRoundRows()
         endEditConfig()
         renderConfigs()
@@ -789,19 +707,10 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
 
     // ---------------- 训练流程 ----------------
 
-    private fun onStartTraining() {
-        if (plan.rounds.isEmpty()) return
-        if (useMic && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            pendingStart = true
-            micPerm.launch(Manifest.permission.RECORD_AUDIO)
-            return
-        }
-        beginTraining()
-    }
-
     private fun beginTraining() {
+        // 计划为空时不该进训练流程（原来的 onStartTraining 就有这道守卫，改用
+        // beginTraining 直接绑按钮时别丢）：去掉麦克风权限分支后仍要保留。
+        if (plan.rounds.isEmpty()) return
         results.clear()
         running = true
         paused = false
@@ -809,8 +718,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         anchorMs = SystemClock.elapsedRealtime()
         currentPhase = null
         phaseRound = -1
-        lastStrokes = 0
-        roundStartStrokes = 0
         lastRestTick = -1
         guideRound = -1
         guideBpm = -1
@@ -819,10 +726,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         b.setupGroup.visibility = View.GONE
         b.runGroup.visibility = View.VISIBLE
         b.btnStartTraining.visibility = View.GONE
-        b.micCard.visibility = if (useMic) View.VISIBLE else View.GONE
-        b.liveSpeed.setText(R.string.strength_live_placeholder)
-        b.liveDetail.text = ""
-        b.micHintRun.text = ""
         b.btnPause.setText(R.string.strength_pause)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -833,7 +736,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         TrainingConfigStore.putDistinct(this, currentConfig(displayName()))
         renderConfigs()
 
-        if (useMic) startMic()
         handler.post(ticker)
         render()
     }
@@ -864,7 +766,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             phaseRound = st.roundIndex
             if (prevPhase == TrainingPlan.Phase.WORK && prevRound >= 0) {
                 // 正常跑完一轮 → null（打满整轮）；被「跳过」提前离开 → 用实际弹奏时长，
-                // 否则半截轮按整轮算、实测速度被低估成完整。
+                // 否则半截轮按整轮算，小结里的实练时长就偏长。
                 captureRoundResult(prevRound, skipWorkOverrideMs)
             }
             skipWorkOverrideMs = null
@@ -878,10 +780,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun onEnter(st: TrainingPlan.Stage) {
         when (st.phase) {
             TrainingPlan.Phase.WORK -> {
-                roundStartStrokes = lastStrokes
-                roundLiveCpsSum = 0.0
-                roundLiveJitSum = 0.0
-                roundLiveSamples = 0
                 roundStartMs = elapsedMs
             }
             TrainingPlan.Phase.REST -> {
@@ -934,15 +832,12 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         metronome.setAccentFirst(accentFirst)
         metronome.setMode(mode)
         metronome.setBpm(r.bpmD)
-        // 遮蔽周期与目标一致：提前起的这几拍也要被挡掉，否则会被当成真实起音
-        analyzer?.setMetronomeBeat(if (guidePerBeat) 60.0 / r.bpmD else 60.0 / (r.bpmD * 5))
         metronome.start()
     }
 
     private fun stopGuide() {
         if (guideRound >= 0 || metronome.isRunning) {
             metronome.stop()
-            analyzer?.clearMetronomeClicks()
         }
         guideRound = -1
         guideBpm = -1
@@ -1034,7 +929,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         if (!running || paused) return
         val sec = elapsedMs / 1000.0
         // 若正跳过一轮 WORK，记下它已真实弹奏的时长，供下一 tick 结算该轮时用——
-        // 不记就会用 null（打满整轮）把半截轮按整轮算、实测速度被低估成完整。
+        // 不记就会用 null（打满整轮）把半截轮按整轮算，实练时长偏长。
         if (currentPhase == TrainingPlan.Phase.WORK && phaseRound >= 0) {
             skipWorkOverrideMs = (elapsedMs - roundStartMs).coerceAtLeast(1000L)
         }
@@ -1067,104 +962,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             .show()
     }
 
-    // ---------------- 环境声统计 ----------------
-
-    private fun startMic() {
-        val minBuf = AudioRecord.getMinBufferSize(
-            sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
-        )
-        val bufSize = maxOf(minBuf, sampleRate / 4) * 2
-        val recorder = try {
-            AudioRecord(
-                MediaRecorder.AudioSource.MIC, sampleRate,
-                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize
-            )
-        } catch (e: Throwable) {
-            null
-        }
-        if (recorder == null || recorder.state != AudioRecord.STATE_INITIALIZED) {
-            try { recorder?.release() } catch (_: Throwable) {}
-            useMic = false
-            b.micCard.visibility = View.GONE
-            syncMicSwitch()
-            toast(R.string.strength_mic_failed)
-            return
-        }
-        val an = StreamingAnalyzer(sampleRate)
-        an.setMetronomeBeat(1.0)
-        analyzer = an
-        recording = true
-        try {
-            recorder.startRecording()
-        } catch (e: Throwable) {
-            recorder.release()
-            useMic = false
-            b.micCard.visibility = View.GONE
-            syncMicSwitch()
-            toast(R.string.strength_mic_failed)
-            return
-        }
-        this@StrengthTrainingActivity.recorder = recorder
-        recordThread = thread(name = "strength-mic") {
-            val shortBuf = ShortArray(sampleRate / 10)
-            val floatBuf = FloatArray(shortBuf.size)
-            while (recording) {
-                val n = try { recorder.read(shortBuf, 0, shortBuf.size) } catch (e: Throwable) { -1 }
-                if (n > 0) {
-                    for (i in 0 until n) floatBuf[i] = shortBuf[i] / 32768f
-                    val live = an.push(floatBuf, n)
-                    runOnUiThread { onLive(live) }
-                }
-            }
-            try { recorder.stop() } catch (_: Throwable) {}
-            try { recorder.release() } catch (_: Throwable) {}
-        }
-    }
-
-    /** 引导音的回调：映射到分析器自己的时钟，喂给它做时间遮蔽。 */
-    override fun onClick(beatIndex: Long, audibleNanos: Long) {
-        val an = analyzer ?: return
-        val t = an.currentTimeSec() + (audibleNanos - System.nanoTime()) / 1_000_000_000.0
-        if (t > 0) an.addMetronomeClick(t)
-    }
-
-    private fun onLive(live: StreamingAnalyzer.Live) {
-        if (!running) return
-        lastStrokes = live.totalStrokes
-        if (currentPhase == TrainingPlan.Phase.WORK && !paused) {
-            roundLiveCpsSum += live.strokesPerSec
-            roundLiveJitSum += live.jitterPct
-            roundLiveSamples++
-        }
-        if (!useMic || b.micCard.visibility != View.VISIBLE) return
-        b.liveSpeed.text = if (live.strokesPerSec > 0.2) {
-            getString(R.string.strength_live_speed, live.strokesPerSec)
-        } else {
-            getString(R.string.strength_live_placeholder)
-        }
-        b.liveDetail.text = getString(
-            R.string.strength_live_detail, live.totalStrokes, live.jitterPct.roundToInt()
-        )
-        // 第一次训练进行 6 秒仍一无所获时给一句可操作的提示
-        b.micHintRun.text = if (currentPhase == TrainingPlan.Phase.WORK &&
-            lastStrokes == 0 && elapsedMs - roundStartMs > 6000
-        ) {
-            getString(R.string.strength_no_stroke)
-        } else {
-            ""
-        }
-    }
-
-    private fun stopMic() {
-        recording = false
-        // 先打断阻塞中的 read()，再 join：否则主线程最多干等 500ms。
-        try { recorder?.stop() } catch (_: Throwable) {}
-        recorder = null
-        recordThread?.join(300)
-        recordThread = null
-        analyzer = null
-    }
-
     private fun stopEverything() {
         running = false
         paused = false
@@ -1172,7 +969,6 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         stopGuide()
         try { metronome.stop() } catch (_: Throwable) {}
         try { tone.stop() } catch (_: Throwable) {}
-        stopMic()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
@@ -1181,16 +977,15 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private fun captureRoundResult(index: Int, playedMsOverride: Long?) {
         val r = roundAt(index) ?: return
         // 分母只认真实弹奏时长：暂停期间 elapsedMs 本来就不累加，所以跑满一轮时
-        // 就是这一轮的时长本身；旧代码又减一次「暂停累计」，等于扣了两遍 →
-        // 实测速度虚高（120s 轮次暂停 20s，5.0 音/秒会显示成 6.0）。见 RoundTiming。
+        // 就是这一轮的时长本身；被「跳过」提前离开时用实际弹奏时长。
         val playedMs = RoundTiming.playedMs(r.durationSec, playedMsOverride)
-        val strokes = if (useMic) (lastStrokes - roundStartStrokes).coerceAtLeast(0) else 0
-        val measured = if (useMic && playedMs > 0) strokes * 1000.0 / playedMs else 0.0
-        val jitter = if (roundLiveSamples > 0) roundLiveJitSum / roundLiveSamples else 0.0
         results.add(
             RoundResult(
-                index = index, targetBpm = r.bpm, strokes = strokes, measuredCps = measured,
-                jitterPct = jitter, mic = useMic, full = playedMsOverride == null
+                index = index,
+                targetBpm = r.bpm,
+                plannedSec = r.durationSec,
+                playedSec = playedMs / 1000.0,
+                full = playedMsOverride == null
             )
         )
     }
@@ -1199,7 +994,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
         // 还没做完的那一次也计入小结（按已经弹过的时间算）
         if (running && early && currentPhase == TrainingPlan.Phase.WORK && phaseRound >= 0) {
             // elapsedMs 在暂停时本来就不累加（暂停时长不在这一轮里），所以
-            // played 就取实弹时长；旧代码这里多减一次暂停累计会让速度虚高。
+            // played 就取实弹时长。
             val played = (elapsedMs - roundStartMs).coerceAtLeast(1000L)
             captureRoundResult(phaseRound, played)
         }
@@ -1220,23 +1015,11 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             sb.append(
                 getString(
                     R.string.strength_summary_round, r.index + 1, r.targetBpm,
-                    mmss(plan.rounds.getOrNull(r.index)?.durationSec?.toDouble() ?: 0.0)
+                    mmss(r.plannedSec.toDouble())
                 )
             )
-            sb.append('\n')
-            sb.append(
-                if (r.mic && r.strokes > 0) {
-                    getString(
-                        R.string.strength_summary_measured, r.measuredCps, r.strokes,
-                        r.jitterPct.roundToInt()
-                    )
-                } else {
-                    getString(R.string.strength_summary_nomic)
-                }
-            )
-            if (!r.full) sb.append(getString(R.string.strength_summary_short))
+            if (!r.full) sb.append(getString(R.string.strength_summary_short, mmss(r.playedSec)))
         }
-        sb.append("\n\n").append(getString(R.string.strength_summary_note))
 
         if (isFinishing || isDestroyed) return
         MaterialAlertDialogBuilder(this)
@@ -1248,7 +1031,7 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
             .show()
     }
 
-    /** 训练收尾后：停在指力训练页的设置界面，重置按钮与计时状态。 */
+    /** 训练收尾后：停在基本功页的设置界面，重置按钮与计时状态。 */
     private fun returnToSetup() {
         if (isFinishing || isDestroyed) return
         b.runGroup.visibility = View.GONE
@@ -1304,10 +1087,8 @@ class StrengthTrainingActivity : AppCompatActivity(), Metronome.Listener {
     private class RoundResult(
         val index: Int,
         val targetBpm: Int,
-        val strokes: Int,
-        val measuredCps: Double,
-        val jitterPct: Double,
-        val mic: Boolean,
+        val plannedSec: Int,
+        val playedSec: Double,
         val full: Boolean
     )
 

@@ -1,29 +1,10 @@
 # 轮指大作战 (Pipa Lunzhi Trainer)
 
-Android app for pipa **lunzhi** (tremolo / 轮指) practice — the display name is
-**轮指大作战**. Analyze a recorded audio/video file or practise live from the
-microphone.
+Android app for pipa practice. The display name is **轮指大作战**.
 
 ## Features
 
-**File analysis mode**
-- Pick any audio file (m4a / mp3 / wav / ogg — anything the device can decode).
-- Runs the same pipeline as the reference Python analysis:
-  - spectral-flux onset detection (FFT win=1024, hop=128)
-  - adaptive peak-picking → stroke onsets
-  - strokes/sec, strokes/min, roll-cycles/sec (5-stroke)
-  - evenness via inter-onset-interval **coefficient of variation (CV)**
-  - per-position loudness via 5-stroke fold (finger-strength profile)
-- Charts: onset envelope with stroke markers, IOI-over-time scatter, per-position loudness bars.
-- Graded report (A/B/C/D) with concrete advice.
-
-**Live microphone mode**
-- Streaming `AudioRecord` capture at 44.1 kHz, 100 ms blocks.
-- Real-time rolling **strokes/min**, **evenness CV**, stroke count, and a
-  live loudness bar.
-- Tap **Stop** to get a full-session evaluation (same metrics + finger profile).
-
-**Interval training (指力训练)**
+**基本功（分次定时训练）**
 - Build a plan of training rounds before you start: each round has its own
   target speed (**metronome BPM**, 60 BPM = 5 strokes/s) and length (default
   2:00), and rounds can be added or removed at any time.
@@ -32,18 +13,25 @@ microphone.
 - Guide click in 每拍一轮 (one click per 轮) or 每击一响 (one click per stroke),
   with the accent set to 强调首拍 or 每拍相同.
 - **Remembers your last plan** and keeps up to 8 reusable configs (tap a chip to
-  load, long-press to delete); configs are recorded automatically when a
-  session starts.
-- With the microphone on, the live readout shows your *actual* strokes/sec and
-  evenness during each round, and a per-round summary when the session ends.
+  load, long-press to edit / duplicate / delete); configs are recorded
+  automatically when a session starts.
+
+**调音器**
+- Pipa (D 调正调 A-d-e-a), guzheng (21 strings) and guitar (EADGBE) tunings.
+- Note name + cents, per-string rows, reference tones.
+
+**节拍器**
+- 四分·整拍 / 二八·分拍 / 轮指（每拍 5 响）, accent switching, common tempo presets.
+
+**名曲跟练**
+- Preset pieces with section structure and a reference tempo; overall and
+  per-section progress.
+- Import your own scores as JSON, or build them in the visual score editor.
 
 ## Metrics — how to read them
 
-- **CV (evenness):** lower is better. ≤0.12 A (near-professional), ≤0.20 B,
-  ≤0.30 C, >0.30 D.
-- **Finger profile:** if position-to-position spread is < ~1.2×, unevenness is
-  mostly random stroke-to-stroke; a persistently weak position points at a
-  weak finger (typically ring/little for late positions).
+- **BPM ↔ speed:** 轮指每拍 5 响，所以 音/秒 = BPM ÷ 12、音/分 = BPM × 5
+  (60 BPM = 5 音/秒 = 300 音/分).
 
 ## Build
 
@@ -55,11 +43,10 @@ Local build (needs Android SDK + JDK 17):
 
 ```bash
 ./gradlew assembleDebug
-./gradlew testDebugUnitTest   # DSP validation on synthetic click trains
+./gradlew testDebugUnitTest
 ```
 
 ## Stack
 
 - Kotlin, minSdk 24, targetSdk 34
-- Pure-Kotlin FFT + DSP (no native deps)
-- MPAndroidChart for visualization
+- Pure-Kotlin audio (no native deps)

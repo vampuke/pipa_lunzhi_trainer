@@ -1,39 +1,15 @@
 <resources>
     <string name="app_name">轮指大作战</string>
     <string name="title_home">轮指大作战</string>
-    <string name="subtitle_home">分析你的轮指练习：速度 · 均匀度 · 力度</string>
-    <string name="feat_file_title">音频 / 视频分析</string>
-    <string name="feat_file_sub">导入录音，评估速度 · 均匀度 · 力度</string>
-    <string name="feat_live_title">实时练习</string>
-    <string name="feat_live_sub">边弹边看，整段评估轮指表现</string>
+    <string name="subtitle_home">从基本功练到成曲：分次定时 · 跟谱陪练 · 调音定弦</string>
     <string name="feat_tuner_title">调音器</string>
     <string name="feat_tuner_sub">琵琶 · 古筝 · 吉他，音名 + 音分</string>
     <string name="feat_metronome_title">节拍器</string>
     <string name="feat_metronome_sub">整拍 / 分拍 · 重音切换 · 常用速度</string>
     <string name="feat_play_title">名曲跟练</string>
     <string name="feat_play_sub">预设经典曲目，按速度显示段落与实时进度</string>
-    <string name="btn_pick_file">分析音频 / 视频文件</string>
-    <string name="btn_live">麦克风实时练习</string>
     <string name="btn_start">开始</string>
-    <string name="btn_stop">结束并评估</string>
-    <string name="live_hint">开始后弹奏轮指，指标会实时更新；点「结束并评估」查看整段评价。\n开头约半秒用于测量环境底噪，这期间的击数不计；先按「开始」再起手更准。</string>
-    <string name="metric_bpm">速度（音/分）</string>
-    <string name="metric_cps">速度（音/秒）</string>
-    <string name="metric_cv">均匀度</string>
-    <string name="metric_strokes">已检测音数</string>
-    <string name="analyzing">正在分析…</string>
-    <string name="need_mic">实时模式需要麦克风权限。</string>
-    <string name="analysis_done">分析完成</string>
-    <string name="sec_speed">速度</string>
-    <string name="sec_even">均匀度</string>
-    <string name="sec_finger">轮内各位力度</string>
-    <string name="chart_flux">起音波形与检测到的每一击</string>
-    <string name="chart_ioi">相邻音间隔随时间变化（毫秒，越平越匀）</string>
-    <string name="chart_finger">轮内各位力度（以第1击为第1位，%）</string>
-    <string name="chart_window">分段稳定度（每5秒）</string>
-    <string name="metronome">节拍器</string>
     <string name="metro_bpm">速度 (BPM)</string>
-    <string name="metro_note">提示：节拍器声会被算法自动剔除，不会被记为轮指击弦</string>
 
     <!-- 独立节拍器 -->
     <string name="btn_metronome">节拍器</string>
@@ -50,10 +26,6 @@
     <string name="metro_start">开始</string>
     <string name="metro_stop">停止</string>
     <string name="metro_hint">「四分·整拍」每拍一响，4 个指示器；「二八·分拍」每拍 2 响共 8 响、8 个指示器（「每拍相同」八响同一个声音，「强调首拍」只有整小节第 1 响不同）；「轮指·每拍5响」每拍均匀响 5 次、无指示器只发声（「强调首拍」每拍第 1 响不同，「每拍相同」五响一样）。速度 20–200，可用 −/+ 微调或点常用速度快捷跳转。</string>
-
-    <string name="lbl_loudness">当前击弦力度</string>
-    <string name="gate_quiet">环境安静，未检测到信号</string>
-    <string name="gate_active">录音中 · 环境门已开启</string>
 
     <!-- 调音器 -->
     <string name="btn_tuner">调音器</string>
@@ -117,7 +89,7 @@
     <string name="play_click_off">节拍器声：关</string>
     <string name="play_score">简谱（跟练高亮当前音符）</string>
     <string name="play_has_score">含简谱</string>
-    <string name="play_disclaimer">提示：进度按你设定的速度匀速推进，用来帮你把握段落节奏与整体结构；真实演奏的快慢处理可自行伸缩。配合「实时练习」可同时检查你的轮指均匀度。</string>
+    <string name="play_disclaimer">提示：进度按你设定的速度匀速推进，用来帮你把握段落节奏与整体结构；真实演奏的快慢处理可自行伸缩。</string>
 
     <!-- 导入自定义简谱 -->
     <string name="import_title">导入简谱</string>
@@ -211,12 +183,9 @@
     <string name="strength_guide">引导音</string>
     <string name="strength_guide_beat">每拍一轮</string>
     <string name="strength_guide_stroke">每击一响</string>
-    <string name="strength_guide_hint_beat">每拍响一下（1 拍 = 1 轮 = 5 个音），先把整体节奏稳住。麦克风统计需要这个模式。</string>
-    <string name="strength_guide_hint_stroke">引导音按目标速度逐音提示（每拍 5 响），适合卡速度；此时引导音会被麦克风当成击弦，统计已自动关闭。</string>
+    <string name="strength_guide_hint_beat">每拍响一下（1 拍 = 1 轮 = 5 个音），先把整体节奏稳住。</string>
+    <string name="strength_guide_hint_stroke">引导音按目标速度逐音提示（每拍 5 响），适合卡速度、把每一击都对齐。</string>
     <string name="strength_accent">节拍重音</string>
-    <string name="strength_mic">环境声统计（麦克风）</string>
-    <string name="strength_mic_hint">开：实时显示你实际的速度与均匀度，训练后给出每次的小结。</string>
-    <string name="strength_mic_off_hint">关：只按时间与引导音训练，不做统计。</string>
     <string name="strength_summary">共 %1$d 次 · 训练 %2$s · 休息 %3$s · 合计 %4$s</string>
     <string name="strength_start">开始训练</string>
     <string name="strength_footer">点右下角「开始训练」后倒数 5 秒进入第一次训练，之后每两次之间自动休息。倒数与每段休息的最后几秒会提前响起下一轮的节拍，让你先把动作对上节奏。</string>
@@ -239,10 +208,6 @@
     <string name="strength_run_drop">− 取消末次</string>
     <string name="strength_end">结束训练</string>
     <string name="strength_run_hint">「跳过当前阶段」可直接进入下一次训练或休息；「结束训练」立即收尾并给出小结。</string>
-    <string name="strength_live_placeholder">实测 ——</string>
-    <string name="strength_live_speed">实测 ≈ %1$.1f 音/秒</string>
-    <string name="strength_live_detail">已击 %1$d 击 · 均匀度 ≈ %2$d%%</string>
-    <string name="strength_no_stroke">还没检测到击弦：把手机放近琴身、环境安静些。</string>
     <string name="strength_bpm_dialog">训练速度（BPM）</string>
     <string name="strength_bpm_field">速度（BPM）</string>
     <string name="strength_dur_dialog">本次时长（秒）</string>
@@ -254,9 +219,6 @@
     <string name="strength_cannot_drop">正在进行的这一次不能取消</string>
     <string name="strength_dropped">已取消最后一次训练</string>
     <string name="strength_added">已追加一次训练</string>
-    <string name="strength_mic_off_for_stroke">「每击一响」的引导音会被麦克风当成击弦，已关闭环境声统计</string>
-    <string name="strength_guide_switched">统计需要「每拍一轮」引导音，已切换</string>
-    <string name="strength_mic_failed">麦克风初始化失败，将不做统计</string>
     <string name="strength_interrupted">训练已中断</string>
     <string name="strength_quit_title">结束训练？</string>
     <string name="strength_quit_msg">确定要结束当前训练吗？</string>
@@ -267,31 +229,16 @@
     <string name="strength_summary_head">%1$s共完成 %2$d 次训练 · 用时 %3$s</string>
     <string name="strength_summary_early">【提前结束】</string>
     <string name="strength_summary_round">第 %1$d 次 · 目标 %2$d BPM · %3$s</string>
-    <string name="strength_summary_measured">　实测 ≈ %1$.1f 音/秒 · %2$d 击 · 均匀度 ≈ %3$d%%</string>
-    <string name="strength_summary_nomic">　（未统计）</string>
-    <string name="strength_summary_short"> · 提前结束</string>
-    <string name="strength_summary_note">注：实测速度由手机麦克风估计，仅供参考。</string>
+    <string name="strength_summary_short"> · 实练 %1$s（提前结束）</string>
     <string name="strength_done_btn">完成</string>
 
-    <!-- 麦克风权限 / 初始化（实时练习、调音器共用） -->
+    <!-- 麦克风权限 / 初始化（调音器） -->
     <string name="mic_init_failed">麦克风初始化失败。可能有其它应用正在占用麦克风，稍后重试。</string>
     <string name="mic_denied_title">需要麦克风权限</string>
-    <string name="mic_denied_msg">实时练习与调音器靠麦克风分析你的轮指。请在接下来弹出的系统提示里选择「允许」。</string>
+    <string name="mic_denied_msg">调音器靠麦克风听你的弦音。请在接下来弹出的系统提示里选择「允许」。</string>
     <string name="mic_denied_retry">重新授权</string>
     <string name="mic_blocked_title">麦克风权限被拒绝了</string>
     <string name="mic_blocked_msg">系统已经不再弹出授权提示。请到「应用信息 → 权限 → 麦克风」里手动打开，再回来重试。</string>
     <string name="mic_open_settings">打开设置</string>
     <string name="mic_settings_failed">打不开系统设置，请手动到「应用信息 → 权限」里打开麦克风。</string>
-
-    <!-- 实时练习页 -->
-    <string name="live_sens_strict">严格</string>
-    <string name="live_sens_normal">标准</string>
-    <string name="live_sens_sensitive">灵敏</string>
-    <string name="live_too_few">只检测到 %1$d 击，样本太少。</string>
-    <string name="live_too_few_hint">可尝试：把「灵敏度」调到「灵敏」；手机离琴近一些；确认开始后确实在弹。</string>
-    <string name="live_report_head">【整段评估】</string>
-    <string name="live_report_score">综合 %1$d 分 · %2$s</string>
-    <string name="live_report_advice">练习建议：</string>
-    <string name="live_strokes_line">%1$d 击　·　全段CV %2$.2f</string>
-    <string name="live_gate_line">底噪 %1$.4f · 门限 %2$.4f · 当前 %3$.4f</string>
 </resources>

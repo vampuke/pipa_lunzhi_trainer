@@ -11,8 +11,8 @@ android {
         applicationId = "com.vampuck.pipa_trainer"
         minSdk = 24
         targetSdk = 34
-        versionCode = 43
-        versionName = "1.24.1"
+        versionCode = 44
+        versionName = "1.25.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -66,8 +66,6 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    // Charting
-    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     testImplementation("junit:junit:4.13.2")
     // 让纯逻辑单测能用 org.json（JScoreJson.parse）——Android 的 org.json 在单测里是
     // 抛异常的桩，补一个真实现。
