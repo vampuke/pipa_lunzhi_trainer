@@ -4,6 +4,7 @@ import com.vampuck.pipa_trainer.dsp.Tuner
 import com.vampuck.pipa_trainer.dsp.Tuning
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -379,13 +380,13 @@ class TunerTest {
     }
 
     @Test
-    fun pegPositionsMatchTheReferenceLayout() {
-        // 左列一弦在上、二弦在下；右列三弦在上、四弦在下
+    fun pegPositionsMatchTheInstrument() {
+        // 琴头朝上、正面看琴：右列一弦在下、三弦在上；左列二弦在下、四弦在上
         val expected = mapOf(
-            1 to (Tuning.PegSide.LEFT to true),
+            1 to (Tuning.PegSide.RIGHT to false),
             2 to (Tuning.PegSide.LEFT to false),
             3 to (Tuning.PegSide.RIGHT to true),
-            4 to (Tuning.PegSide.RIGHT to false)
+            4 to (Tuning.PegSide.LEFT to true)
         )
         for ((number, pos) in expected) {
             val p = Tuning.pegOf(number)
@@ -393,6 +394,24 @@ class TunerTest {
             assertEquals("$number 弦 在左还是右", pos.first, p!!.side)
             assertEquals("$number 弦 靠上还是靠下", pos.second, p.upper)
         }
+    }
+
+    /**
+     * 实物上的两条硬约束，再单独钉一遍——上一条是逐轴对照，这条写成人话，
+     * 免得日后有人「顺手」把上下摆正回来一个（v1.26.0 就是把一弦摆到了最上面）。
+     */
+    @Test
+    fun pegHeightsAndSidesMatchTheInstrument() {
+        for (n in listOf(1, 2)) {
+            assertFalse("$n 弦的轴应在下面（一弦轸在最下、四弦轸在最上）", Tuning.pegOf(n)!!.upper)
+        }
+        for (n in listOf(3, 4)) {
+            assertTrue("$n 弦的轴应在上面", Tuning.pegOf(n)!!.upper)
+        }
+        // 同侧上下相邻的隔着一根弦：一弦与三弦同侧、二弦与四弦同侧
+        assertEquals("一弦与三弦应同侧", Tuning.pegOf(1)!!.side, Tuning.pegOf(3)!!.side)
+        assertEquals("二弦与四弦应同侧", Tuning.pegOf(2)!!.side, Tuning.pegOf(4)!!.side)
+        assertNotEquals("一弦与二弦应分列两侧", Tuning.pegOf(1)!!.side, Tuning.pegOf(2)!!.side)
     }
 
     /** 每个轴都得能在定弦表里找到那根弦，否则界面上会出现一个标不出音名的空轴。 */

@@ -91,15 +91,24 @@ object Tuning {
     data class Peg(val stringNumber: Int, val side: PegSide, val upper: Boolean)
 
     /**
-     * 琵琶四个琴轴的位置（照参考图）：左列一弦在上、二弦在下，右列三弦在上、四弦在下。
+     * 琵琶四个琴轴的位置，照实物：**琴头朝上、正面看琴**（面板朝着自己）时，
+     * 右列一弦在下、三弦在上，左列二弦在下、四弦在上。
+     *
+     * 两条硬约束，摆错就等于把用户指到相反的轴上去拧：
+     *  - **一弦的轴在最下面、四弦的在最上面**（实物「四个轸子依次从下向上穿系一、二、三、四弦」）。
+     *    曾经按参考图摆成「左列一弦在上、右列四弦在下」，上下正好颠倒。
+     *  - 同侧上下相邻的隔着**一根**弦（右列一、三；左列二、四），不是相邻两根。
+     *
+     * 琴头画成正面看的样子，所以调音时抱琴（面板朝外）看到的是左右镜像——界面文案里
+     * 写明了这一点，免得用户拿演奏姿势去对。
      *
      * 古筝用雁柱、吉他六轴且结构不同，都不适用这张表——界面只对琵琶画琴轴图。
      */
     val PIPA_PEGS: List<Peg> = listOf(
-        Peg(1, PegSide.LEFT, true),
+        Peg(1, PegSide.RIGHT, false),
         Peg(2, PegSide.LEFT, false),
         Peg(3, PegSide.RIGHT, true),
-        Peg(4, PegSide.RIGHT, false)
+        Peg(4, PegSide.LEFT, true)
     )
 
     /** 弦号 → 琴轴。不是琵琶的弦号（古筝二十一弦、吉他六弦）返回 null。 */
