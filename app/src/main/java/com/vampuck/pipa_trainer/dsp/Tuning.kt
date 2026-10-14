@@ -6,7 +6,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * 音名 / 音分换算，以及各乐器定弦表。
+ * 音名 / 音分换算，各乐器定弦表，以及琵琶琴轴（轸子）的位置。
  *
  * 定弦用最常见的**标准调**。每张表都按「一弦在最前」排列：弦号越小越细越高，
  * 所以表是**从高到低**的（琵琶一弦 A3 → 四弦 A2）。
@@ -79,6 +79,33 @@ object Tuning {
 
     val INSTRUMENTS: List<Instrument> = listOf(PIPA, GUZHENG, GUITAR)
 
+    /** 琴轴在琴头的哪一侧。 */
+    enum class PegSide { LEFT, RIGHT }
+
+    /**
+     * 一个琴轴：它系着哪根弦、在琴头的哪一侧、靠上还是靠下。
+     *
+     * [upper] 是**同侧两个轴之间的相对高低**，不是绝对高度，界面据此把四个徽标
+     * 摆成两列各两个。
+     */
+    data class Peg(val stringNumber: Int, val side: PegSide, val upper: Boolean)
+
+    /**
+     * 琵琶四个琴轴的位置（照参考图）：左列一弦在上、二弦在下，右列三弦在上、四弦在下。
+     *
+     * 古筝用雁柱、吉他六轴且结构不同，都不适用这张表——界面只对琵琶画琴轴图。
+     */
+    val PIPA_PEGS: List<Peg> = listOf(
+        Peg(1, PegSide.LEFT, true),
+        Peg(2, PegSide.LEFT, false),
+        Peg(3, PegSide.RIGHT, true),
+        Peg(4, PegSide.RIGHT, false)
+    )
+
+    /** 弦号 → 琴轴。不是琵琶的弦号（古筝二十一弦、吉他六弦）返回 null。 */
+    fun pegOf(stringNumber: Int): Peg? =
+        PIPA_PEGS.firstOrNull { it.stringNumber == stringNumber }
+
     data class NoteReading(val name: String, val octave: Int, val cents: Double, val midi: Int) {
         val label: String get() = "$name$octave"
     }
@@ -94,6 +121,14 @@ object Tuning {
 
     /** 偏差在这个范围内算「准」。 */
     const val IN_TUNE_CENTS = 5.0
+
+    /**
+     * 偏差在这个范围内算「接近了」，界面用 warn 色提示。
+     *
+     * 调音器的音分文字与琴轴高亮都按这个门限取色——两处必须同源，
+     * 否则会出现「字是绿的、轴是黄的」。
+     */
+    const val NEAR_CENTS = 20.0
 
     private val NAMES = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 

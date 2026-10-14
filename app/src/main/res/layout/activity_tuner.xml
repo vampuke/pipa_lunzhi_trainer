@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg">
@@ -76,6 +77,19 @@
                     android:textSize="15sp"
                     android:textStyle="bold"
                     android:textColor="@color/brand_text_strong" />
+
+                <!--
+                    琵琶专用：琴头 + 四个琴轴，指出要拧哪个轴。古筝（21 弦）、吉他（6 弦）
+                    的琴头结构与琵琶完全不同，切到它们时这一块隐藏，退回下面的弦列表。
+                    id 与 TunerActivity 里的 b.pipaPeg 一一对应。
+                -->
+                <com.vampuck.pipa_trainer.view.PipaPegView
+                    android:id="@+id/pipaPeg"
+                    android:layout_width="match_parent"
+                    android:layout_height="250dp"
+                    android:layout_marginTop="10dp"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
 
                 <TextView
                     android:id="@+id/noteName"

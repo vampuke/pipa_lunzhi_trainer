@@ -7,6 +7,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -79,7 +80,14 @@ class TunerActivity : AppCompatActivity() {
         b = ActivityTunerBinding.inflate(layoutInflater)
         setContentView(b.root)
         buildStringRows()
-        b.stringsHint.setText(stringsHintRes(instrument))
+        applyInstrumentUi()
+        // 琴轴图上的轴和下面弦列表里的行是同一件事：点一下听那根弦的参考音。
+        b.pipaPeg.onPegTap = { number ->
+            instrument.strings.firstOrNull { it.number == number }?.let { s ->
+                tonePlayer.play(s.hz)
+                setStatus(getString(R.string.tuner_playing, s.label, s.note))
+            }
+        }
         b.instrumentGroup.check(R.id.btnPipa)
         b.instrumentGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
@@ -103,7 +111,7 @@ class TunerActivity : AppCompatActivity() {
         if (inst.key == instrument.key) return
         instrument = inst
         buildStringRows()
-        b.stringsHint.setText(stringsHintRes(inst))
+        applyInstrumentUi()
         // 弦号/音分是相对定弦表的，换表后旧读数不再有效，必须清掉。
         b.noteName.text = "--"
         b.noteFreq.text = getString(R.string.tuner_ready)
@@ -111,6 +119,7 @@ class TunerActivity : AppCompatActivity() {
         b.stringHint.text = ""
         tintDot(getColor(R.color.text_secondary))
         markStrings(-1, 0.0)
+        clearPeg()
         setStatus(getString(R.string.tuner_ready))
         // 录音线程闭包捕获的是构造时的 Tuner：只换字段的话，跑着的线程会继续用
         // 旧弦表出「第几弦、往哪拧」，用户照着拧就拧错弦。所以正在听就重启引擎。
@@ -120,7 +129,27 @@ class TunerActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 按当前乐器切换主区：琵琶用琴头 + 四轴（琴轴指示），其余用弦列表。
+     *
+     * 古筝二十一弦用雁柱、吉他六轴且琴头结构不同，画不出一张通用的琴轴图，
+     * 所以只有琵琶走琴轴图这条路。
+     */
+    private fun applyInstrumentUi() {
+        val pipa = instrument.key == Tuning.PIPA.key
+        b.pipaPeg.visibility = if (pipa) View.VISIBLE else View.GONE
+        b.stringList.visibility = if (pipa) View.GONE else View.VISIBLE
+        b.stringsHint.setText(stringsHintRes(instrument))
+    }
+
+    /** 琴轴图上一个轴都不高亮（换乐器、停止、没有读数时）。 */
+    private fun clearPeg() {
+        b.pipaPeg.cents = 0.0
+        b.pipaPeg.activeString = 0
+    }
+
     private fun stringsHintRes(inst: Tuning.Instrument): Int = when (inst.key) {
+        Tuning.PIPA.key -> R.string.tuner_peg_hint
         Tuning.GUZHENG.key -> R.string.tuner_strings_hint_guzheng
         Tuning.GUITAR.key -> R.string.tuner_strings_hint_guitar
         else -> R.string.tuner_strings_hint
@@ -230,6 +259,8 @@ class TunerActivity : AppCompatActivity() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         b.btnTunerToggle.setText(R.string.btn_tuner_start)
         setStatus(getString(R.string.tuner_ready))
+        // 停了就没有读数，琴轴不该还亮着上一个音的状态色
+        clearPeg()
         // 先 stop() 打断阻塞中的 read()，再 join —— 否则主线程最多干等 500ms。
         try { recorder?.stop() } catch (_: Throwable) {}
         recordThread?.join(300)
@@ -263,6 +294,7 @@ class TunerActivity : AppCompatActivity() {
                 setStatus(getString(R.string.tuner_unclear))
             }
             markStrings(-1, 0.0)
+            clearPeg()
             return
         }
 
@@ -284,7 +316,7 @@ class TunerActivity : AppCompatActivity() {
         val inTune = m.inTune
         val color = when {
             inTune -> getColor(R.color.good)
-            abs(m.cents) <= 20 -> getColor(R.color.warn)
+            abs(m.cents) <= Tuning.NEAR_CENTS -> getColor(R.color.warn)
             else -> getColor(R.color.bad)
         }
         b.centsText.text = when {
@@ -297,6 +329,9 @@ class TunerActivity : AppCompatActivity() {
         tintDot(color)
         positionDot(m.cents)
         markStrings(m.string.number, m.cents)
+        // 先给音分再给弦号：两个 setter 都会刷新读屏描述，顺序反了会先按上一根弦的音分播报
+        b.pipaPeg.cents = m.cents
+        b.pipaPeg.activeString = m.string.number
         setStatus(getString(R.string.tuner_listening_rate, rateText))
     }
 

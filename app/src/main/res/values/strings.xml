@@ -36,7 +36,7 @@
     <string name="tuner_listening">正在听…</string>
     <string name="tuner_in_tune">准了</string>
     <!-- 调音器主显示：要调的弦 + 它的音名；绝对音高降为次行，避免「听到的音名」被当成弦名 -->
-    <string name="tuner_tuning_target">正在调 %1$s</string>
+    <string name="tuner_tuning_target">请拨动 %1$s</string>
     <string name="tuner_heard">听到 %1$s · %2$s</string>
     <string name="tuner_adjust_loosen">偏高 %1$d 音分 · 松一点</string>
     <string name="tuner_adjust_tighten">偏低 %1$d 音分 · 紧一点</string>
@@ -51,6 +51,8 @@
     <string name="tuner_center">0</string>
     <string name="tuner_sharp">偏高 →</string>
     <string name="tuner_strings_hint">标准 D 调定弦（正调，A-d-e-a）；点任意一行听参考音</string>
+    <string name="tuner_peg_hint">照琴头点相应的琴轴，可以听该弦的参考音</string>
+    <string name="tuner_peg_desc">琴轴指示：%1$s</string>
     <string name="tuner_strings_hint_guzheng">标准 D 调定弦（21 弦，D2–D6，五声调式）；点任意一行听参考音</string>
     <string name="tuner_strings_hint_guitar">标准调弦 EADGBE（E2–E4）；点任意一行听参考音</string>
     <string name="instrument_pipa">琵琶</string>
