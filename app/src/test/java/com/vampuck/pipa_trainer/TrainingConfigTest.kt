@@ -20,8 +20,7 @@ class TrainingConfigTest {
         rounds = listOf(TrainingPlan.Round(60, 120), TrainingPlan.Round(84, 60)),
         restSec = 30,
         guidePerBeat = true,
-        accentFirst = false,
-        useMic = true
+        accentFirst = false
     )
 
     @Test
@@ -35,14 +34,29 @@ class TrainingConfigTest {
         assertEquals(c.restSec, back.restSec)
         assertEquals(c.guidePerBeat, back.guidePerBeat)
         assertEquals(c.accentFirst, back.accentFirst)
-        assertEquals(c.useMic, back.useMic)
     }
 
     @Test
     fun `encoded text is a single line`() {
         val text = cfg().encode()
         assertFalse(text.contains('\n'))
-        assertEquals("30|101|60:120,84:60|日常", text)
+        assertEquals("30|10|60:120,84:60|日常", text)
+    }
+
+    /**
+     * 开关段历史上是 3 位（第 3 位是已删除的「环境声统计」）。老用户设备上存的就是
+     * 3 位，升级后必须照常读回，不能因为少了一位就被判成脏数据、把配置全丢光。
+     */
+    @Test
+    fun `legacy three flag configs still decode`() {
+        val back = TrainingConfig.decode("30|101|60:120,84:60|日常")!!
+        assertEquals(30, back.restSec)
+        assertTrue(back.guidePerBeat)
+        assertFalse(back.accentFirst)
+        assertEquals(listOf(TrainingPlan.Round(60, 120), TrainingPlan.Round(84, 60)), back.rounds)
+        assertEquals("日常", back.name)
+        // 重新编码后收敛成 2 位
+        assertEquals("30|10|60:120,84:60|日常", back.encode())
     }
 
     @Test
@@ -77,7 +91,7 @@ class TrainingConfigTest {
         assertNull(TrainingConfig.decode("abc|100|60:120|名字"))
         assertNull(TrainingConfig.decode("30|100||名字"))
         assertNull(TrainingConfig.decode("30|100|60:abc|名字"))
-        assertNull(TrainingConfig.decode("30|10|60:120|名字"))
+        assertNull(TrainingConfig.decode("30|1|60:120|名字"))
     }
 
     @Test

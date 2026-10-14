@@ -360,4 +360,58 @@ class TunerTest {
         assertNotNull(last)
         assertEquals(8, last!!.string.string.number)
     }
+
+    // ---------------- 琴轴布局 ----------------
+
+    /**
+     * 四个琴轴各自系哪根弦、在琴头哪一侧，是照着实物摆的。摆错了就等于告诉用户去拧
+     * 错轴——比不给指示还糟，所以把这些位置关系钉死。
+     */
+    @Test
+    fun pipaPegsCoverEveryStringExactlyOnce() {
+        val pegs = Tuning.PIPA_PEGS
+        assertEquals(4, pegs.size)
+        assertEquals(listOf(1, 2, 3, 4), pegs.map { it.stringNumber }.sorted())
+        assertEquals("左右各两个", 2, pegs.count { it.side == Tuning.PegSide.LEFT })
+        assertEquals("左右各两个", 2, pegs.count { it.side == Tuning.PegSide.RIGHT })
+        assertEquals("每侧一上一下", 2, pegs.count { it.upper })
+        assertEquals("每侧一上一下", 2, pegs.count { !it.upper })
+    }
+
+    @Test
+    fun pegPositionsMatchTheReferenceLayout() {
+        // 左列一弦在上、二弦在下；右列三弦在上、四弦在下
+        val expected = mapOf(
+            1 to (Tuning.PegSide.LEFT to true),
+            2 to (Tuning.PegSide.LEFT to false),
+            3 to (Tuning.PegSide.RIGHT to true),
+            4 to (Tuning.PegSide.RIGHT to false)
+        )
+        for ((number, pos) in expected) {
+            val p = Tuning.pegOf(number)
+            assertNotNull("$number 弦没有琴轴", p)
+            assertEquals("$number 弦 在左还是右", pos.first, p!!.side)
+            assertEquals("$number 弦 靠上还是靠下", pos.second, p.upper)
+        }
+    }
+
+    /** 每个轴都得能在定弦表里找到那根弦，否则界面上会出现一个标不出音名的空轴。 */
+    @Test
+    fun everyPegHasAStringInTheTuningTable() {
+        for (p in Tuning.PIPA_PEGS) {
+            val s = Tuning.PIPA_STANDARD.firstOrNull { it.number == p.stringNumber }
+            assertNotNull("${p.stringNumber} 弦不在定弦表里", s)
+            assertTrue("${s!!.label} 的频率应为正", s.hz > 0.0)
+        }
+    }
+
+    /** 古筝二十一弦、吉他六弦都该拿不到琴轴，不能误映射到琵琶的四个轴上。 */
+    @Test
+    fun pegOfRejectsNonPipaStringNumbers() {
+        assertNull(Tuning.pegOf(0))
+        assertNull(Tuning.pegOf(-1))
+        assertNull(Tuning.pegOf(5))
+        assertNull(Tuning.pegOf(6))    // 吉他六弦
+        assertNull(Tuning.pegOf(21))   // 古筝二十一弦
+    }
 }

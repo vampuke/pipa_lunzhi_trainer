@@ -4,24 +4,25 @@ package com.vampuck.pipa_trainer.training
  * 一套可保存 / 复用的指力训练配置（纯 Kotlin，便于单元测试）。
  *
  * 编码成**一行文本**存进 SharedPreferences，方便持久化也方便测：
- *   `休息秒数|开关(guide/accent/mic 各 0 或 1)|bpm:秒,bpm:秒…|名字`
+ *   `休息秒数|开关(guide/accent 各 0 或 1)|bpm:秒,bpm:秒…|名字`
  * 名字放最后一段（`split('|', limit = 4)`），所以除非名字里带 `|` 否则不用转义；
  * [sanitize] 会把换行和 `|` 换成空格，避免存进去读不回来。
+ *
+ * 开关段历史上是 3 位（还带过一位麦克风统计），现在只写 2 位；[decode] 按
+ * 「至少 2 位」解析、多余的位置直接忽略，旧数据仍能正常读回。
  */
 data class TrainingConfig(
     val name: String,
     val rounds: List<TrainingPlan.Round>,
     val restSec: Int,
     val guidePerBeat: Boolean,
-    val accentFirst: Boolean,
-    val useMic: Boolean
+    val accentFirst: Boolean
 ) {
 
     fun encode(): String {
         val flags = buildString {
             append(if (guidePerBeat) '1' else '0')
             append(if (accentFirst) '1' else '0')
-            append(if (useMic) '1' else '0')
         }
         val rs = rounds.joinToString(",") { "${it.bpm}:${it.durationSec}" }
         return "${restSec}|$flags|$rs|${sanitize(name)}"
@@ -30,7 +31,7 @@ data class TrainingConfig(
     /** 名字以外都相同（用来判重：同一套计划不该在列表里出现两次）。 */
     fun samePlanAs(other: TrainingConfig): Boolean =
         restSec == other.restSec && guidePerBeat == other.guidePerBeat &&
-            accentFirst == other.accentFirst && useMic == other.useMic && rounds == other.rounds
+            accentFirst == other.accentFirst && rounds == other.rounds
 
     fun applyTo(plan: TrainingPlan) {
         plan.rounds.clear()
@@ -59,14 +60,13 @@ data class TrainingConfig(
 
         fun of(
             plan: TrainingPlan, name: String,
-            guidePerBeat: Boolean, accentFirst: Boolean, useMic: Boolean
+            guidePerBeat: Boolean, accentFirst: Boolean
         ): TrainingConfig = TrainingConfig(
             name = sanitize(name),
             rounds = plan.rounds.map { TrainingPlan.Round(it.bpm, it.durationSec) },
             restSec = plan.restSec,
             guidePerBeat = guidePerBeat,
-            accentFirst = accentFirst,
-            useMic = useMic
+            accentFirst = accentFirst
         )
 
         /**
@@ -134,7 +134,7 @@ data class TrainingConfig(
             val rest = parts[0].toIntOrNull()
                 ?.coerceIn(TrainingPlan.MIN_REST_SEC, TrainingPlan.MAX_REST_SEC) ?: return null
             val flags = parts[1]
-            if (flags.length < 3) return null
+            if (flags.length < 2) return null
             val rounds = ArrayList<TrainingPlan.Round>()
             for (token in parts[2].split(',')) {
                 if (token.isBlank()) continue
@@ -155,8 +155,7 @@ data class TrainingConfig(
                 rounds = rounds,
                 restSec = rest,
                 guidePerBeat = flags[0] == '1',
-                accentFirst = flags[1] == '1',
-                useMic = flags[2] == '1'
+                accentFirst = flags[1] == '1'
             )
         }
     }

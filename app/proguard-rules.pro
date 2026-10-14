@@ -1,1 +1,1 @@
-# Keep default. MPAndroidChart is fine without minify.
+# Keep default. No charting library any more; nothing extra to keep.

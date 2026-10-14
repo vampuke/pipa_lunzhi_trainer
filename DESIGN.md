@@ -21,7 +21,6 @@ colors:
   good: "#1C7D45"
   warn: "#8A6400"
   bad: "#C62F2F"
-  chart-line: "#2255CC"
 typography:
   display:
     fontFamily: sans-serif-medium
@@ -94,26 +93,14 @@ components:
     textColor: "{colors.accent-dark}"
     rounded: "{rounded.pill}"
     padding: 6px
-  score-good:
-    backgroundColor: "{colors.good}"
-    textColor: "{colors.on-primary}"
-    rounded: "{rounded.sm}"
-  score-warn:
-    backgroundColor: "{colors.warn}"
-    textColor: "{colors.on-primary}"
-    rounded: "{rounded.sm}"
-  score-bad:
-    backgroundColor: "{colors.bad}"
-    textColor: "{colors.on-primary}"
-    rounded: "{rounded.sm}"
 ---
 
 ## Overview
 
-琵琶轮指训练是一款面向中国民乐练习者的分析工具。视觉基调取自琵琶本身：
+琵琶轮指训练是一款面向中国民乐练习者的练习工具。视觉基调取自琵琶本身：
 **红木（primary）** 的温润深色作为品牌与头部底色，**丝弦金（accent）** 作为
 点睛的高光与进度/强调，**宣纸米白（background/surface）** 做大面积留白。整体
-克制、专业、有东方器物感，不花哨——数据与图表才是主角。
+克制、专业、有东方器物感，不花哨——节奏与练习信息才是主角。
 
 ## Colors
 
@@ -122,7 +109,7 @@ components:
 - **Accent 丝弦金 (#C8973F)：** 唯一的高光色——进度条、选中态、强调数字。
   克制使用，一屏不超过两三处，否则廉价。
 - **Surface / Background：** 暖米白，`surface` 比 `background` 略亮，卡片浮于其上。
-- **good / warn / bad：** 仅用于评分与均匀度等级徽标，不参与品牌表达。
+- **good / warn / bad：** 保留的语义色，仅用于状态与提示，不参与品牌表达。
 
 对比度：`text-primary` on `surface` ≈ 13:1，`on-primary` on `primary` ≈ 6.4:1，
 均过 WCAG AA。丝弦金只做大字/图形强调，不做小正文（金对白对比不足）。
@@ -145,14 +132,14 @@ components:
 ## Components
 
 - **hero：** 红木实底（或红木→深红木 135° 渐变），承载应用名与副标题，底角圆。
-- **card：** 米白表面、16dp 圆角、1dp 投影，承载每个功能入口与分析结果。
+- **card：** 米白表面、16dp 圆角、1dp 投影，承载每个功能入口。
 - **feature-icon：** 48dp pill 底托（primary-container），内嵌线性图标。
 - **button-primary：** 红木实心，按下转深红木。
-- **chip-accent / score-*：** 丝弦金信息胶囊；评分徽标按 good/warn/bad 取色。
+- **chip-accent：** 丝弦金信息胶囊；状态提示按 good/warn/bad 取色。
 
 ## Do's and Don'ts
 
 - Do 用大面积米白留白，让红木与丝弦金成为视觉焦点。
-- Do 评分、等级这类"结论"才用彩色徽标；过程数据用中性灰。
+- Do 状态、提示这类"结论"才用彩色；过程数据用中性灰。
 - Don't 把丝弦金用在小正文或大色块——它只做点睛。
 - Don't 在一个界面堆超过两种强调色。

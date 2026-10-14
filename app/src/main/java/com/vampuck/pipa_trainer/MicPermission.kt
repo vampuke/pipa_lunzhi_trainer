@@ -14,9 +14,9 @@ import androidx.core.content.ContextCompat
 /**
  * 麦克风权限的统一处理。
  *
- * 抽出来是因为「实时练习」和「调音器」原来各自只写了一句
- * `if (granted) start() else Toast(...)`：用户点两次拒绝（或勾「不再询问」）之后，
- * 这两个功能就永久不可用，界面只留一句 Toast，没有任何去系统设置的入口。
+ * 抽出来是因为调音器原来只写了一句 `if (granted) start() else Toast(...)`：
+ * 用户点两次拒绝（或勾「不再询问」）之后，这个功能就永久不可用，界面只留一句
+ * Toast，没有任何去系统设置的入口。
  */
 internal object MicPermission {
 

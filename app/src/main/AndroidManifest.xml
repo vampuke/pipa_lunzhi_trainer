@@ -36,14 +36,6 @@
             当前方向，用户的操作不丢。
         -->
         <activity
-            android:name=".FileAnalysisActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
-        <activity
-            android:name=".LiveActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
-        <activity
             android:name=".StrengthTrainingActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />

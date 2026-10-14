@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="10dp"
@@ -27,10 +28,10 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="第 1 次训练"
                 android:textColor="@color/brand_text_strong"
                 android:textSize="15sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                tools:text="第 1 次训练" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRemove"
@@ -41,7 +42,7 @@
                 android:insetBottom="0dp"
                 android:minWidth="0dp"
                 android:paddingHorizontal="10dp"
-                android:text="移除"
+                android:text="@string/strength_round_remove"
                 android:textSize="13sp" />
         </LinearLayout>
 
@@ -56,7 +57,7 @@
             <TextView
                 android:layout_width="40dp"
                 android:layout_height="wrap_content"
-                android:text="速度"
+                android:text="@string/strength_round_speed"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
             <com.google.android.material.button.MaterialButton
@@ -78,10 +79,10 @@
                 android:background="?android:attr/selectableItemBackground"
                 android:gravity="center"
                 android:paddingVertical="6dp"
-                android:text="60 BPM"
                 android:textColor="@color/brand_text_strong"
                 android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                tools:text="60 BPM" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnBpmPlus"
@@ -101,9 +102,9 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="40dp"
             android:gravity="center"
-            android:text="= 5.0 音/秒 · 300 音/分"
             android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            tools:text="= 5.0 音/秒 · 300 音/分" />
 
         <!-- 时长 -->
         <LinearLayout
@@ -116,7 +117,7 @@
             <TextView
                 android:layout_width="40dp"
                 android:layout_height="wrap_content"
-                android:text="时长"
+                android:text="@string/strength_round_duration"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
 
@@ -139,10 +140,10 @@
                 android:background="?android:attr/selectableItemBackground"
                 android:gravity="center"
                 android:paddingVertical="6dp"
-                android:text="2:00"
                 android:textColor="@color/brand_text_strong"
                 android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                tools:text="2:00" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnDurPlus"
