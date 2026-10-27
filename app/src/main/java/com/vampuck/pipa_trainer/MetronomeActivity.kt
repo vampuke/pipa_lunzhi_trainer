@@ -11,7 +11,13 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.vampuck.pipa_trainer.audio.Metronome
 import com.vampuck.pipa_trainer.databinding.ActivityMetronomeBinding
+import com.vampuck.pipa_trainer.practice.PracticeRecorder
+import com.vampuck.pipa_trainer.practice.PracticeSource
+import com.vampuck.pipa_trainer.practice.PracticeStore
 import com.vampuck.pipa_trainer.view.SymbolButton
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 
 /**
  * 独立节拍器。
@@ -30,6 +36,10 @@ class MetronomeActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMetronomeBinding
     private val metronome = Metronome()
+    private val recorder by lazy {
+        val store = PracticeStore(applicationContext)
+        PracticeRecorder(store::save)
+    }
 
     private var bpm = 80
     /** 当前模式用到的指示圆点，数量随模式变化（4 整拍 / 8 分拍 / 5 轮指）。 */
@@ -37,6 +47,14 @@ class MetronomeActivity : AppCompatActivity() {
     private var slotCount = 4
 
     private val argb = ArgbEvaluator()
+    private val checkpointHandler = Handler(Looper.getMainLooper())
+    private val checkpointTicker = object : Runnable {
+        override fun run() {
+            if (!metronome.isRunning) return
+            recorder.checkpoint(SystemClock.elapsedRealtime())
+            checkpointHandler.postDelayed(this, 5_000L)
+        }
+    }
     private var cardFlash: ValueAnimator? = null
 
     private var surfaceColor = 0
@@ -145,11 +163,15 @@ class MetronomeActivity : AppCompatActivity() {
 
     private fun start() {
         metronome.start()
+        recorder.start(PracticeSource.METRONOME, SystemClock.elapsedRealtime())
+        checkpointHandler.postDelayed(checkpointTicker, 5_000L)
         b.btnMetroToggle.setText(R.string.metro_stop)
     }
 
     private fun stop() {
         metronome.stop()
+        checkpointHandler.removeCallbacks(checkpointTicker)
+        recorder.stop(SystemClock.elapsedRealtime())
         b.btnMetroToggle.setText(R.string.metro_start)
         cardFlash?.cancel()
         b.bpmCard.setCardBackgroundColor(surfaceColor)
@@ -256,6 +278,7 @@ class MetronomeActivity : AppCompatActivity() {
         // 不清掉的话，工作线程没及时退出时会把已销毁的界面一起拖住。
         metronome.onBeat = null
         metronome.stop()
+        recorder.stop(SystemClock.elapsedRealtime())
         cardFlash?.cancel()
         cardFlash = null
         for (d in dots) d.animate().cancel()

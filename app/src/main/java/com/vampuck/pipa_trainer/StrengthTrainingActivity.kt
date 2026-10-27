@@ -22,6 +22,9 @@ import com.vampuck.pipa_trainer.audio.TonePlayer
 import com.vampuck.pipa_trainer.data.TrainingConfigStore
 import com.vampuck.pipa_trainer.databinding.ActivityStrengthTrainingBinding
 import com.vampuck.pipa_trainer.databinding.ItemRoundPlanBinding
+import com.vampuck.pipa_trainer.practice.PracticeSource
+import com.vampuck.pipa_trainer.practice.PracticeRecorder
+import com.vampuck.pipa_trainer.practice.PracticeStore
 import com.vampuck.pipa_trainer.training.RoundTiming
 import com.vampuck.pipa_trainer.training.TrainingConfig
 import com.vampuck.pipa_trainer.training.TrainingPlan
@@ -49,6 +52,9 @@ class StrengthTrainingActivity : AppCompatActivity() {
 
     private val plan = TrainingPlan()
     private val metronome = Metronome()
+    private val practiceStore by lazy { PracticeStore(applicationContext) }
+    private val recorder by lazy { PracticeRecorder(practiceStore::save) }
+    private var lastPracticeSaveMs = 0L
     private val tone = TonePlayer()
 
     // ---- 设置项 ----
@@ -197,6 +203,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
         if (running && !paused) {
             paused = true
             pausedByBackground = true
+            recorder.pause(SystemClock.elapsedRealtime())
             stopGuide()
             b.btnPause.setText(R.string.strength_resume)
             render()
@@ -751,6 +758,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
         // beginTraining 直接绑按钮时别丢）：去掉麦克风权限分支后仍要保留。
         if (plan.rounds.isEmpty()) return
         results.clear()
+        lastPracticeSaveMs = 0L
         running = true
         paused = false
         pausedByBackground = false
@@ -784,11 +792,17 @@ class StrengthTrainingActivity : AppCompatActivity() {
         override fun run() {
             if (!running) return
             val now = SystemClock.elapsedRealtime()
+            if (!running || paused) return
             val delta = now - anchorMs
             anchorMs = now
             // 暂停时**不**累加 elapsedMs：整条时间轴停在原地（恢复时重新锚定 anchorMs），
             // 所以轮次结算的分母就是这一轮的时长本身，不需要另外记暂停时长。
             if (!paused) elapsedMs += delta
+            if (!paused && currentPhase == TrainingPlan.Phase.WORK && phaseRound >= 0 &&
+                elapsedMs - lastPracticeSaveMs >= 5_000L) {
+                recorder.checkpoint(now)
+                lastPracticeSaveMs = elapsedMs
+            }
             render()
             handler.postDelayed(this, TICK_MS)
         }
@@ -805,6 +819,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
             currentPhase = st.phase
             phaseRound = st.roundIndex
             if (prevPhase == TrainingPlan.Phase.WORK && prevRound >= 0) {
+                recorder.stop(SystemClock.elapsedRealtime())
                 // 正常跑完一轮 → null（打满整轮）；被「跳过」提前离开 → 用实际弹奏时长，
                 // 否则半截轮按整轮算，小结里的实练时长就偏长。
                 captureRoundResult(prevRound, skipWorkOverrideMs)
@@ -821,6 +836,8 @@ class StrengthTrainingActivity : AppCompatActivity() {
         when (st.phase) {
             TrainingPlan.Phase.WORK -> {
                 roundStartMs = elapsedMs
+                recorder.start(PracticeSource.BASICS, SystemClock.elapsedRealtime())
+                lastPracticeSaveMs = elapsedMs
             }
             TrainingPlan.Phase.REST -> {
                 lastRestTick = -1
@@ -960,8 +977,10 @@ class StrengthTrainingActivity : AppCompatActivity() {
         paused = !paused
         pausedByBackground = false
         if (paused) {
+            recorder.pause(SystemClock.elapsedRealtime())
             stopGuide()
         } else {
+            recorder.resume(SystemClock.elapsedRealtime())
             anchorMs = SystemClock.elapsedRealtime()
         }
         b.btnPause.setText(if (paused) R.string.strength_resume else R.string.strength_pause)
@@ -1007,6 +1026,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
     }
 
     private fun stopEverything() {
+        recorder.stop(SystemClock.elapsedRealtime())
         running = false
         paused = false
         pausedByBackground = false

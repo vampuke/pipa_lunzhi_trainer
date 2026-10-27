@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/App.Card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/activity_title"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/activity_scope"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView android:id="@+id/todayPractice" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="0 分钟"
+                    android:textColor="@color/brand_text" android:textSize="28sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="@string/activity_today" android:textColor="@color/text_secondary" android:textSize="12sp" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView android:id="@+id/streakPractice" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="连续 0 天"
+                    android:textColor="@color/text_primary" android:textSize="18sp" android:textStyle="bold" />
+                <TextView android:id="@+id/yearPractice" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                    android:text="近一年 0 分钟" android:textColor="@color/text_secondary" android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:layout_marginVertical="16dp" android:background="@color/outline" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="@string/activity_year"
+                android:textColor="@color/text_secondary" android:textSize="12sp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="@string/activity_scroll" android:textColor="@color/text_secondary" android:textSize="11sp" />
+        </LinearLayout>
+
+        <HorizontalScrollView
+            android:id="@+id/activityScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:scrollbars="none"
+            android:fillViewport="false">
+            <com.vampuck.pipa_trainer.view.PracticeHeatmapView
+                android:id="@+id/activityHeatmap"
+                android:layout_width="wrap_content"
+                android:layout_height="129dp"
+                android:contentDescription="@string/activity_heatmap_desc" />
+        </HorizontalScrollView>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="分钟" android:textColor="@color/text_secondary" android:textSize="10sp" />
+            <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="14dp"
+                android:src="@drawable/activity_level_0" android:contentDescription="@null" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="4dp" android:text="0" android:textColor="@color/text_secondary" android:textSize="10sp" />
+            <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="10dp"
+                android:src="@drawable/activity_level_1" android:contentDescription="@null" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="4dp" android:text="1–9" android:textColor="@color/text_secondary" android:textSize="10sp" />
+            <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="10dp"
+                android:src="@drawable/activity_level_2" android:contentDescription="@null" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="4dp" android:text="10–19" android:textColor="@color/text_secondary" android:textSize="10sp" />
+            <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="10dp"
+                android:src="@drawable/activity_level_3" android:contentDescription="@null" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="4dp" android:text="20–29" android:textColor="@color/text_secondary" android:textSize="10sp" />
+            <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="10dp"
+                android:src="@drawable/activity_level_4" android:contentDescription="@null" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="4dp" android:text="30+" android:textColor="@color/text_secondary" android:textSize="10sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/activity_detail_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

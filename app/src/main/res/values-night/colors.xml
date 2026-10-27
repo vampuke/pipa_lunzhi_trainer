@@ -44,4 +44,9 @@
     <color name="countdown_scrim">#F21A1614</color>
     <!-- 节拍器熄灭的指示圆点：深色下用暗色，不能再用浅米色 -->
     <color name="metro_dot_off">#FF3A322D</color>
+    <color name="activity_0">#FF4A413B</color>
+    <color name="activity_1">#FF166534</color>
+    <color name="activity_2">#FF159447</color>
+    <color name="activity_3">#FF2FC55D</color>
+    <color name="activity_4">#FF6BE68C</color>
 </resources>
