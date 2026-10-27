@@ -9,12 +9,12 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.vampuck.pipa_trainer.databinding.ActivityMainBinding
+import com.vampuck.pipa_trainer.practice.PracticeDay
 import com.vampuck.pipa_trainer.practice.PracticeFormat
 import com.vampuck.pipa_trainer.practice.PracticeSource
 import com.vampuck.pipa_trainer.practice.PracticeStats
 import com.vampuck.pipa_trainer.practice.PracticeStore
 import com.vampuck.pipa_trainer.update.UpdateChecker
-import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -61,11 +61,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderPracticeActivity() {
         val log = practiceStore.load()
-        val today = LocalDate.now()
-        val todayKey = today.toString()
+        val today = PracticeDay.today()
+        val todayKey = today
         b.practiceActivity.todayPractice.text = PracticeFormat.duration(log.totalMs(todayKey))
         b.practiceActivity.streakPractice.text = "连续 ${PracticeStats.streak(log, todayKey)} 天"
-        b.practiceActivity.yearPractice.text = "近一年 ${PracticeFormat.duration(log.totalMsSince(today.minusDays(364).toString()))}"
+        b.practiceActivity.yearPractice.text = "近一年 ${PracticeFormat.duration(log.totalMsSince(PracticeDay.shift(today, -364)))}"
         b.practiceActivity.activityHeatmap.submit(log, today)
         b.practiceActivity.activityScroll.post {
             b.practiceActivity.activityScroll.fullScroll(android.view.View.FOCUS_RIGHT)

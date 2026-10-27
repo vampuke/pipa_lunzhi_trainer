@@ -1,86 +1,65 @@
 package com.vampuck.pipa_trainer.practice
 
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
-
-object PracticeTime {
-    fun dayAt(epochMs: Long): String =
-        SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date(epochMs))
-
-    fun nextDayStart(epochMs: Long): Long = Calendar.getInstance().apply {
-        timeInMillis = epochMs
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-        add(Calendar.DAY_OF_YEAR, 1)
-    }.timeInMillis
-}
-
 /**
- * Active-time session. Checkpoints are cheap and idempotent in PracticeStore.
- * Wall time is used only for the date; elapsedRealtime drives all durations.
+ * Active-time recorder. Every run between pauses is an independent segment;
+ * a segment may be split at midnight, but never overwrites another segment.
  */
 class PracticeRecorder(private val save: (String, PracticeSource, String, Long) -> Unit) {
     var sessionId: String? = null
         private set
     private var source = PracticeSource.BASICS
+    private var segment = 0
     private var wallStartMs = 0L
     private var anchorMs = 0L
-    private var accumulatedMs = 0L
-    private var pausedAtMs: Long? = null
+    private var paused = false
 
-    fun elapsed(now: Long): Long =
-        accumulatedMs + if (sessionId != null && pausedAtMs == null) now - anchorMs else 0L
-
-    fun start(source: PracticeSource, now: Long,
-              wallNow: Long = System.currentTimeMillis()) {
+    fun start(source: PracticeSource, now: Long, wallNow: Long = System.currentTimeMillis()) {
         stop(now)
-        sessionId = "${wallNow}_${now}"
+        sessionId = "${wallNow}_$now"
         this.source = source
+        segment = 0
         wallStartMs = wallNow
         anchorMs = now
-        accumulatedMs = 0L
-        pausedAtMs = null
+        paused = false
     }
 
     fun checkpoint(now: Long) {
         val id = sessionId ?: return
-        val total = elapsed(now)
-        var start = wallStartMs
-        var offset = 0L
-        while (true) {
-            val dayEnd = PracticeTime.nextDayStart(start)
-            val end = (wallStartMs + total).coerceAtMost(dayEnd)
-            val duration = (end - start).coerceAtLeast(0L)
-            if (duration > 0L) save("$id:$offset", source, PracticeTime.dayAt(start), duration)
-            if (end >= wallStartMs + total) break
-            offset += duration
-            start = dayEnd
+        if (paused) return // pause() already saved this segment's exact endpoint
+        val activeMs = (now - anchorMs).coerceAtLeast(0L)
+        var partStart = wallStartMs
+        val activeEnd = wallStartMs + activeMs
+        while (partStart < activeEnd) {
+            val dayEnd = PracticeDay.nextDayStart(partStart)
+            val partEnd = activeEnd.coerceAtMost(dayEnd)
+            val day = PracticeDay.at(partStart)
+            // The segment number makes every pause/resume segment distinct.
+            // Re-saving a checkpoint for the same segment/day replaces its value.
+            save("$id:$segment:$day", source, day, partEnd - partStart)
+            partStart = partEnd
         }
     }
 
     fun pause(now: Long) {
-        if (sessionId == null || pausedAtMs != null) return
-        accumulatedMs = elapsed(now)
-        pausedAtMs = now
+        if (sessionId == null || paused) return
         checkpoint(now)
+        paused = true
     }
 
-    fun resume(now: Long) {
-        if (sessionId == null || pausedAtMs == null) return
-        wallStartMs += now - anchorMs
+    fun resume(now: Long, wallNow: Long = System.currentTimeMillis()) {
+        if (sessionId == null || !paused) return
+        // Keep all saved segments untouched. The next segment begins at the
+        // actual resume instant, so neither a pause nor midnight is counted.
+        segment++
+        wallStartMs = wallNow
         anchorMs = now
-        pausedAtMs = null
+        paused = false
     }
 
     fun stop(now: Long) {
         if (sessionId == null) return
-        if (pausedAtMs == null) checkpoint(now)
+        checkpoint(now)
         sessionId = null
-        accumulatedMs = 0L
-        pausedAtMs = null
+        paused = false
     }
 }

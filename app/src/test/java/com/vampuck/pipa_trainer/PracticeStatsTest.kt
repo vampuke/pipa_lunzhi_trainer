@@ -1,5 +1,6 @@
 package com.vampuck.pipa_trainer
 
+import com.vampuck.pipa_trainer.practice.PracticeDay
 import com.vampuck.pipa_trainer.practice.PracticeRecorder
 import com.vampuck.pipa_trainer.practice.PracticeSource
 import com.vampuck.pipa_trainer.practice.PracticeStats
@@ -54,7 +55,7 @@ class PracticeRecorderTest {
         r.checkpoint(2_100)
         r.pause(5_100)
         r.pause(8_100)
-        r.resume(10_100)
+        r.resume(10_100, 1_000_000 + 10_100 - 100)
         r.stop(13_100)
         r.stop(14_100)
         assertEquals(8_000, log.totalMs("1970-01-01"))
@@ -94,6 +95,34 @@ class PracticeRecorderTest {
             java.util.TimeZone.setDefault(previousZone)
         }
     }
+    @Test
+    fun `pause and resume across midnight attributes only active time`() {
+        val log = PracticeLog()
+        val zone = java.util.TimeZone.getDefault()
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Shanghai"))
+        try {
+            val wall = java.time.ZonedDateTime.parse("2026-10-27T23:59:59+08:00").toInstant().toEpochMilli()
+            val r = PracticeRecorder { id, source, day, ms -> log.put(id, source, day, ms) }
+            r.start(PracticeSource.BASICS, 0, wall)
+            r.pause(1_000)
+            r.resume(10_000)
+            r.stop(11_000)
+            assertEquals(1_000, log.totalMs("2026-10-27"))
+            assertEquals(1_000, log.totalMs("2026-10-28"))
+        } finally { java.util.TimeZone.setDefault(zone) }
+    }
+}
+
+class PracticeDayTest {
+    @Test
+    fun `calendar math validates dates and aligns Monday weeks`() {
+        assert(!PracticeDay.isValid("2026-02-29"))
+        assert(PracticeDay.isValid("2028-02-29"))
+        assertEquals("2026-10-26", PracticeDay.shift("2026-10-27", -1))
+        assertEquals(2, PracticeDay.daysBetween("2026-10-27", "2026-10-29"))
+        assertEquals(6, PracticeDay.mondayOffset("2026-10-25"))
+        assertEquals("10月27日 · 星期二", PracticeDay.displayDate("2026-10-27"))
+    }
 }
 class PracticeStatsTest {
     @Test
@@ -122,6 +151,6 @@ class PracticeStatsTest {
         log.put("a", PracticeSource.BASICS, "2026-10-25", 60_000)
         log.put("b", PracticeSource.BASICS, "2026-10-27", 60_000)
         assertEquals(1, PracticeStats.streak(log, "2026-10-27"))
-        assertEquals(0, PracticeStats.streak(log, "2026-10-28"))
+        assertEquals(1, PracticeStats.streak(log, "2026-10-28"))
     }
 }

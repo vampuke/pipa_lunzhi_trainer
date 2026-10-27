@@ -792,7 +792,6 @@ class StrengthTrainingActivity : AppCompatActivity() {
         override fun run() {
             if (!running) return
             val now = SystemClock.elapsedRealtime()
-            if (!running || paused) return
             val delta = now - anchorMs
             anchorMs = now
             // 暂停时**不**累加 elapsedMs：整条时间轴停在原地（恢复时重新锚定 anchorMs），

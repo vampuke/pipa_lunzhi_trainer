@@ -1,7 +1,6 @@
 package com.vampuck.pipa_trainer.practice
 
 import android.content.Context
-import java.time.LocalDate
 
 /** Small local-only store; no account, network or storage permission. */
 class PracticeStore(context: Context) {
@@ -35,9 +34,5 @@ object PracticeFormat {
         else "${totalMinutes / 60} 小时 ${totalMinutes % 60} 分钟"
     }
 
-    fun fullDate(day: String): String {
-        val d = LocalDate.parse(day)
-        val weekdays = listOf("一", "二", "三", "四", "五", "六", "日")
-        return "${d.monthValue}月${d.dayOfMonth}日 · 星期${weekdays[d.dayOfWeek.value - 1]}"
-    }
+    fun fullDate(day: String): String = PracticeDay.displayDate(day)
 }
