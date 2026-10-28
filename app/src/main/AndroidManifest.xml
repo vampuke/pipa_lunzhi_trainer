@@ -31,9 +31,7 @@
         </activity>
         <!--
             所有页面都自己兜住旋转/分屏/字号变化：
-            App 没有 onSaveInstanceState，重建就等于「正在录入的简谱归零、分析结果
-            丢失、训练中断」。声明 configChanges 后系统不会重建 Activity，界面保持
-            当前方向，用户的操作不丢。
+            训练中断、正在听的调音状态都不因系统重建 Activity 而丢失。
         -->
         <activity
             android:name=".StrengthTrainingActivity"
@@ -47,23 +45,6 @@
             android:name=".MetronomeActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
-        <activity
-            android:name=".PlayAlongActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
-        <activity
-            android:name=".PiecePlayerActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
-        <activity
-            android:name=".ImportActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
-        <activity
-            android:name=".ScoreEditorActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden" />
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

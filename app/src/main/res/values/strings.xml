@@ -1,13 +1,11 @@
 <resources>
     <string name="app_name">轮指大作战</string>
     <string name="title_home">轮指大作战</string>
-    <string name="subtitle_home">从基本功练到成曲：分次定时 · 跟谱陪练 · 调音定弦</string>
+    <string name="subtitle_home">专注基本功：分次定时 · 节拍陪练 · 调音定弦</string>
     <string name="feat_tuner_title">调音器</string>
     <string name="feat_tuner_sub">琵琶 · 古筝 · 吉他，音名 + 音分</string>
     <string name="feat_metronome_title">节拍器</string>
     <string name="feat_metronome_sub">整拍 / 分拍 · 重音切换 · 常用速度</string>
-    <string name="feat_play_title">名曲跟练</string>
-    <string name="feat_play_sub">预设经典曲目，按速度显示段落与实时进度</string>
     <string name="btn_start">开始</string>
     <string name="metro_bpm">速度 (BPM)</string>
 
@@ -73,71 +71,20 @@
     <string name="update_need_permission">安装更新需要允许「安装未知应用」权限，前往设置开启后将自动继续安装。</string>
     <string name="update_goto_settings">前往设置</string>
 
-    <!-- 名曲跟练 -->
-    <string name="play_list_hint">选择一首曲目，按参考速度练习。可整体调速；屏幕实时显示当前段落与进度。注：这里提供的是段落结构+参考速度的练习陪练，不是逐音符曲谱。</string>
-    <string name="play_piece_meta">参考 %1$d BPM · %2$d 段 · 约 %3$d:%4$02d</string>
-    <string name="play_overall">整体进度</string>
-    <string name="play_section_progress">当前段落</string>
-    <string name="play_sections">段落</string>
-    <string name="play_section_idx">第 %1$d / %2$d 段</string>
-    <string name="play_next">下一段：%1$s</string>
-    <string name="play_next_last">这是最后一段</string>
-    <string name="play_next_none">—</string>
-    <string name="play_bpm_label">%1$d BPM</string>
-    <string name="play_pause">暂停</string>
-    <string name="play_reset">重置</string>
-    <string name="play_again">再来一遍</string>
-    <string name="play_click_on">节拍器声：开</string>
-    <string name="play_click_off">节拍器声：关</string>
-    <string name="play_score">简谱（跟练高亮当前音符）</string>
-    <string name="play_has_score">含简谱</string>
-    <string name="play_disclaimer">提示：进度按你设定的速度匀速推进，用来帮你把握段落节奏与整体结构；真实演奏的快慢处理可自行伸缩。</string>
-
-    <!-- 导入自定义简谱 -->
-    <string name="import_title">导入简谱</string>
-    <string name="import_entry">导入我的简谱 (JSON)</string>
-    <string name="import_hint">把一首曲子的简谱按 JSON 格式粘贴进来，即可加入「名曲跟练」列表、看着谱子跟练。点「填入模板」看格式示例，照着改成你的谱子。</string>
-    <string name="import_json_label">简谱 JSON</string>
-    <string name="import_fill_template">填入模板示例</string>
-    <string name="import_do">导入</string>
-    <string name="import_empty">请先粘贴简谱 JSON</string>
-    <string name="import_ok">已导入《%1$s》，可在列表里找到</string>
-    <string name="import_fail">导入失败：%1$s</string>
-    <string name="import_copyright">版权提示：请仅导入你自己拥有或自行录入的谱子作个人练习之用。请勿导入他人享有版权的乐谱并传播。</string>
-    <string name="play_imported_tag">自录</string>
-    <string name="play_edit">编辑</string>
-    <string name="play_delete">删除</string>
-    <string name="play_delete_confirm">确定删除《%1$s》？此操作无法撤销。</string>
-    <string name="play_imported_hint">长按可编辑或删除</string>
-
-    <!-- 交互式简谱编辑器 -->
-    <string name="editor_title">简谱编辑器</string>
-    <string name="editor_entry">编辑简谱（可视化录入）</string>
-    <string name="editor_preview">预览</string>
-    <string name="editor_degree">音级（点选，再「添加音符」）</string>
-    <string name="editor_octave">八度</string>
-    <string name="editor_duration">时值</string>
-    <string name="editor_dur_hint">16=十六分 8=八分 4=四分 2=二分 2.=附点二分 1=全音符</string>
-    <string name="editor_fingering">指法</string>
-    <string name="editor_bpb">每小节拍数</string>
-    <string name="editor_add">添加音符</string>
-    <string name="editor_rest">休止符</string>
-    <string name="editor_backspace">删除上一个</string>
-    <string name="editor_clear">清空</string>
-    <string name="editor_clear_confirm">确定清空所有已录入的音符？</string>
-    <string name="editor_meta">曲目信息</string>
-    <string name="editor_count">已录入 %1$d 个音符 · 共 %2$s 拍</string>
-    <string name="editor_hint_title">曲名（必填）</string>
-    <string name="editor_hint_key">调号，如 1=D</string>
-    <string name="editor_hint_bpm">参考速度，如 72</string>
-    <string name="editor_hint_section">段落名，如 第一句</string>
-    <string name="editor_hint_diff">难度，如 入门</string>
-    <string name="editor_hint_blurb">一句话简介（可选）</string>
-    <string name="editor_save">保存为可跟练曲目</string>
-    <string name="editor_need_title">请先填写曲名</string>
-    <string name="editor_need_notes">请先添加至少一个音符</string>
-    <string name="editor_self_made">自录简谱</string>
-    <string name="editor_saved">已保存《%1$s》，可在列表里找到并跟练</string>
+    <!-- 练习活跃度 -->
+    <string name="activity_title">练习活跃度</string>
+    <string name="activity_scope">仅记录基本功与独立节拍器</string>
+    <string name="activity_today">今日练习</string>
+    <string name="activity_year">近一年</string>
+    <string name="activity_scroll">左右滑动查看</string>
+    <string name="activity_detail_hint">点击日期查看当天练习明细</string>
+    <string name="activity_heatmap_desc">近一年每日练习时间，点击查看单日明细</string>
+    <string name="activity_day_total">当日共练习</string>
+    <string name="activity_basics">基本功</string>
+    <string name="activity_metronome">节拍器</string>
+    <string name="activity_basics_note">只计正式训练 · 不含倒数、休息与暂停</string>
+    <string name="activity_metronome_note">按节拍器实际运行时间记录</string>
+    <string name="activity_local_note">按实际练习时间记录，仅保存在本机</string>
 
     <!-- 基本功 -->
     <string name="feat_strength_title">基本功</string>

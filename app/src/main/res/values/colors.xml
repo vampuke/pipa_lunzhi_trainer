@@ -41,4 +41,10 @@
     <color name="countdown_scrim">#F2FFFBF8</color>
     <!-- 节拍器熄灭的指示圆点 -->
     <color name="metro_dot_off">#FFE0D2C6</color>
+    <!-- 练习活跃度：GitHub 式绿色五档，低值与无记录也有明确区别 -->
+    <color name="activity_0">#FFDDD6CF</color>
+    <color name="activity_1">#FFA9E5B5</color>
+    <color name="activity_2">#FF5CC877</color>
+    <color name="activity_3">#FF2F9E4F</color>
+    <color name="activity_4">#FF1E6C39</color>
 </resources>

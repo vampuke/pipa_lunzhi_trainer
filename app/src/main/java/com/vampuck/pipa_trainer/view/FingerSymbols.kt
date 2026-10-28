@@ -5,7 +5,7 @@ import android.graphics.Paint
 import android.graphics.Path
 
 /**
- * 琵琶指法符号的统一绘制。谱面(JianpuView)和编辑器调色板(FingerGlyphView)都调用它，
+ * 琵琶指法符号的统一绘制。基本功的轮指按钮也调用它，保持符号外观一致。
  * 保证「按钮上看到的」与「谱子里画出来的」完全一致。
  *
  * 所有坐标以 (cx,cy) 为中心，scale 控制整体大小（1f≈谱面默认尺寸）。
@@ -24,7 +24,7 @@ object FingerSymbols {
     private val path2 = Path()
 
     /**
-     * @param code  指法 code（见 Fingerings）
+     * @param code 指法符号代号
      * @param cx,cy 中心坐标（px）
      * @param u     单位长度（px），符号整体按它缩放（谱面传 density*dp 后的基准）
      */
