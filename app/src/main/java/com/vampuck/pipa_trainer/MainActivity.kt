@@ -80,10 +80,8 @@ class MainActivity : AppCompatActivity() {
         val log = practiceStore.load()
         val basics = PracticeFormat.duration(log.totalMs(day, PracticeSource.BASICS))
         val metro = PracticeFormat.duration(log.totalMs(day, PracticeSource.METRONOME))
-        val free = PracticeFormat.duration(log.totalMs(day, PracticeSource.FREE))
         val message = "${getString(R.string.activity_day_total)}：${PracticeFormat.duration(log.totalMs(day))}\n\n" +
             "${getString(R.string.activity_basics)}：$basics\n${getString(R.string.activity_basics_note)}\n\n" +
-            "${getString(R.string.activity_free)}：$free\n${getString(R.string.activity_free_note)}\n\n" +
             "${getString(R.string.activity_metronome)}：$metro\n${getString(R.string.activity_metronome_note)}\n\n" +
             getString(R.string.activity_local_note)
         MaterialAlertDialogBuilder(this)

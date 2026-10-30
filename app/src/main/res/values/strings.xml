@@ -109,8 +109,6 @@
     <string name="activity_day_total">当日共练习</string>
     <string name="activity_basics">基本功</string>
     <string name="activity_metronome">节拍器</string>
-    <string name="activity_free">自由练习</string>
-    <string name="activity_free_note">按倒计时或秒表的实际运行时间记录</string>
     <string name="activity_basics_note">只计正式训练 · 不含倒数、休息与暂停</string>
     <string name="activity_metronome_note">按节拍器实际运行时间记录</string>
     <string name="activity_local_note">按实际练习时间记录，仅保存在本机</string>
