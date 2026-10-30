@@ -1,8 +1,8 @@
 package com.vampuck.pipa_trainer.practice
 
-/** Only these two activities are practice; opening a page alone never counts. */
+/** Only actual running practice time counts; opening a page alone never counts. */
 enum class PracticeSource(val key: String) {
-    BASICS("basics"), METRONOME("metronome")
+    BASICS("basics"), METRONOME("metronome"), FREE("free")
 }
 
 /** A session checkpoint replaces its previous value, never double-counting it. */

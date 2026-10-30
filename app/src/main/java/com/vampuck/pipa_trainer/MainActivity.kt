@@ -31,6 +31,7 @@ class MainActivity : AppCompatActivity() {
         bindFeature(b.itStrength, R.drawable.ic_strength, R.string.feat_strength_title, R.string.feat_strength_sub)
         bindFeature(b.itTuner, R.drawable.ic_tuner, R.string.feat_tuner_title, R.string.feat_tuner_sub)
         bindFeature(b.itMetronome, R.drawable.ic_metronome, R.string.feat_metronome_title, R.string.feat_metronome_sub)
+        bindFeature(b.itFree, R.drawable.ic_free_practice, R.string.feat_free_title, R.string.feat_free_sub)
 
         b.btnStrength.setOnClickListener {
             startActivity(Intent(this, StrengthTrainingActivity::class.java))
@@ -40,6 +41,9 @@ class MainActivity : AppCompatActivity() {
         }
         b.btnMetronome.setOnClickListener {
             startActivity(Intent(this, MetronomeActivity::class.java))
+        }
+        b.btnFree.setOnClickListener {
+            startActivity(Intent(this, FreePracticeActivity::class.java))
         }
 
         b.practiceActivity.activityHeatmap.onDayClick = { showPracticeDay(it) }
@@ -76,8 +80,10 @@ class MainActivity : AppCompatActivity() {
         val log = practiceStore.load()
         val basics = PracticeFormat.duration(log.totalMs(day, PracticeSource.BASICS))
         val metro = PracticeFormat.duration(log.totalMs(day, PracticeSource.METRONOME))
+        val free = PracticeFormat.duration(log.totalMs(day, PracticeSource.FREE))
         val message = "${getString(R.string.activity_day_total)}：${PracticeFormat.duration(log.totalMs(day))}\n\n" +
             "${getString(R.string.activity_basics)}：$basics\n${getString(R.string.activity_basics_note)}\n\n" +
+            "${getString(R.string.activity_free)}：$free\n${getString(R.string.activity_free_note)}\n\n" +
             "${getString(R.string.activity_metronome)}：$metro\n${getString(R.string.activity_metronome_note)}\n\n" +
             getString(R.string.activity_local_note)
         MaterialAlertDialogBuilder(this)
