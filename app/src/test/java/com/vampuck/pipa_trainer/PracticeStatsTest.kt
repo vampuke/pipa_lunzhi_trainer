@@ -105,11 +105,31 @@ class PracticeRecorderTest {
             val r = PracticeRecorder { id, source, day, ms -> log.put(id, source, day, ms) }
             r.start(PracticeSource.BASICS, 0, wall)
             r.pause(1_000)
-            r.resume(10_000)
+            // Keep the wall-clock in sync with the simulated monotonic jump.
+            r.resume(10_000, wall + 10_000)
             r.stop(11_000)
             assertEquals(1_000, log.totalMs("2026-10-27"))
             assertEquals(1_000, log.totalMs("2026-10-28"))
         } finally { java.util.TimeZone.setDefault(zone) }
+    }
+    @Test
+    fun `free practice contributes its own source to daily activity`() {
+        val log = PracticeLog()
+        log.put("free", PracticeSource.FREE, "2026-10-30", 15 * 60_000L)
+        assertEquals(15 * 60_000L, log.totalMs("2026-10-30", PracticeSource.FREE))
+        assertEquals(15 * 60_000L, log.totalMs("2026-10-30"))
+        assertEquals(0L, log.totalMs("2026-10-30", PracticeSource.METRONOME))
+    }
+
+    @Test
+    fun `free practice recorder excludes paused time`() {
+        val log = PracticeLog()
+        val recorder = PracticeRecorder { id, source, day, ms -> log.put(id, source, day, ms) }
+        recorder.start(PracticeSource.FREE, 0, 1_000_000)
+        recorder.pause(5_000)
+        recorder.resume(20_000, 1_020_000)
+        recorder.stop(25_000)
+        assertEquals(10_000L, log.totalMs("1970-01-01", PracticeSource.FREE))
     }
 }
 

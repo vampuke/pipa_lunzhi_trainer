@@ -6,6 +6,33 @@
     <string name="feat_tuner_sub">琵琶 · 古筝 · 吉他，音名 + 音分</string>
     <string name="feat_metronome_title">节拍器</string>
     <string name="feat_metronome_sub">整拍 / 分拍 · 重音切换 · 常用速度</string>
+    <string name="feat_free_title">自由练习</string>
+    <string name="feat_free_sub">倒计时 / 秒表 · 随心练习也计入活跃度</string>
+    <string name="free_title">自由练习</string>
+    <string name="free_subtitle">不限内容，专心练自己的曲目或指法</string>
+    <string name="free_mode">计时模式</string>
+    <string name="free_countdown">倒计时</string>
+    <string name="free_stopwatch">秒表</string>
+    <string name="free_countdown_remaining">剩余时间</string>
+    <string name="free_elapsed">已练习</string>
+    <string name="free_duration">倒计时时长</string>
+    <string name="free_duration_value">%1$d 分钟</string>
+    <string name="free_duration_minus">减少一分钟</string>
+    <string name="free_duration_plus">增加一分钟</string>
+    <string name="free_ready">设定时长后点击开始</string>
+    <string name="free_running">专心练习，时间正在记录</string>
+    <string name="free_paused">已暂停，暂停期间不计入练习</string>
+    <string name="free_completed">时间到，本次练习已完成</string>
+    <string name="free_stopped">本次练习已结束，点击开始可重新计时</string>
+    <string name="free_background">已自动暂停，回来点「继续」接着练</string>
+    <string name="free_start">开始</string>
+    <string name="free_pause">暂停</string>
+    <string name="free_resume">继续</string>
+    <string name="free_reset">结束</string>
+    <string name="free_activity_note">实际计时将计入首页「练习活跃度」。暂停、切后台和锁屏自动暂停；倒计时可设 1–180 分钟。</string>
+    <string name="free_quit_title">结束自由练习？</string>
+    <string name="free_quit_message">确定结束这次计时吗？已练习的时间会保留在活跃度中。</string>
+    <string name="free_quit_confirm">结束</string>
     <string name="btn_start">开始</string>
     <string name="metro_bpm">速度 (BPM)</string>
 
@@ -73,7 +100,7 @@
 
     <!-- 练习活跃度 -->
     <string name="activity_title">练习活跃度</string>
-    <string name="activity_scope">仅记录基本功与独立节拍器</string>
+    <string name="activity_scope">记录基本功、自由练习与独立节拍器</string>
     <string name="activity_today">今日练习</string>
     <string name="activity_year">近一年</string>
     <string name="activity_scroll">左右滑动查看</string>
