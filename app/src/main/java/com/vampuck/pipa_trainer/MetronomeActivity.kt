@@ -5,6 +5,7 @@ import android.animation.ValueAnimator
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
+import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import android.widget.SeekBar
 import android.widget.Toast
@@ -66,6 +67,8 @@ class MetronomeActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         b = ActivityMetronomeBinding.inflate(layoutInflater)
         setContentView(b.root)
+        // 停留在节拍器页时不自动熄屏。
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         bpm = MetronomePrefs.bpm(this)
 
         surfaceColor = getColor(R.color.surface)

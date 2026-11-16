@@ -114,6 +114,8 @@ class StrengthTrainingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         b = ActivityStrengthTrainingBinding.inflate(layoutInflater)
         setContentView(b.root)
+        // 停留在基本功页时不自动熄屏，与训练运行状态无关。
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // 引导音只负责发声：不再有麦克风统计，所以不需要注册节拍回调。
         metronome.setAccentFirst(accentFirst)
@@ -193,7 +195,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
     /**
      * 切后台（来电、切应用、锁屏）不再把整组训练作废——一组排下来可能 20 多分钟，
      * 接个电话全没了代价太大。改成**自动暂停**：elapsedMs 原地不动，回来点「继续」
-     * 接着练。同时把 ticker 停掉，后台不必每 100ms 空转；屏幕也允许正常熄灭。
+     * 接着练。同时把 ticker 停掉，后台不必每 100ms 空转；常亮标记只在页面可见时生效。
      *
      * 真正丢掉会话只剩一种情况：Activity 被销毁（进程回收 / 退到首页）——那需要
      * 前台服务才能救，不在这次范围内。
@@ -209,7 +211,6 @@ class StrengthTrainingActivity : AppCompatActivity() {
             render()
         }
         handler.removeCallbacks(ticker)
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     override fun onResume() {
@@ -217,7 +218,6 @@ class StrengthTrainingActivity : AppCompatActivity() {
         if (!running) return
         // 重新锚定：后台那段时间不该算进训练。暂停中也不累加，所以两条路径都安全。
         anchorMs = SystemClock.elapsedRealtime()
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         handler.removeCallbacks(ticker)
         handler.post(ticker)
         render()
@@ -775,7 +775,6 @@ class StrengthTrainingActivity : AppCompatActivity() {
         b.runGroup.visibility = View.VISIBLE
         b.btnStartTraining.visibility = View.GONE
         b.btnPause.setText(R.string.strength_pause)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // 记下这次实际开跑的配置：下次进来能在「常用配置」里直接选。
         // 用 displayName()（用户定过的名字）——这里原来传的是自动名，会把用户
@@ -1033,7 +1032,6 @@ class StrengthTrainingActivity : AppCompatActivity() {
         stopGuide()
         try { metronome.stop() } catch (_: Throwable) {}
         try { tone.stop() } catch (_: Throwable) {}
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     // ---------------- 结算 ----------------
