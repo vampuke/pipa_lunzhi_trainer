@@ -153,6 +153,8 @@ class PracticeStatsTest {
         assertEquals(2, PracticeStats.level(10 * 60_000L))
         assertEquals(3, PracticeStats.level(20 * 60_000L))
         assertEquals(4, PracticeStats.level(30 * 60_000L))
+        assertEquals(4, PracticeStats.level(59 * 60_000L + 59_000L))
+        assertEquals(5, PracticeStats.level(60 * 60_000L))
     }
 
     @Test
