@@ -41,7 +41,8 @@ object PracticeStats {
         elapsedMs < 10 * 60_000L -> 1
         elapsedMs < 20 * 60_000L -> 2
         elapsedMs < 30 * 60_000L -> 3
-        else -> 4
+        elapsedMs < 60 * 60_000L -> 4
+        else -> 5
     }
 
     fun streak(log: PracticeLog, today: String): Int {

@@ -10,6 +10,7 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.vampuck.pipa_trainer.audio.Metronome
+import com.vampuck.pipa_trainer.data.MetronomePrefs
 import com.vampuck.pipa_trainer.databinding.ActivityMetronomeBinding
 import com.vampuck.pipa_trainer.practice.PracticeRecorder
 import com.vampuck.pipa_trainer.practice.PracticeSource
@@ -22,9 +23,9 @@ import android.os.SystemClock
 /**
  * 独立节拍器。
  *
- *  - 拍型：四分音符整拍（每拍一响）/ 八分音符分拍（每拍中间多一记弱音）。
- *  - 速度：20–200 BPM，SeekBar 粗调 + −/+ 微调 + 常用速度(80–100)快捷按钮。
- *  - 重音：强调每小节第一拍（首拍不同、其余三拍相同）/ 四拍完全相同，一键切换。
+ *  - 拍型：默认八分音符分拍（每拍中间多一记弱音），可切换四分音符整拍 / 轮指。
+ *  - 速度：20–200 BPM，记住上次 BPM（首次 80），SeekBar 粗调 + −/+ 微调 + 常用速度(80–100)快捷按钮。
+ *  - 重音：默认每拍相同，可一键切换为强调每小节第一拍（首拍不同、其余三拍相同）。
  *  - 「开始 / 停止」是节奏声音的快捷开关；改任意参数即时生效，无需重启。
  *
  * 运行时的视觉指示（参考成熟节拍器）：每一拍都会让显示卡整体「闪一下」、
@@ -41,7 +42,7 @@ class MetronomeActivity : AppCompatActivity() {
         PracticeRecorder(store::save)
     }
 
-    private var bpm = 80
+    private var bpm = MetronomePrefs.DEFAULT_BPM
     /** 当前模式用到的指示圆点，数量随模式变化（4 整拍 / 8 分拍 / 5 轮指）。 */
     private var dots: List<View> = emptyList()
     private var slotCount = 4
@@ -65,13 +66,14 @@ class MetronomeActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         b = ActivityMetronomeBinding.inflate(layoutInflater)
         setContentView(b.root)
+        bpm = MetronomePrefs.bpm(this)
 
         surfaceColor = getColor(R.color.surface)
         accentColor = getColor(R.color.pipa_accent)
         downbeatColor = getColor(R.color.pipa_primary)
 
         dots = emptyList()
-        rebuildDots(4)
+        rebuildDots(8)
 
         metronome.onError = { msg ->
             runOnUiThread { Toast.makeText(this, "节拍器无法播放：$msg", Toast.LENGTH_LONG).show() }
@@ -108,7 +110,8 @@ class MetronomeActivity : AppCompatActivity() {
         b.btnQuarter.symbol = SymbolButton.Symbol.QUARTER
         b.btnEighth.symbol = SymbolButton.Symbol.EIGHTH_PAIR
         b.btnLunzhi.symbol = SymbolButton.Symbol.LUN
-        b.modeGroup.check(R.id.btnQuarter)
+        b.modeGroup.check(R.id.btnEighth)
+        metronome.setMode(Metronome.MODE_EIGHTH)
         b.modeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             when (checkedId) {
@@ -119,8 +122,8 @@ class MetronomeActivity : AppCompatActivity() {
         }
 
         // ---- 重音：强调首拍 / 四拍相同 ----
-        b.accentGroup.check(R.id.btnAccentFirst)
-        metronome.setAccentFirst(true)
+        b.accentGroup.check(R.id.btnAccentSame)
+        metronome.setAccentFirst(false)
         b.accentGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             metronome.setAccentFirst(checkedId == R.id.btnAccentFirst)
@@ -137,10 +140,13 @@ class MetronomeActivity : AppCompatActivity() {
         applyBpm(bpm)   // 初始化显示与 SeekBar
     }
 
-    /** 统一入口：夹到 20..200，更新 BPM、SeekBar、显示并同步节拍器。 */
+    /** 统一入口：夹到 20..200，速度改变时保存，更新 SeekBar、显示并同步节拍器。 */
     private fun applyBpm(value: Int, fromSeek: Boolean = false) {
         val v = value.coerceIn(MIN_BPM, MAX_BPM)
-        bpm = v
+        if (bpm != v) {
+            bpm = v
+            MetronomePrefs.saveBpm(this, v)
+        }
         b.bpmValue.text = v.toString()
         if (!fromSeek) b.seekBpm.progress = v - MIN_BPM
         metronome.setBpm(v.toDouble())
@@ -284,7 +290,7 @@ class MetronomeActivity : AppCompatActivity() {
         for (d in dots) d.animate().cancel()
     }
 
-    private companion object {
+    companion object {
         const val MIN_BPM = 20
         const val MAX_BPM = 200
     }

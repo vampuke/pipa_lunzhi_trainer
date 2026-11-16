@@ -24,7 +24,8 @@ class PracticeHeatmapView @JvmOverloads constructor(
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
     private val colors = intArrayOf(R.color.activity_0, R.color.activity_1,
-        R.color.activity_2, R.color.activity_3, R.color.activity_4).map { context.getColor(it) }
+        R.color.activity_2, R.color.activity_3, R.color.activity_4,
+        R.color.activity_5).map { context.getColor(it) }
     private val textColor = context.getColor(R.color.text_secondary)
     private var log = PracticeLog()
     private var today = PracticeDay.today()

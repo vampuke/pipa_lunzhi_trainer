@@ -84,34 +84,45 @@
                 android:contentDescription="@string/activity_heatmap_desc" />
         </HorizontalScrollView>
 
-        <LinearLayout
-            android:layout_width="wrap_content"
+        <!-- 六档图例在宽度不足时可横向滑动。 -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:orientation="horizontal">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="分钟" android:textColor="@color/text_secondary" android:textSize="10sp" />
-            <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="14dp"
-                android:src="@drawable/activity_level_0" android:contentDescription="@null" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_marginStart="4dp" android:text="0" android:textColor="@color/text_secondary" android:textSize="10sp" />
-            <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="10dp"
-                android:src="@drawable/activity_level_1" android:contentDescription="@null" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_marginStart="4dp" android:text="1–9" android:textColor="@color/text_secondary" android:textSize="10sp" />
-            <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="10dp"
-                android:src="@drawable/activity_level_2" android:contentDescription="@null" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_marginStart="4dp" android:text="10–19" android:textColor="@color/text_secondary" android:textSize="10sp" />
-            <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="10dp"
-                android:src="@drawable/activity_level_3" android:contentDescription="@null" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_marginStart="4dp" android:text="20–29" android:textColor="@color/text_secondary" android:textSize="10sp" />
-            <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="10dp"
-                android:src="@drawable/activity_level_4" android:contentDescription="@null" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_marginStart="4dp" android:text="30+" android:textColor="@color/text_secondary" android:textSize="10sp" />
-        </LinearLayout>
+            android:scrollbars="none"
+            android:fillViewport="false">
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="分钟" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="10dp"
+                    android:src="@drawable/activity_level_0" android:contentDescription="@null" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp" android:text="0" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="7dp"
+                    android:src="@drawable/activity_level_1" android:contentDescription="@null" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp" android:text="1–9" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="7dp"
+                    android:src="@drawable/activity_level_2" android:contentDescription="@null" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp" android:text="10–19" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="7dp"
+                    android:src="@drawable/activity_level_3" android:contentDescription="@null" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp" android:text="20–29" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="7dp"
+                    android:src="@drawable/activity_level_4" android:contentDescription="@null" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp" android:text="30–59" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="7dp"
+                    android:src="@drawable/activity_level_5" android:contentDescription="@null" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp" android:text="60+" android:textColor="@color/text_secondary" android:textSize="10sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
 
         <TextView
             android:layout_width="wrap_content"
