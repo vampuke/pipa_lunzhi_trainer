@@ -104,7 +104,7 @@
                 <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="7dp"
                     android:src="@drawable/activity_level_1" android:contentDescription="@null" />
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp" android:text="1–9" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                    android:layout_marginStart="4dp" android:text="@string/activity_band_under_ten" android:textColor="@color/text_secondary" android:textSize="10sp" />
                 <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginStart="7dp"
                     android:src="@drawable/activity_level_2" android:contentDescription="@null" />
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"

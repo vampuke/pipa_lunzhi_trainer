@@ -11,8 +11,8 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.vampuck.pipa_trainer.databinding.ActivityFreePracticeBinding
 import com.vampuck.pipa_trainer.practice.FreePracticeMode
 import com.vampuck.pipa_trainer.practice.FreePracticeTimer
+import com.vampuck.pipa_trainer.practice.FreePracticeSession
 import com.vampuck.pipa_trainer.practice.PracticeRecorder
-import com.vampuck.pipa_trainer.practice.PracticeSource
 import com.vampuck.pipa_trainer.practice.PracticeStore
 
 /** Free practice timer; no mic, sound, permissions or network involved. */
@@ -27,6 +27,7 @@ class FreePracticeActivity : AppCompatActivity() {
         val store = PracticeStore(applicationContext)
         PracticeRecorder(store::save)
     }
+    private var session: FreePracticeSession? = null
     private val handler = Handler(Looper.getMainLooper())
     private val ticker = object : Runnable {
         override fun run() {
@@ -75,7 +76,8 @@ class FreePracticeActivity : AppCompatActivity() {
     }
 
     private fun rebuildTimer() {
-        recorder.stop(SystemClock.elapsedRealtime())
+        session?.stop(SystemClock.elapsedRealtime())
+        session = null
         timer = FreePracticeTimer(mode, durationMin * 60_000L)
         startedThisVisit = false
         handler.removeCallbacks(ticker)
@@ -90,8 +92,7 @@ class FreePracticeActivity : AppCompatActivity() {
         if (timer.isStarted && !timer.isCompleted) return
         val now = SystemClock.elapsedRealtime()
         rebuildTimer()
-        timer.start(now)
-        recorder.start(PracticeSource.FREE, now)
+        session = FreePracticeSession(timer, recorder).also { it.start(now) }
         startedThisVisit = true
         nextCheckpointMs = now + 5_000L
         handler.post(ticker)
@@ -101,8 +102,11 @@ class FreePracticeActivity : AppCompatActivity() {
     private fun pause(manual: Boolean) {
         if (!timer.isStarted || timer.isPaused || timer.isCompleted) return
         val now = SystemClock.elapsedRealtime()
-        timer.pause(now)
-        recorder.pause(now)
+        session?.pause(now)
+        if (timer.isCompleted) {
+            complete()
+            return
+        }
         handler.removeCallbacks(ticker)
         render()
         if (!manual) b.timeHint.setText(R.string.free_background)
@@ -111,15 +115,13 @@ class FreePracticeActivity : AppCompatActivity() {
     private fun resume() {
         if (!timer.isStarted || !timer.isPaused || timer.isCompleted) return
         val now = SystemClock.elapsedRealtime()
-        timer.resume(now)
-        recorder.resume(now)
+        session?.resume(now)
         nextCheckpointMs = now + 5_000L
         handler.post(ticker)
         render()
     }
 
     private fun complete() {
-        recorder.stop(SystemClock.elapsedRealtime())
         handler.removeCallbacks(ticker)
         startedThisVisit = false
         render()
@@ -129,10 +131,10 @@ class FreePracticeActivity : AppCompatActivity() {
     private fun tick() {
         val now = SystemClock.elapsedRealtime()
         if (now >= nextCheckpointMs) {
-            recorder.checkpoint(now)
+            session?.checkpoint(now)
             nextCheckpointMs = now + 5_000L
         }
-        if (timer.pollCompletion(now)) {
+        if (session?.pollCompletion(now) == true) {
             complete()
             return
         }
@@ -196,7 +198,7 @@ class FreePracticeActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
-        recorder.stop(SystemClock.elapsedRealtime())
+        session?.stop(SystemClock.elapsedRealtime())
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         super.onDestroy()
     }

@@ -12,6 +12,7 @@ class FreePracticeTimer(
     private var anchorMs = 0L
     private var accumulatedMs = 0L
     private var completionDelivered = false
+    private var pausedEndpointMs = 0L
 
     var isStarted = false
         private set
@@ -36,6 +37,7 @@ class FreePracticeTimer(
 
     fun pause(now: Long) {
         if (!isStarted || isPaused || isCompleted) return
+        pausedEndpointMs = recordingEndAt(now)
         accumulatedMs = elapsedAt(now)
         isPaused = true
     }
@@ -63,6 +65,14 @@ class FreePracticeTimer(
     fun displayedMsAt(now: Long): Long = when (mode) {
         FreePracticeMode.STOPWATCH -> elapsedAt(now)
         FreePracticeMode.COUNTDOWN -> (targetMs - elapsedAt(now)).coerceAtLeast(0L)
+    }
+
+    /** Exact endpoint of the current active segment, even before completion is polled. */
+    fun recordingEndAt(now: Long): Long = when {
+        !isStarted -> now
+        isPaused -> pausedEndpointMs
+        mode == FreePracticeMode.STOPWATCH -> now
+        else -> now.coerceAtMost(anchorMs + (targetMs - accumulatedMs).coerceAtLeast(0L))
     }
 
     /** The caller stops recording before invoking this again. */
