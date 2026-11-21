@@ -26,13 +26,3 @@ class PracticeStore(context: Context) {
         return PracticeLog.decode(rows)
     }
 }
-
-object PracticeFormat {
-    fun duration(ms: Long): String {
-        val totalMinutes = ms / 60_000L
-        return if (totalMinutes < 60) "$totalMinutes 分钟"
-        else "${totalMinutes / 60} 小时 ${totalMinutes % 60} 分钟"
-    }
-
-    fun fullDate(day: String): String = PracticeDay.displayDate(day)
-}

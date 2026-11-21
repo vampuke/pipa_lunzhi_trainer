@@ -22,10 +22,9 @@ import com.vampuck.pipa_trainer.audio.TonePlayer
 import com.vampuck.pipa_trainer.data.TrainingConfigStore
 import com.vampuck.pipa_trainer.databinding.ActivityStrengthTrainingBinding
 import com.vampuck.pipa_trainer.databinding.ItemRoundPlanBinding
-import com.vampuck.pipa_trainer.practice.PracticeSource
 import com.vampuck.pipa_trainer.practice.PracticeRecorder
 import com.vampuck.pipa_trainer.practice.PracticeStore
-import com.vampuck.pipa_trainer.training.RoundTiming
+import com.vampuck.pipa_trainer.training.StrengthPracticeSession
 import com.vampuck.pipa_trainer.training.TrainingConfig
 import com.vampuck.pipa_trainer.training.TrainingPlan
 import kotlin.math.ceil
@@ -42,7 +41,7 @@ import kotlin.math.roundToInt
  *  - 引导音按目标速度走（[guidePerBeat]：每拍一轮 / 每击一响），训练开始自动响、休息自动停；
  *  - 可随时暂停 / 跳过当前阶段 / 追加一次 / 取消还没开始的次数 / 结束训练。
  *
- * 时间轴交给纯逻辑的 [TrainingPlan]（有单元测试），界面每次 tick 用
+ * 时间轴与练习记录交给纯逻辑的 [StrengthPracticeSession]，界面每次 tick 用
  * [SystemClock.elapsedRealtime] 重算已过去的秒数并映射到阶段，因此暂停、跳过、
  * 增删次数都不会让计时漂移或错位。
  */
@@ -54,7 +53,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
     private val metronome = Metronome()
     private val practiceStore by lazy { PracticeStore(applicationContext) }
     private val recorder by lazy { PracticeRecorder(practiceStore::save) }
-    private var lastPracticeSaveMs = 0L
+    private val practice by lazy { StrengthPracticeSession(plan, recorder) }
     private val tone = TonePlayer()
 
     // ---- 设置项 ----
@@ -86,15 +85,10 @@ class StrengthTrainingActivity : AppCompatActivity() {
     // ---- 运行状态 ----
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
-    private var paused = false
-    private var elapsedMs = 0L
-    private var anchorMs = 0L
+    private val paused: Boolean get() = practice.isPaused
+    private val elapsedMs: Long get() = practice.elapsedMs
     private var currentPhase: TrainingPlan.Phase? = null
     private var phaseRound = -1
-    private var roundStartMs = 0L
-    // 「跳过本次训练」时记下这一轮已真实弹奏的毫秒数：阶段切换结算该轮时用它，
-    // 否则会用 null（= 打满整轮）把被跳过的半截轮按整轮算，小结里的实练时长就偏长。
-    private var skipWorkOverrideMs: Long? = null
     private var lastRestTick = -1
     /** [paused] 是被 [onStop] 切后台自动按下的（用来在回来时提示一句，而不是静默停下）。 */
     private var pausedByBackground = false
@@ -148,8 +142,9 @@ class StrengthTrainingActivity : AppCompatActivity() {
         b.btnPause.setOnClickListener { togglePause() }
         b.btnSkip.setOnClickListener { skipStage() }
         b.btnRunAdd.setOnClickListener {
-            plan.addRound()
-            toast(R.string.strength_added)
+            val size = plan.size
+            practice.append(SystemClock.elapsedRealtime())
+            if (plan.size > size) toast(R.string.strength_added)
             render()
         }
         b.btnRunDrop.setOnClickListener { dropLastPending() }
@@ -203,9 +198,8 @@ class StrengthTrainingActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         if (running && !paused) {
-            paused = true
-            pausedByBackground = true
-            recorder.pause(SystemClock.elapsedRealtime())
+            practice.pause(SystemClock.elapsedRealtime())
+            pausedByBackground = paused
             stopGuide()
             b.btnPause.setText(R.string.strength_resume)
             render()
@@ -216,8 +210,6 @@ class StrengthTrainingActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (!running) return
-        // 重新锚定：后台那段时间不该算进训练。暂停中也不累加，所以两条路径都安全。
-        anchorMs = SystemClock.elapsedRealtime()
         handler.removeCallbacks(ticker)
         handler.post(ticker)
         render()
@@ -758,12 +750,9 @@ class StrengthTrainingActivity : AppCompatActivity() {
         // beginTraining 直接绑按钮时别丢）：去掉麦克风权限分支后仍要保留。
         if (plan.rounds.isEmpty()) return
         results.clear()
-        lastPracticeSaveMs = 0L
         running = true
-        paused = false
         pausedByBackground = false
-        elapsedMs = 0L
-        anchorMs = SystemClock.elapsedRealtime()
+        practice.start(SystemClock.elapsedRealtime())
         currentPhase = null
         phaseRound = -1
         lastRestTick = -1
@@ -790,19 +779,9 @@ class StrengthTrainingActivity : AppCompatActivity() {
     private val ticker = object : Runnable {
         override fun run() {
             if (!running) return
-            val now = SystemClock.elapsedRealtime()
-            val delta = now - anchorMs
-            anchorMs = now
-            // 暂停时**不**累加 elapsedMs：整条时间轴停在原地（恢复时重新锚定 anchorMs），
-            // 所以轮次结算的分母就是这一轮的时长本身，不需要另外记暂停时长。
-            if (!paused) elapsedMs += delta
-            if (!paused && currentPhase == TrainingPlan.Phase.WORK && phaseRound >= 0 &&
-                elapsedMs - lastPracticeSaveMs >= 5_000L) {
-                recorder.checkpoint(now)
-                lastPracticeSaveMs = elapsedMs
-            }
+            practice.update(SystemClock.elapsedRealtime())
             render()
-            handler.postDelayed(this, TICK_MS)
+            if (running) handler.postDelayed(this, TICK_MS)
         }
     }
 
@@ -812,17 +791,8 @@ class StrengthTrainingActivity : AppCompatActivity() {
         val changed = st.phase != currentPhase ||
             (st.phase == TrainingPlan.Phase.WORK && st.roundIndex != phaseRound)
         if (changed) {
-            val prevPhase = currentPhase
-            val prevRound = phaseRound
             currentPhase = st.phase
             phaseRound = st.roundIndex
-            if (prevPhase == TrainingPlan.Phase.WORK && prevRound >= 0) {
-                recorder.stop(SystemClock.elapsedRealtime())
-                // 正常跑完一轮 → null（打满整轮）；被「跳过」提前离开 → 用实际弹奏时长，
-                // 否则半截轮按整轮算，小结里的实练时长就偏长。
-                captureRoundResult(prevRound, skipWorkOverrideMs)
-            }
-            skipWorkOverrideMs = null
             onEnter(st)
             if (!running) return          // 收尾（总结弹窗）已接管
         }
@@ -832,11 +802,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
 
     private fun onEnter(st: TrainingPlan.Stage) {
         when (st.phase) {
-            TrainingPlan.Phase.WORK -> {
-                roundStartMs = elapsedMs
-                recorder.start(PracticeSource.BASICS, SystemClock.elapsedRealtime())
-                lastPracticeSaveMs = elapsedMs
-            }
+            TrainingPlan.Phase.WORK -> { /* 练习记录由时间轴按正式训练边界结算。 */ }
             TrainingPlan.Phase.REST -> {
                 lastRestTick = -1
             }
@@ -972,43 +938,30 @@ class StrengthTrainingActivity : AppCompatActivity() {
 
     private fun togglePause() {
         if (!running) return
-        paused = !paused
+        val now = SystemClock.elapsedRealtime()
         pausedByBackground = false
-        if (paused) {
-            recorder.pause(SystemClock.elapsedRealtime())
+        if (paused) practice.resume(now) else {
+            practice.pause(now)
             stopGuide()
-        } else {
-            recorder.resume(SystemClock.elapsedRealtime())
-            anchorMs = SystemClock.elapsedRealtime()
         }
         b.btnPause.setText(if (paused) R.string.strength_resume else R.string.strength_pause)
         render()
     }
 
-    /** 跳过当前阶段（倒数 / 本次训练 / 休息）。 */
+    /** 跳过当前阶段（倒数 / 本次训练 / 休息），只结算真实经过的时间。 */
     private fun skipStage() {
         if (!running || paused) return
-        val sec = elapsedMs / 1000.0
-        // 若正跳过一轮 WORK，记下它已真实弹奏的时长，供下一 tick 结算该轮时用——
-        // 不记就会用 null（打满整轮）把半截轮按整轮算，实练时长偏长。
-        if (currentPhase == TrainingPlan.Phase.WORK && phaseRound >= 0) {
-            skipWorkOverrideMs = (elapsedMs - roundStartMs).coerceAtLeast(1000L)
-        }
-        val end = plan.stageEndSec(sec)
-        elapsedMs = (end * 1000).toLong()
+        practice.skip(SystemClock.elapsedRealtime())
         render()
     }
 
     /** 追加/取消训练次数（训练中）。 */
     private fun dropLastPending() {
-        val st = plan.stageAt(elapsedMs / 1000.0)
-        val idx = plan.size - 1
-        if (idx < 0 || !plan.canRemoveDuringRun(idx, st)) {
+        if (!practice.dropLast(SystemClock.elapsedRealtime())) {
             toast(if (plan.size <= 1) R.string.strength_keep_one else R.string.strength_cannot_drop)
-            return
+        } else {
+            toast(R.string.strength_dropped)
         }
-        plan.removeRound(idx)
-        toast(R.string.strength_dropped)
         render()
     }
 
@@ -1024,9 +977,8 @@ class StrengthTrainingActivity : AppCompatActivity() {
     }
 
     private fun stopEverything() {
-        recorder.stop(SystemClock.elapsedRealtime())
+        practice.stop(SystemClock.elapsedRealtime())
         running = false
-        paused = false
         pausedByBackground = false
         handler.removeCallbacks(ticker)
         stopGuide()
@@ -1036,31 +988,17 @@ class StrengthTrainingActivity : AppCompatActivity() {
 
     // ---------------- 结算 ----------------
 
-    private fun captureRoundResult(index: Int, playedMsOverride: Long?) {
-        val r = roundAt(index) ?: return
-        // 分母只认真实弹奏时长：暂停期间 elapsedMs 本来就不累加，所以跑满一轮时
-        // 就是这一轮的时长本身；被「跳过」提前离开时用实际弹奏时长。
-        val playedMs = RoundTiming.playedMs(r.durationSec, playedMsOverride)
-        results.add(
-            RoundResult(
-                index = index,
-                targetBpm = r.bpm,
-                plannedSec = r.durationSec,
-                playedSec = playedMs / 1000.0,
-                full = playedMsOverride == null
-            )
-        )
-    }
-
     private fun finishTraining(early: Boolean = false) {
-        // 还没做完的那一次也计入小结（按已经弹过的时间算）
-        if (running && early && currentPhase == TrainingPlan.Phase.WORK && phaseRound >= 0) {
-            // elapsedMs 在暂停时本来就不累加（暂停时长不在这一轮里），所以
-            // played 就取实弹时长。
-            val played = (elapsedMs - roundStartMs).coerceAtLeast(1000L)
-            captureRoundResult(phaseRound, played)
+        practice.stop(SystemClock.elapsedRealtime())
+        results.clear()
+        plan.rounds.forEachIndexed { index, round ->
+            if (practice.hasWork(index)) {
+                val playedMs = practice.playedMs(index)
+                results.add(RoundResult(index, round.bpm, round.durationSec, playedMs / 1000.0,
+                    playedMs == round.durationSec.toLong() * 1000L))
+            }
         }
-        val usedMs = elapsedMs
+        val usedMs = practice.activeMs
         stopEverything()
 
         val sb = StringBuilder()

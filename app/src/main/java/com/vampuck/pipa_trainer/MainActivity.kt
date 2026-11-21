@@ -13,6 +13,7 @@ import com.vampuck.pipa_trainer.practice.PracticeDay
 import com.vampuck.pipa_trainer.practice.PracticeFormat
 import com.vampuck.pipa_trainer.practice.PracticeSource
 import com.vampuck.pipa_trainer.practice.PracticeStats
+import com.vampuck.pipa_trainer.practice.PracticeSummary
 import com.vampuck.pipa_trainer.practice.PracticeStore
 import com.vampuck.pipa_trainer.update.UpdateChecker
 import kotlinx.coroutines.Dispatchers
@@ -78,12 +79,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun showPracticeDay(day: String) {
         val log = practiceStore.load()
-        val basics = PracticeFormat.duration(log.totalMs(day, PracticeSource.BASICS))
-        val metro = PracticeFormat.duration(log.totalMs(day, PracticeSource.METRONOME))
-        val message = "${getString(R.string.activity_day_total)}：${PracticeFormat.duration(log.totalMs(day))}\n\n" +
-            "${getString(R.string.activity_basics)}：$basics\n${getString(R.string.activity_basics_note)}\n\n" +
-            "${getString(R.string.activity_metronome)}：$metro\n${getString(R.string.activity_metronome_note)}\n\n" +
-            getString(R.string.activity_local_note)
+        val message = PracticeSummary.day(log, day, getString(R.string.activity_day_total),
+            mapOf(
+                PracticeSource.BASICS to (getString(R.string.activity_basics) to getString(R.string.activity_basics_note)),
+                PracticeSource.METRONOME to (getString(R.string.activity_metronome) to getString(R.string.activity_metronome_note)),
+                PracticeSource.FREE to (getString(R.string.activity_free) to getString(R.string.activity_free_note))
+            ), getString(R.string.activity_local_note))
         MaterialAlertDialogBuilder(this)
             .setTitle(PracticeFormat.fullDate(day))
             .setMessage(message)
