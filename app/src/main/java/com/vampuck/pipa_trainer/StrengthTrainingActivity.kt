@@ -24,6 +24,7 @@ import com.vampuck.pipa_trainer.databinding.ActivityStrengthTrainingBinding
 import com.vampuck.pipa_trainer.databinding.ItemRoundPlanBinding
 import com.vampuck.pipa_trainer.practice.PracticeRecorder
 import com.vampuck.pipa_trainer.practice.PracticeStore
+import com.vampuck.pipa_trainer.sync.PracticeSyncer
 import com.vampuck.pipa_trainer.training.StrengthPracticeSession
 import com.vampuck.pipa_trainer.training.TrainingConfig
 import com.vampuck.pipa_trainer.training.TrainingPlan
@@ -199,6 +200,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
         super.onStop()
         if (running && !paused) {
             practice.pause(SystemClock.elapsedRealtime())
+            PracticeSyncer.requestSync(applicationContext)
             pausedByBackground = paused
             stopGuide()
             b.btnPause.setText(R.string.strength_resume)
@@ -942,6 +944,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
         pausedByBackground = false
         if (paused) practice.resume(now) else {
             practice.pause(now)
+            PracticeSyncer.requestSync(applicationContext)
             stopGuide()
         }
         b.btnPause.setText(if (paused) R.string.strength_resume else R.string.strength_pause)
@@ -979,6 +982,7 @@ class StrengthTrainingActivity : AppCompatActivity() {
     private fun stopEverything() {
         practice.stop(SystemClock.elapsedRealtime())
         running = false
+        PracticeSyncer.requestSync(applicationContext)
         pausedByBackground = false
         handler.removeCallbacks(ticker)
         stopGuide()

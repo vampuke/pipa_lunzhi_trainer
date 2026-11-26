@@ -5,24 +5,35 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.vampuck.pipa_trainer.databinding.ActivityMainBinding
 import com.vampuck.pipa_trainer.practice.PracticeDay
 import com.vampuck.pipa_trainer.practice.PracticeFormat
 import com.vampuck.pipa_trainer.practice.PracticeSource
-import com.vampuck.pipa_trainer.practice.PracticeStats
+import com.vampuck.pipa_trainer.practice.ActivityViewData
+import com.vampuck.pipa_trainer.practice.PracticeLog
 import com.vampuck.pipa_trainer.practice.PracticeSummary
-import com.vampuck.pipa_trainer.practice.PracticeStore
+import com.vampuck.pipa_trainer.sync.AccountText
+import com.vampuck.pipa_trainer.sync.HomeSyncData
+import com.vampuck.pipa_trainer.sync.PracticeSyncer
 import com.vampuck.pipa_trainer.update.UpdateChecker
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AppCompatActivity() {
     private lateinit var b: ActivityMainBinding
-    private val practiceStore by lazy { PracticeStore(applicationContext) }
+    private val syncer by lazy { PracticeSyncer.get(applicationContext) }
+    private var displayedPractice = ActivityViewData(PracticeLog(), false)
+    private var displayedDay: String? = null
+    private val mergeNoticeInFlight = AtomicBoolean(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,12 +59,29 @@ class MainActivity : AppCompatActivity() {
         }
 
         b.practiceActivity.activityHeatmap.onDayClick = { showPracticeDay(it) }
+        b.practiceActivity.accountStatus.setOnClickListener {
+            startActivity(Intent(this, AccountActivity::class.java))
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                syncer.status.collectLatest {
+                    val home = renderPracticeActivity()
+                    showMergeNotice()
+                    if (home.activity.isCloud) {
+                        val now = System.currentTimeMillis()
+                        delay((PracticeDay.nextDayStart(now) - now).coerceAtLeast(1L))
+                        renderPracticeActivity()
+                    }
+                }
+            }
+        }
         checkForUpdate()
     }
 
     override fun onResume() {
         super.onResume()
-        renderPracticeActivity()
+        PracticeSyncer.requestSync(applicationContext)
+        lifecycleScope.launch { renderPracticeActivity() }
         // 从「允许安装未知应用」设置页返回：如已授权且有待装 APK，继续安装。
         // 路径存在 SharedPreferences 里——只放内存字段的话，跳设置页途中被系统
         // 回收，这次更新就静默丢了。
@@ -64,27 +92,49 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun renderPracticeActivity() {
-        val log = practiceStore.load()
+    private suspend fun renderPracticeActivity(): HomeSyncData {
+        val home = syncer.homeData()
+        val data = home.activity
         val today = PracticeDay.today()
-        val todayKey = today
-        b.practiceActivity.todayPractice.text = PracticeFormat.duration(log.totalMs(todayKey))
-        b.practiceActivity.streakPractice.text = "连续 ${PracticeStats.streak(log, todayKey)} 天"
-        b.practiceActivity.yearPractice.text = "近一年 ${PracticeFormat.duration(log.totalMsSince(PracticeDay.shift(today, -364)))}"
-        b.practiceActivity.activityHeatmap.submit(log, today)
-        b.practiceActivity.activityScroll.post {
-            b.practiceActivity.activityScroll.fullScroll(android.view.View.FOCUS_RIGHT)
+        val changed = displayedDay != today || displayedPractice.log.snapshot() != data.log.snapshot()
+        displayedPractice = data
+        displayedDay = today
+        b.practiceActivity.accountStatus.text = AccountText.status(this, home.account)
+        b.practiceActivity.activityScope.setText(if (data.isCloud) R.string.activity_cloud_note else R.string.activity_scope)
+        b.practiceActivity.todayPractice.text = PracticeFormat.duration(data.totalMs(today))
+        b.practiceActivity.streakPractice.text = getString(R.string.activity_streak_value, data.streak(today))
+        b.practiceActivity.yearPractice.text = getString(R.string.activity_year_value,
+            PracticeFormat.duration(data.totalMsSince(PracticeDay.shift(today, -364))))
+        b.practiceActivity.activityHeatmap.submit(data.log, today)
+        if (changed) {
+            b.practiceActivity.activityScroll.post {
+                b.practiceActivity.activityScroll.fullScroll(android.view.View.FOCUS_RIGHT)
+            }
+        }
+        return home
+    }
+
+    private fun showMergeNotice() {
+        if (isFinishing || !mergeNoticeInFlight.compareAndSet(false, true)) return
+        lifecycleScope.launch {
+            try {
+                val mergedDays = syncer.takeMergeNotice()
+                if (mergedDays > 0 && !isFinishing) {
+                    Toast.makeText(this@MainActivity, getString(R.string.account_merged, mergedDays), Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                mergeNoticeInFlight.set(false)
+            }
         }
     }
 
     private fun showPracticeDay(day: String) {
-        val log = practiceStore.load()
-        val message = PracticeSummary.day(log, day, getString(R.string.activity_day_total),
+        val message = PracticeSummary.day(displayedPractice.log, day, getString(R.string.activity_day_total),
             mapOf(
                 PracticeSource.BASICS to (getString(R.string.activity_basics) to getString(R.string.activity_basics_note)),
                 PracticeSource.METRONOME to (getString(R.string.activity_metronome) to getString(R.string.activity_metronome_note)),
                 PracticeSource.FREE to (getString(R.string.activity_free) to getString(R.string.activity_free_note))
-            ), getString(R.string.activity_local_note))
+            ), getString(if (displayedPractice.isCloud) R.string.activity_cloud_note else R.string.activity_local_note))
         MaterialAlertDialogBuilder(this)
             .setTitle(PracticeFormat.fullDate(day))
             .setMessage(message)
