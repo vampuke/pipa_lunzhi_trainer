@@ -99,7 +99,7 @@ class MainActivity : AppCompatActivity() {
         val changed = displayedDay != today || displayedPractice.log.snapshot() != data.log.snapshot()
         displayedPractice = data
         displayedDay = today
-        b.practiceActivity.accountStatus.text = AccountText.status(this, home.account)
+        b.practiceActivity.accountStatus.text = AccountText.status(this, home.account, home.activity.isCloud)
         b.practiceActivity.activityScope.setText(if (data.isCloud) R.string.activity_cloud_note else R.string.activity_scope)
         b.practiceActivity.todayPractice.text = PracticeFormat.duration(data.totalMs(today))
         b.practiceActivity.streakPractice.text = getString(R.string.activity_streak_value, data.streak(today))

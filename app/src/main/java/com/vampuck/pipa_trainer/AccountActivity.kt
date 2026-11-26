@@ -18,6 +18,7 @@ import com.vampuck.pipa_trainer.sync.AccountText
 import com.vampuck.pipa_trainer.sync.ApiException
 import com.vampuck.pipa_trainer.sync.PracticeSyncer
 import com.vampuck.pipa_trainer.sync.SyncState
+import java.io.IOException
 import java.text.Normalizer
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
@@ -66,7 +67,12 @@ class AccountActivity : AppCompatActivity() {
         b.logout.setOnClickListener {
             val dialog = MaterialAlertDialogBuilder(this).setTitle(R.string.account_logout)
                 .setMessage(R.string.account_logout_notice).setNegativeButton(R.string.account_cancel, null)
-                .setPositiveButton(R.string.account_logout) { _, _ -> perform { syncer.logout() } }.show()
+                .setPositiveButton(R.string.account_logout) { _, _ ->
+                    perform {
+                        try { syncer.logout() }
+                        catch (_: IOException) { confirmOfflineLogout() }
+                    }
+                }.show()
             tintDialogButtons(dialog)
         }
         b.recoverySaved.setOnCheckedChangeListener { _, checked ->
@@ -163,6 +169,16 @@ class AccountActivity : AppCompatActivity() {
             b.regenerateRecovery, b.logout).forEach { it.isEnabled = enabled }
     }
 
+    private fun confirmOfflineLogout() {
+        val dialog = MaterialAlertDialogBuilder(this).setTitle(R.string.account_logout)
+            .setMessage(R.string.account_logout_offline_notice)
+            .setNegativeButton(R.string.account_cancel, null)
+            .setPositiveButton(R.string.account_logout_continue) { _, _ ->
+                perform { syncer.logout(localOnly = true) }
+            }.show()
+        tintDialogButtons(dialog)
+    }
+
     private fun submitAuth() {
         val username = Normalizer.normalize(b.usernameInput.text.toString(), Normalizer.Form.NFKC)
             .trim().lowercase(Locale.ROOT)
@@ -182,14 +198,14 @@ class AccountActivity : AppCompatActivity() {
             return
         }
         val selected = mode
-        b.passwordInput.text?.clear()
-        b.recoveryInput.text?.clear()
         perform {
             when (selected) {
                 Mode.LOGIN -> syncer.login(username, password, deviceName)
                 Mode.REGISTER -> syncer.register(username, password, deviceName)
                 Mode.RECOVER -> syncer.recover(username, recovery, password, deviceName)
             }
+            b.passwordInput.text?.clear()
+            b.recoveryInput.text?.clear()
         }
     }
 
@@ -212,14 +228,28 @@ class AccountActivity : AppCompatActivity() {
                 } else if (changePassword && newPassword.length !in 8..128) {
                     fields.newPassword.error = getString(R.string.account_error_password)
                 } else {
-                    fields.currentPassword.text?.clear()
-                    fields.newPassword.text?.clear()
-                    dialog.dismiss()
                     perform {
-                        if (changePassword) {
-                            syncer.changePassword(current, newPassword)
-                            Toast.makeText(this@AccountActivity, R.string.account_password_changed, Toast.LENGTH_SHORT).show()
-                        } else syncer.regenerateRecoveryCode(current)
+                        val controls = listOf(fields.currentPassword, fields.newPassword,
+                            dialog.getButton(AlertDialog.BUTTON_POSITIVE), dialog.getButton(AlertDialog.BUTTON_NEGATIVE))
+                        controls.forEach { it.isEnabled = false }
+                        dialog.setCancelable(false)
+                        try {
+                            if (changePassword) {
+                                syncer.changePassword(current, newPassword)
+                                Toast.makeText(this@AccountActivity, R.string.account_password_changed, Toast.LENGTH_SHORT).show()
+                            } else syncer.regenerateRecoveryCode(current)
+                            fields.currentPassword.text?.clear()
+                            fields.newPassword.text?.clear()
+                            dialog.dismiss()
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            fields.currentPassword.error = AccountText.error(this@AccountActivity, error)
+                            throw error
+                        } finally {
+                            controls.forEach { it.isEnabled = true }
+                            dialog.setCancelable(true)
+                        }
                     }
                 }
             }

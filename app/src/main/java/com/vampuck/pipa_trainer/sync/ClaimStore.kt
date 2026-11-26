@@ -17,13 +17,6 @@ class ClaimStore(context: Context) {
 
     fun skipped(segmentId: String): Boolean = prefs.getBoolean("skipped:$segmentId", false)
 
-    @Synchronized
-    fun claim(segmentId: String, userId: String) {
-        require(userId.isNotBlank())
-        val owner = claimedBy(segmentId)
-        if (owner == null || owner == userId) prefs.edit().putString("claimed:$segmentId", userId).apply()
-    }
-
     fun unclaimed(entries: List<UploadSegment>, userId: String): List<UploadSegment> =
         SegmentQueue.unclaimed(entries, userId, ::claimedBy)
 

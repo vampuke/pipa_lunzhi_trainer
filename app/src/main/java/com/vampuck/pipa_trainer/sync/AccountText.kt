@@ -45,14 +45,15 @@ object AccountText {
         }
     }
 
-    fun status(context: Context, account: AccountView): String {
-        if (!account.loggedIn && account.status.state != SyncState.AUTH_REQUIRED) return context.getString(R.string.account_local)
-        return when (account.status.state) {
-            SyncState.SYNCING -> context.getString(R.string.account_syncing)
-            SyncState.OK -> context.getString(R.string.account_status_ok, account.username.orEmpty(), relativeTime(context, account.lastSyncAt))
-            SyncState.OFFLINE -> context.getString(R.string.account_status_offline, account.username.orEmpty())
-            SyncState.IDLE -> context.getString(R.string.account_status_idle, account.username.orEmpty())
-            SyncState.AUTH_REQUIRED -> context.getString(R.string.account_auth_required)
+    fun status(context: Context, account: AccountView, showingCloud: Boolean): String {
+        return when (AccountStatusLabel.choose(account.loggedIn, account.status.state, showingCloud)) {
+            AccountStatusLabel.LOCAL -> context.getString(R.string.account_local)
+            AccountStatusLabel.SYNCING -> context.getString(R.string.account_syncing)
+            AccountStatusLabel.OK -> context.getString(R.string.account_status_ok, account.username.orEmpty(), relativeTime(context, account.lastSyncAt))
+            AccountStatusLabel.OFFLINE_CLOUD -> context.getString(R.string.account_status_offline_cloud, account.username.orEmpty())
+            AccountStatusLabel.OFFLINE_LOCAL -> context.getString(R.string.account_status_offline, account.username.orEmpty())
+            AccountStatusLabel.IDLE -> context.getString(R.string.account_status_idle, account.username.orEmpty())
+            AccountStatusLabel.AUTH_REQUIRED -> context.getString(R.string.account_auth_required)
         }
     }
 }
