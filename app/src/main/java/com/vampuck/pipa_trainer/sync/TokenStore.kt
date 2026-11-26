@@ -2,18 +2,22 @@ package com.vampuck.pipa_trainer.sync
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.EOFException
 import java.io.File
 import java.io.FileOutputStream
 import java.security.KeyStore
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import org.json.JSONException
 import org.json.JSONObject
 
 class TokenStore(context: Context) {
@@ -45,7 +49,6 @@ class TokenStore(context: Context) {
             true
         } catch (_: Exception) {
             if (output != null) runCatching { file.failWrite(output) }
-            clear()
             false
         }
     }
@@ -53,35 +56,46 @@ class TokenStore(context: Context) {
     @Synchronized
     fun load(): AccountSession? = try {
         DataInputStream(file.openRead()).use { input ->
-            require(input.readInt() == 1)
+            requireValidFile(input.readInt() == 1)
             val ivLength = input.readInt()
-            require(ivLength == 12)
+            requireValidFile(ivLength == 12)
             val iv = ByteArray(ivLength).also(input::readFully)
             val buffer = ByteArrayOutputStream()
             val chunk = ByteArray(1024)
             while (true) {
                 val count = input.read(chunk)
                 if (count < 0) break
-                require(buffer.size() + count <= 16 * 1024)
+                requireValidFile(buffer.size() + count <= 16 * 1024)
                 buffer.write(chunk, 0, count)
             }
+            requireValidFile(buffer.size() >= 16) // A GCM ciphertext must contain its authentication tag.
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, iv))
             cipher.updateAAD(AAD)
             val json = JSONObject(String(cipher.doFinal(buffer.toByteArray()), Charsets.UTF_8))
             AccountSession(json.getString("token"), json.getString("userId"),
                 json.getString("username"), json.getLong("expiresAt")).also {
-                require(it.token.matches(Regex("[A-Za-z0-9_-]{43}")))
-                require(it.userId.isNotBlank() && it.username.isNotBlank() && it.expiresAt > 0)
+                requireValidFile(it.token.matches(Regex("[A-Za-z0-9_-]{43}")))
+                requireValidFile(it.userId.isNotBlank() && it.username.isNotBlank() && it.expiresAt > 0)
             }
         }
-    } catch (_: Exception) {
-        clear()
+    } catch (error: Exception) {
+        // Keep the last good file through temporary keystore/provider and read failures.
+        if (error is AEADBadTagException || error is KeyPermanentlyInvalidatedException ||
+            error is EOFException || error is JSONException || error is MalformedSessionFileException) {
+            clear()
+        }
         null
     }
 
     @Synchronized
     fun clear() { runCatching { file.delete() } }
+
+    private fun requireValidFile(condition: Boolean) {
+        if (!condition) throw MalformedSessionFileException()
+    }
+
+    private class MalformedSessionFileException : Exception()
 
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

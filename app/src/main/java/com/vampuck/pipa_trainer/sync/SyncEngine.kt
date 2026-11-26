@@ -23,6 +23,7 @@ class SyncEngine(
     private val clearSession: () -> Unit,
     private val synchronize: (AccountSession) -> MergeReport,
     initialState: SyncState = SyncState.IDLE,
+    private val scheduleRetry: () -> Unit = {},
     private val monotonicMs: () -> Long = { System.nanoTime() / 1_000_000L }
 ) {
     private val mutex = Mutex()
@@ -62,6 +63,7 @@ class SyncEngine(
             null
         } finally {
             mutex.unlock()
+            if (mutableStatus.value.state == SyncState.OFFLINE) scheduleRetry()
         }
     }
 

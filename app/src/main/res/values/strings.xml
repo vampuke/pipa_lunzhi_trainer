@@ -261,6 +261,8 @@
     <string name="account_regenerate_notice">生成后旧恢复码立即失效。请输入当前密码确认。</string>
     <string name="account_logout">退出登录</string>
     <string name="account_logout_notice">退出当前设备的会话。本机练习记录会继续保留。</string>
+    <string name="account_logout_offline_notice">网络不可用，仍要在此设备退出？服务器端会话将在 180 天后自动过期</string>
+    <string name="account_logout_continue">继续退出</string>
     <string name="account_confirm">确定</string>
     <string name="account_cancel">取消</string>
     <string name="account_sync_idle">等待同步</string>
@@ -272,6 +274,7 @@
     <string name="account_status_ok">\@%1$s · 已同步 · %2$s</string>
     <string name="account_status_idle">\@%1$s · 等待同步</string>
     <string name="account_status_offline">\@%1$s · 本机记录 · 待同步</string>
+    <string name="account_status_offline_cloud">\@%1$s · 已同步 · 离线</string>
     <string name="account_just_now">刚刚</string>
     <string name="account_minutes_ago">%1$d 分钟前</string>
     <string name="account_hours_ago">%1$d 小时前</string>

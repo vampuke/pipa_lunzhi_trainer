@@ -9,7 +9,7 @@ object DeviceId {
         val prefs = context.applicationContext.getSharedPreferences("practice_sync", Context.MODE_PRIVATE)
         prefs.getString("device_id", null)?.let { return it }
         return UUID.randomUUID().toString().also {
-            prefs.edit().putString("device_id", it).apply()
+            prefs.edit().putString("device_id", it).commit()
         }
     }
 }

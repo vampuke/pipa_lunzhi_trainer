@@ -380,6 +380,50 @@ class SyncEngineTest {
         assertEquals(900_000L, engine.retryDelayMs())
     }
 
+    @Test fun `offline sync schedules retries with backoff and stops after success`() = runBlocking {
+        var now = 0L
+        var attempts = 0
+        val retryDelays = mutableListOf<Long>()
+        lateinit var engine: SyncEngine
+        engine = SyncEngine({ session }, { fail("must retain token") }, {
+            attempts++
+            if (attempts < 3) throw IOException()
+            MergeReport(1, 1)
+        }, scheduleRetry = {
+            assertEquals(SyncState.OFFLINE, engine.status.value.state)
+            retryDelays.add(engine.retryDelayMs())
+        }, monotonicMs = { now })
+        engine.sync()
+        now += retryDelays.last()
+        engine.sync()
+        now += retryDelays.last()
+        assertEquals(MergeReport(1, 1), engine.sync())
+        assertEquals(listOf(1_000L, 2_000L), retryDelays)
+        assertEquals(3, attempts)
+        assertEquals(SyncState.OK, engine.status.value.state)
+    }
+
+    @Test fun `server rate limit schedules a retry but auth required does not`() = runBlocking {
+        var now = 0L
+        var expired = false
+        var token: AccountSession? = session
+        val retryDelays = mutableListOf<Long>()
+        lateinit var engine: SyncEngine
+        engine = SyncEngine({ token }, { token = null }, {
+            if (expired) throw ApiException("session_invalid", 401)
+            throw ApiException("rate_limited", 429, 900)
+        }, scheduleRetry = { retryDelays.add(engine.retryDelayMs()) }, monotonicMs = { now })
+        engine.sync()
+        assertEquals(listOf(900_000L), retryDelays)
+        now += retryDelays.last()
+        expired = true
+        engine.sync()
+        engine.sync()
+        assertNull(token)
+        assertEquals(SyncState.AUTH_REQUIRED, engine.status.value.state)
+        assertEquals(listOf(900_000L), retryDelays)
+    }
+
     @Test fun `concurrent triggers are single flight`() = runBlocking {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)

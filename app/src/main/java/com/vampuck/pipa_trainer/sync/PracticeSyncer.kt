@@ -39,17 +39,24 @@ class PracticeSyncer private constructor(context: Context) {
         Thread(runnable, "practice-sync").apply { isDaemon = true }
     }
     private var pending: ScheduledFuture<*>? = null
+    private var pendingRetryOnly = false
     private var lastStartMs: Long? = null
     private val mutableRecovery = MutableStateFlow<String?>(null)
     val pendingRecovery: StateFlow<String?> = mutableRecovery.asStateFlow()
     private val mutableBusy = MutableStateFlow(false)
     val accountBusy: StateFlow<Boolean> = mutableBusy.asStateFlow()
-    private val engine = SyncEngine(tokens::load, tokens::clear, ::synchronize)
+    private val engine = SyncEngine(tokens::load, tokens::clear, ::synchronize,
+        scheduleRetry = { enqueue(retryOnly = true) })
     val status: StateFlow<SyncStatus> = engine.status
 
     @Synchronized
-    private fun enqueue() {
-        if (pending != null) return
+    private fun enqueue(retryOnly: Boolean = false) {
+        if (pending != null) {
+            // An explicit trigger still needs to run if an earlier retry becomes unnecessary.
+            pendingRetryOnly = pendingRetryOnly && retryOnly
+            return
+        }
+        pendingRetryOnly = retryOnly
         schedule(queuedDelay())
     }
 
@@ -66,6 +73,7 @@ class PracticeSyncer private constructor(context: Context) {
     private fun runQueued() {
         synchronized(this) {
             pending = null
+            if (pendingRetryOnly && status.value.state != SyncState.OFFLINE) return
             val delay = queuedDelay()
             if (delay > 0L) {
                 schedule(delay)
@@ -85,10 +93,12 @@ class PracticeSyncer private constructor(context: Context) {
 
     suspend fun register(username: String, password: String, deviceName: String) {
         authenticate { api.register(username, password, deviceName, DeviceId.get(app)) }
+        enqueue()
     }
 
     suspend fun recover(username: String, code: String, password: String, deviceName: String) {
         authenticate { api.recover(username, code, password, deviceName, DeviceId.get(app)) }
+        enqueue()
     }
 
     private suspend fun authenticate(request: () -> AuthResult) = accountAction {
@@ -118,12 +128,11 @@ class PracticeSyncer private constructor(context: Context) {
         mutableRecovery.value = api.regenerateRecoveryCode(requireSession().token, password)
     }
 
-    suspend fun logout() = accountAction {
-        val session = tokens.load()
-        // Retain a valid token if remote revocation fails, so logout can be retried.
-        if (session != null) {
-            try { api.logout(session.token) }
-            catch (error: ApiException) { if (error.httpStatus != 401) throw error }
+    suspend fun logout(localOnly: Boolean = false) = accountAction {
+        // A failed remote logout keeps the session until the user confirms local-only logout.
+        // A 401 means the server already dropped it, so treat that as success.
+        if (!localOnly) tokens.load()?.let {
+            try { api.logout(it.token) } catch (error: ApiException) { if (error.httpStatus != 401) throw error }
         }
         tokens.clear()
         claims.clearAccount()
@@ -146,7 +155,8 @@ class PracticeSyncer private constructor(context: Context) {
         // Manual sync is immediate; subsequent automatic runs still respect the 15s interval.
         synchronized(this) { lastStartMs = monotonicMs() }
         val renewed = api.me(session)
-        if (renewed.expiresAt != session.expiresAt) saveSession(renewed)
+        // Renewal keeps the same token: a failed write can safely retain the old expiry.
+        if (renewed.expiresAt != session.expiresAt) tokens.save(renewed)
         claims.setAccount(renewed)
         val deviceId = DeviceId.get(app)
         val entries = SegmentQueue.fromEntries(deviceId, store.rawEntries())
