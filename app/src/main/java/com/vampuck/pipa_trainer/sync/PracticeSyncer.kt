@@ -187,15 +187,12 @@ class PracticeSyncer private constructor(context: Context) {
         val entries = store.rawEntries()
         val local = PracticeLog.decode(entries)
         val now = System.currentTimeMillis()
-        val today = PracticeDay.at(now)
-        val pending = if (session == null) false else {
-            val segments = SegmentQueue.fromEntries(DeviceId.get(app), entries)
-            (claims.unclaimed(segments, session.userId) + claims.changedOwnedEntries(segments, session.userId)).any {
-                it.elapsedMs > 0L && it.day >= PracticeDay.shift(today, -364) && it.day <= today
-            }
-        }
-        HomeSyncData(ActivityViewData.choose(local, session?.takeIf { it.expiresAt * 1_000L > now }?.userId,
-            claims.snapshot(), account.status.state, pending), account)
+        val userId = session?.takeIf { it.expiresAt * 1_000L > now }?.userId
+        val deltas = if (userId == null) emptyList() else PendingDeltas.fromSegments(
+            SegmentQueue.fromEntries(DeviceId.get(app), entries), userId,
+            claims::claimedBy, claims::uploadedMs, claims::skipped)
+        HomeSyncData(ActivityViewData.choose(local, userId,
+            claims.snapshot(), account.status.state, deltas), account)
     }
 
     suspend fun takeMergeNotice(): Int = withContext(Dispatchers.IO) {

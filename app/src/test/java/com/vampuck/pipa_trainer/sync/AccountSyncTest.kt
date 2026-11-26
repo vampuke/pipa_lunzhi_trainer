@@ -157,10 +157,10 @@ class ActivityViewDataTest {
 
     @Test fun `guest missing and other account caches fall back without changing local records`() {
         for (state in SyncState.values()) {
-            for (pending in listOf(false, true)) {
+            for (deltas in listOf(emptyList(), listOf(Delta(day, PracticeSource.FREE, 19L)))) {
                 for ((userId, snapshot) in listOf(null to cloud, "bob" to cloud, "alice" to null)) {
-                    val data = ActivityViewData.choose(local, userId, snapshot, state, pending)
-                    assertFalse("$userId $state pending=$pending", data.isCloud)
+                    val data = ActivityViewData.choose(local, userId, snapshot, state, deltas)
+                    assertFalse("$userId $state deltas=$deltas", data.isCloud)
                     assertSame(local, data.log)
                 }
             }
@@ -169,11 +169,15 @@ class ActivityViewDataTest {
     }
 
     @Test fun `auth required idle and syncing show local details and totals`() {
+        val deltas = PendingDeltas.fromSegments(SegmentQueue.fromEntries("device", local.snapshot()),
+            "alice", { null }, { Long.MAX_VALUE }, { false })
         for (state in listOf(SyncState.AUTH_REQUIRED, SyncState.IDLE, SyncState.SYNCING)) {
-            val data = ActivityViewData.choose(local, "alice", cloud, state)
+            val data = ActivityViewData.choose(local, "alice", cloud, state, deltas)
             assertFalse(state.name, data.isCloud)
             assertSame(local, data.log)
             assertEquals(19L, data.totalMs(day, PracticeSource.FREE))
+            assertEquals(19L, data.totalMsSince("2026-01-01"))
+            assertEquals(1, data.streak(day))
         }
     }
 
@@ -190,13 +194,98 @@ class ActivityViewDataTest {
         }
     }
 
-    @Test fun `pending local entries keep local details and totals in every state`() {
-        for (state in SyncState.values()) {
-            val data = ActivityViewData.choose(local, "alice", cloud, state, hasPendingLocalEntries = true)
-            assertFalse(state.name, data.isCloud)
-            assertSame(local, data.log)
-            assertEquals(19L, data.totalMs(day))
+    @Test fun `cloud plus unclaimed practice preserves both devices totals details and streak`() {
+        val practiced = PracticeLog.decode(local.snapshot()).apply {
+            put("second", PracticeSource.FREE, day, 11L)
         }
+        val snapshot = cloud.copy(days = cloud.days + mapOf(
+            "2026-11-25" to CloudDay(15, 15, 15), "2026-11-24" to CloudDay(0, 15, 0)))
+        val deltas = PendingDeltas.fromSegments(SegmentQueue.fromEntries("device", practiced.snapshot()),
+            "alice", { null }, { Long.MAX_VALUE }, { false })
+        assertEquals(listOf(Delta(day, PracticeSource.FREE, 30L)), deltas)
+        for (state in listOf(SyncState.OK, SyncState.OFFLINE)) {
+            val data = ActivityViewData.choose(practiced, "alice", snapshot, state, deltas)
+            assertTrue(state.name, data.isCloud)
+            assertEquals(90L, data.totalMs(day))
+            assertEquals(10L, data.totalMs(day, PracticeSource.BASICS))
+            assertEquals(20L, data.totalMs(day, PracticeSource.METRONOME))
+            assertEquals(60L, data.totalMs(day, PracticeSource.FREE))
+            assertEquals(45L, data.totalMs("2026-11-25"))
+            assertEquals(150L, data.totalMsSince("2026-01-01"))
+            assertEquals(3, data.streak(day))
+            assertEquals(listOf("pending:$day:free"), data.log.snapshot().map { it.first }.filter { it.startsWith("pending:") })
+        }
+        assertEquals(30L, practiced.totalMs(day))
+        assertEquals(60L, snapshot.days.getValue(day).totalMs)
+    }
+
+    @Test fun `partially uploaded checkpoint adds only growth and no double count after acceptance`() {
+        val practiced = PracticeLog().apply { put("checkpoint", PracticeSource.FREE, day, 45_000L) }
+        val segments = SegmentQueue.fromEntries("device", practiced.snapshot())
+        val snapshot = cloud.copy(days = mapOf(day to CloudDay(10_000, 20_000, 30_000)))
+        for (state in listOf(SyncState.OK, SyncState.OFFLINE)) {
+            val deltas = PendingDeltas.fromSegments(segments, "alice", { "alice" }, { 30_000L }, { false })
+            assertEquals(listOf(Delta(day, PracticeSource.FREE, 15_000L)), deltas)
+            val data = ActivityViewData.choose(practiced, "alice", snapshot, state, deltas)
+            assertTrue(data.isCloud)
+            assertEquals(45_000L, data.totalMs(day, PracticeSource.FREE))
+            assertEquals(75_000L, data.totalMs(day))
+            assertEquals(75_000L, data.totalMsSince("2026-01-01"))
+        }
+        val acceptedDeltas = PendingDeltas.fromSegments(segments, "alice", { "alice" }, { 45_000L }, { false })
+        assertTrue(acceptedDeltas.isEmpty())
+        val refreshed = snapshot.copy(days = mapOf(day to CloudDay(10_000, 20_000, 45_000)))
+        assertEquals(75_000L, ActivityViewData.choose(practiced, "alice", refreshed, SyncState.OK, acceptedDeltas).totalMs(day))
+    }
+
+    @Test fun `skipped nonpositive foreign owned invalid and nongrowing entries add nothing`() {
+        val segments = listOf(
+            UploadSegment("skipped", day, PracticeSource.FREE, 100L),
+            UploadSegment("unclaimed-skipped", day, PracticeSource.FREE, 100L),
+            UploadSegment("zero", day, PracticeSource.BASICS, 0L),
+            UploadSegment("negative", day, PracticeSource.METRONOME, -1L),
+            UploadSegment("foreign", day, PracticeSource.FREE, 100L),
+            UploadSegment("invalid", "2026-02-30", PracticeSource.FREE, 100L),
+            UploadSegment("malformed", "2026-11-6", PracticeSource.FREE, 100L),
+            UploadSegment("equal", day, PracticeSource.FREE, 30L),
+            UploadSegment("smaller", day, PracticeSource.FREE, 29L),
+            UploadSegment("legacy", day, PracticeSource.FREE, 100L))
+        val owners = mapOf("skipped" to "alice", "foreign" to "bob",
+            "equal" to "alice", "smaller" to "alice", "legacy" to "alice")
+        val uploads = mapOf("skipped" to 0L, "equal" to 30L, "smaller" to 30L)
+        val deltas = PendingDeltas.fromSegments(segments, "alice", owners::get,
+            { uploads[it] ?: Long.MAX_VALUE }, { it == "skipped" || it == "unclaimed-skipped" })
+        assertTrue(deltas.isEmpty())
+        for (state in listOf(SyncState.OK, SyncState.OFFLINE)) {
+            val data = ActivityViewData.choose(local, "alice", cloud, state, deltas)
+            assertTrue(data.isCloud)
+            assertEquals(60L, data.totalMs(day))
+            assertEquals(60L, data.totalMsSince("2026-01-01"))
+        }
+    }
+
+    @Test fun `pending deltas sum by day and source including full unclaimed elapsed`() {
+        val segments = listOf(
+            UploadSegment("new-a", day, PracticeSource.BASICS, 10L),
+            UploadSegment("new-b", day, PracticeSource.BASICS, 20L),
+            UploadSegment("growing", day, PracticeSource.BASICS, 45L),
+            UploadSegment("metronome", day, PracticeSource.METRONOME, 30L),
+            UploadSegment("free", day, PracticeSource.FREE, 40L),
+            UploadSegment("other-day", "2020-01-01", PracticeSource.BASICS, 50L))
+        val deltas = PendingDeltas.fromSegments(segments, "alice",
+            { if (it == "growing") "alice" else null }, { 30L }, { false })
+        assertEquals(listOf(Delta(day, PracticeSource.BASICS, 45L),
+            Delta(day, PracticeSource.METRONOME, 30L), Delta(day, PracticeSource.FREE, 40L),
+            Delta("2020-01-01", PracticeSource.BASICS, 50L)), deltas)
+    }
+
+    @Test fun `empty owned cloud still shows pending practice as account data`() {
+        val deltas = PendingDeltas.fromSegments(SegmentQueue.fromEntries("device", local.snapshot()),
+            "alice", { null }, { 0L }, { false })
+        val data = ActivityViewData.choose(local, "alice", cloud.copy(days = emptyMap()), SyncState.OK, deltas)
+        assertTrue(data.isCloud)
+        assertEquals(19L, data.totalMs(day))
+        assertEquals(1, data.streak(day))
     }
 
     @Test fun `cloud streak includes yesterday before todays first practice and stops at a gap`() {

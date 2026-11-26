@@ -1,6 +1,7 @@
 package com.vampuck.pipa_trainer.practice
 
 import com.vampuck.pipa_trainer.sync.CloudSnapshot
+import com.vampuck.pipa_trainer.sync.Delta
 import com.vampuck.pipa_trainer.sync.SyncState
 
 /** One immutable choice is used by the totals, heatmap and day detail together. */
@@ -15,12 +16,16 @@ data class ActivityViewData(val log: PracticeLog, val isCloud: Boolean) {
             userId: String?,
             cloud: CloudSnapshot?,
             state: SyncState,
-            hasPendingLocalEntries: Boolean = false
+            deltas: List<Delta> = emptyList()
         ): ActivityViewData {
             val showCloud = cloud != null && userId != null && cloud.userId == userId &&
-                !hasPendingLocalEntries && (state == SyncState.OK || state == SyncState.OFFLINE)
-            return if (showCloud) ActivityViewData(requireNotNull(cloud).toPracticeLog(), true)
-                else ActivityViewData(local, false)
+                (state == SyncState.OK || state == SyncState.OFFLINE)
+            if (!showCloud) return ActivityViewData(local, false)
+            val log = requireNotNull(cloud).toPracticeLog()
+            for (delta in deltas) {
+                log.put("pending:${delta.day}:${delta.source.key}", delta.source, delta.day, delta.ms)
+            }
+            return ActivityViewData(log, true)
         }
     }
 }

@@ -12,6 +12,11 @@ class ClaimStore(context: Context) {
 
     fun claimedBy(segmentId: String): String? = prefs.getString("claimed:$segmentId", null)
 
+    /** A legacy claim without upload metadata must not be counted again. */
+    fun uploadedMs(segmentId: String): Long = prefs.getLong("uploaded_ms:$segmentId", Long.MAX_VALUE)
+
+    fun skipped(segmentId: String): Boolean = prefs.getBoolean("skipped:$segmentId", false)
+
     @Synchronized
     fun claim(segmentId: String, userId: String) {
         require(userId.isNotBlank())
@@ -25,7 +30,7 @@ class ClaimStore(context: Context) {
     /** A checkpoint may grow while a delayed sync is in flight. Only its owner can refresh it. */
     fun changedOwnedEntries(entries: List<UploadSegment>, userId: String): List<UploadSegment> = entries.filter {
         SegmentQueue.needsRefresh(it, userId, claimedBy(it.id),
-            prefs.getLong("uploaded_ms:${it.id}", Long.MAX_VALUE), prefs.getBoolean("skipped:${it.id}", false))
+            uploadedMs(it.id), skipped(it.id))
     }
 
     @Synchronized
