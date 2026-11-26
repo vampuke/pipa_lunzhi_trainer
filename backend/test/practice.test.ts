@@ -106,13 +106,14 @@ describe('practice synchronization', () => {
     expect(count?.n).toBe(0);
   });
 
+  // The 0.8.x pool sends test names in a header; %o escapes control characters.
   it.each([
     ['id', ''], ['id', 'x'.repeat(161)], ['id', '中文'], ['id', '\n'], ['id', '\u007f'],
     ['day', '2026-2-01'], ['day', '2026-02-29'], ['day', '2026-11-31'], ['day', '2026-13-01'],
     ['day', dayAt(NOW - 401 * 86400)], ['day', dayAt(NOW + 2 * 86400)],
     ['source', 'unknown'], ['elapsedMs', 0], ['elapsedMs', -1], ['elapsedMs', 86400001],
     ['elapsedMs', 1.5], ['elapsedMs', '1000'], ['elapsedMs', null],
-  ])('rejects invalid %s = %s', async (field, value) => {
+  ])('rejects invalid %s = %o', async (field, value) => {
     const user = await register();
     const response = await call('/practice/segments', { token: user.token, body: { deviceId: DEVICE.deviceId, segments: [{ ...segment, [field]: value }] } });
     expect(response.status).toBe(400);

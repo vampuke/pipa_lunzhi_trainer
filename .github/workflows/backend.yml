@@ -25,9 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-      - run: npm ci
+      - run: npm install --no-audit --no-fund --no-package-lock
       - run: npm run typecheck
       - run: npm test
 
@@ -43,9 +41,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-      - run: npm ci
+      - run: npm install --no-audit --no-fund --no-package-lock
       - name: Apply production migrations
         run: npx wrangler d1 migrations apply pipa-activity --remote
         env:

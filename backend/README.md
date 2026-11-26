@@ -10,12 +10,33 @@ Use Node 24 on a development machine or CI with adequate memory:
 
 ```sh
 cd backend
-npm ci
+npm install --no-audit --no-fund --no-package-lock
 npm run typecheck
 npm test
 npx wrangler d1 migrations apply pipa-activity --local
 npx wrangler dev
 ```
+
+The backend toolchain matches the tested combination used by `dining_log`:
+
+| Package | Exact version |
+| --- | --- |
+| `@cloudflare/vitest-pool-workers` | `0.8.49` |
+| `@cloudflare/workers-types` | `4.20250620.0` |
+| `@types/node` | `22.15.0` |
+| `typescript` | `5.8.3` |
+| `vitest` | `3.2.4` |
+| `wrangler` | `4.23.0` |
+
+Wrangler and the Vitest Miniflare runtime both use compatibility date
+`2025-06-20`. Tests use the pool's `defineWorkersConfig` API and load the real D1
+migrations with `readD1Migrations`; the setup applies them before tests run.
+Vitest supplies the compatible runner and snapshot packages without direct pins.
+
+There is no committed `package-lock.json`. Both backend CI jobs use the install
+command above, with lockfile caching disabled. Exact direct dependencies are
+pinned; transitive versions are resolved at install time. This avoids relying on
+the incompatible hand-assembled lockfile or regenerating it on the small VPS.
 
 For local development, set `PEPPER` in an untracked `backend/.dev.vars` file.
 Use a long randomly generated value. Tests inject their own explicitly test-only
@@ -148,9 +169,13 @@ as both `from` and `to`. Do not print the saved responses: registration/recovery
 responses contain credentials. The script itself outputs only failure status or
 PASS and has no automatic retries of credential mutations.
 
-No npm commands, typecheck, Vitest Worker tests, deployment or production smoke
-were run on the small implementation VPS. The lockfile was assembled from pinned
-npm registry metadata with integrity hashes, without installing packages. CI is
-the first actual `npm ci`, strict typecheck and Worker test run. Local verification
-uses SQLite for migration constraints and guarded SQL behavior; it does not prove
-Cloudflare runtime integration or public-network behavior.
+Local verification of this toolchain passed strict typecheck and all 106 Worker
+tests (four files, including the real D1 migration) on Node 26.12.1. To fit the
+small VPS, checks reused the sibling project's installed toolchain plus the
+pinned Node types; a fresh dependency install was stopped at 30 seconds. A fresh
+Node 24 install and test run in GitHub Actions remain unverified.
+
+The bundled `workerd` 1.20250617.0 warns that it falls back from the configured
+`2025-06-20` compatibility date to `2025-06-17`. The successful test command also
+logged a Miniflare socket error and timeout during shutdown; clean shutdown on
+CI remains unverified. No deployment or production smoke was performed.
