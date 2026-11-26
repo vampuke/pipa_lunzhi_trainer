@@ -1,0 +1,17 @@
+name = "pipa-api"
+main = "src/index.ts"
+compatibility_date = "2025-06-20"
+workers_dev = false
+
+[[routes]]
+pattern = "pipa-api.alanvampuke.top/*"
+zone_name = "alanvampuke.top"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pipa-activity"
+database_id = "e9afa50e-3cf1-41d0-b98f-b422d4399bd4"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true
