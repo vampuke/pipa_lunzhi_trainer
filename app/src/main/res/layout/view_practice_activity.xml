@@ -20,6 +20,20 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/accountStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:gravity="center_vertical"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"
+            android:text="@string/account_local"
+            android:textColor="@color/brand_text"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/activityScope"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
@@ -39,7 +53,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView android:id="@+id/todayPractice" android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" android:text="0 分钟"
+                    android:layout_height="wrap_content" android:text="@string/activity_empty_duration"
                     android:textColor="@color/brand_text" android:textSize="28sp" android:textStyle="bold" />
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="@string/activity_today" android:textColor="@color/text_secondary" android:textSize="12sp" />
@@ -50,11 +64,11 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <TextView android:id="@+id/streakPractice" android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" android:text="连续 0 天"
+                    android:layout_height="wrap_content" android:text="@string/activity_empty_streak"
                     android:textColor="@color/text_primary" android:textSize="18sp" android:textStyle="bold" />
                 <TextView android:id="@+id/yearPractice" android:layout_width="wrap_content"
                     android:layout_height="wrap_content" android:layout_marginTop="8dp"
-                    android:text="近一年 0 分钟" android:textColor="@color/text_secondary" android:textSize="11sp" />
+                    android:text="@string/activity_empty_year" android:textColor="@color/text_secondary" android:textSize="11sp" />
             </LinearLayout>
         </LinearLayout>
 

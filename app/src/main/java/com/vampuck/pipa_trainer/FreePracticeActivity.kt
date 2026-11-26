@@ -14,8 +14,9 @@ import com.vampuck.pipa_trainer.practice.FreePracticeTimer
 import com.vampuck.pipa_trainer.practice.FreePracticeSession
 import com.vampuck.pipa_trainer.practice.PracticeRecorder
 import com.vampuck.pipa_trainer.practice.PracticeStore
+import com.vampuck.pipa_trainer.sync.PracticeSyncer
 
-/** Free practice timer; no mic, sound, permissions or network involved. */
+/** Free practice timer with local accounting and optional account sync. */
 class FreePracticeActivity : AppCompatActivity() {
     private lateinit var b: ActivityFreePracticeBinding
     private var mode = FreePracticeMode.COUNTDOWN
@@ -77,6 +78,7 @@ class FreePracticeActivity : AppCompatActivity() {
 
     private fun rebuildTimer() {
         session?.stop(SystemClock.elapsedRealtime())
+        PracticeSyncer.requestSync(applicationContext)
         session = null
         timer = FreePracticeTimer(mode, durationMin * 60_000L)
         startedThisVisit = false
@@ -103,6 +105,7 @@ class FreePracticeActivity : AppCompatActivity() {
         if (!timer.isStarted || timer.isPaused || timer.isCompleted) return
         val now = SystemClock.elapsedRealtime()
         session?.pause(now)
+        PracticeSyncer.requestSync(applicationContext)
         if (timer.isCompleted) {
             complete()
             return
@@ -122,6 +125,7 @@ class FreePracticeActivity : AppCompatActivity() {
     }
 
     private fun complete() {
+        PracticeSyncer.requestSync(applicationContext)
         handler.removeCallbacks(ticker)
         startedThisVisit = false
         render()
@@ -199,6 +203,7 @@ class FreePracticeActivity : AppCompatActivity() {
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
         session?.stop(SystemClock.elapsedRealtime())
+        PracticeSyncer.requestSync(applicationContext)
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         super.onDestroy()
     }

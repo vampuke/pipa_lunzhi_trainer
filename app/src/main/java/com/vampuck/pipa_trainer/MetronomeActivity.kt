@@ -16,6 +16,7 @@ import com.vampuck.pipa_trainer.databinding.ActivityMetronomeBinding
 import com.vampuck.pipa_trainer.practice.PracticeRecorder
 import com.vampuck.pipa_trainer.practice.PracticeSource
 import com.vampuck.pipa_trainer.practice.PracticeStore
+import com.vampuck.pipa_trainer.sync.PracticeSyncer
 import com.vampuck.pipa_trainer.view.SymbolButton
 import android.os.Handler
 import android.os.Looper
@@ -181,6 +182,7 @@ class MetronomeActivity : AppCompatActivity() {
         metronome.stop()
         checkpointHandler.removeCallbacks(checkpointTicker)
         recorder.stop(SystemClock.elapsedRealtime())
+        PracticeSyncer.requestSync(applicationContext)
         b.btnMetroToggle.setText(R.string.metro_start)
         cardFlash?.cancel()
         b.bpmCard.setCardBackgroundColor(surfaceColor)
@@ -288,6 +290,7 @@ class MetronomeActivity : AppCompatActivity() {
         metronome.onBeat = null
         metronome.stop()
         recorder.stop(SystemClock.elapsedRealtime())
+        PracticeSyncer.requestSync(applicationContext)
         cardFlash?.cancel()
         cardFlash = null
         for (d in dots) d.animate().cancel()

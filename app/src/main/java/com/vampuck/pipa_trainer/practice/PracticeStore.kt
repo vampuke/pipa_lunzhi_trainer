@@ -2,7 +2,7 @@ package com.vampuck.pipa_trainer.practice
 
 import android.content.Context
 
-/** Small local-only store; no account, network or storage permission. */
+/** Local practice storage. Account metadata lives in a separate store. */
 class PracticeStore(context: Context) {
     private val prefs = context.applicationContext
         .getSharedPreferences("practice_activity", Context.MODE_PRIVATE)
@@ -14,7 +14,11 @@ class PracticeStore(context: Context) {
     }
 
     @Synchronized
-    fun load(): PracticeLog {
+    fun load(): PracticeLog = PracticeLog.decode(rawEntries())
+
+    /** Read-only copy, including original keys and nonpositive durations for sync bookkeeping. */
+    @Synchronized
+    fun rawEntries(): List<Pair<String, PracticeLog.Entry>> {
         val rows = ArrayList<Pair<String, PracticeLog.Entry>>()
         for ((id, raw) in prefs.all) {
             val parts = (raw as? String)?.split('|') ?: continue
@@ -23,6 +27,6 @@ class PracticeStore(context: Context) {
             val ms = parts[2].toLongOrNull() ?: continue
             rows.add(id to PracticeLog.Entry(source, parts[1], ms))
         }
-        return PracticeLog.decode(rows)
+        return rows
     }
 }

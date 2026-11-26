@@ -29,6 +29,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".AccountActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
         <!--
             所有页面都自己兜住旋转/分屏/字号变化：
             训练中断、正在听的调音状态都不因系统重建 Activity 而丢失。
