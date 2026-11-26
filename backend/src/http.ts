@@ -44,7 +44,8 @@ export async function readJson(request: Request): Promise<Record<string, unknown
   if (type !== 'application/json') throw new ApiError(415, 'unsupported_media_type', 'Expected application/json.');
   if (request.body === null) throw new ApiError(400, 'invalid_json', 'Expected a JSON object.');
   const reader = request.body.getReader();
-  const decoder = new TextDecoder('utf-8', { fatal: true });
+  const decoderOptions = { fatal: true, ignoreBOM: false };
+  const decoder = new TextDecoder('utf-8', decoderOptions);
   let size = 0;
   let body = '';
   try {
