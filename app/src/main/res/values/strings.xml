@@ -19,10 +19,11 @@
     <string name="free_duration_value">%1$d 分钟</string>
     <string name="free_duration_minus">减少一分钟</string>
     <string name="free_duration_plus">增加一分钟</string>
-    <string name="free_ready">设定时长后点击开始</string>
+    <string name="free_ready">点击开始计时</string>
     <string name="free_running">专心练习，时间正在记录</string>
     <string name="free_paused">已暂停，暂停期间不计入练习</string>
     <string name="free_completed">时间到，本次练习已完成</string>
+    <string name="free_finished_saved">已结束，本次练习已计入活跃度</string>
     <string name="free_stopped">本次练习已结束，点击开始可重新计时</string>
     <string name="free_background">已自动暂停，回来点「继续」接着练</string>
     <string name="free_start">开始</string>
@@ -234,7 +235,7 @@
     <string name="account_device_name">设备名称</string>
     <string name="account_default_device">安卓设备</string>
     <string name="account_login_hint">登录后自动合并本机未认领的练习记录，可在多台设备同步使用。</string>
-    <string name="account_register_hint">用户名为 3–32 位小写字母、数字或下划线，以字母开头；密码为 8–128 位，请避开常见弱密码。</string>
+    <string name="account_register_hint">用户名为 3–32 位小写字母、数字或下划线，以字母开头；密码至少 1 个字符，无复杂度要求。</string>
     <string name="account_recover">使用恢复码找回账号</string>
     <string name="account_return_login">返回登录</string>
     <string name="account_recover_submit">重置密码并登录</string>
@@ -254,7 +255,7 @@
     <string name="account_sync_now">立即同步</string>
     <string name="account_change_password">修改密码</string>
     <string name="account_current_password">当前密码</string>
-    <string name="account_new_password">新密码（8–128 位）</string>
+    <string name="account_new_password">新密码</string>
     <string name="account_password_notice">修改后，其他设备和旧会话将退出登录。</string>
     <string name="account_password_changed">密码已修改</string>
     <string name="account_regenerate_recovery">重新生成恢复码</string>
@@ -287,11 +288,11 @@
     <string name="account_error_recovery">用户名或恢复码错误，恢复码也可能已使用</string>
     <string name="account_error_rate_limited">尝试次数过多，请稍后重试</string>
     <string name="account_error_retry_after">尝试次数过多，请在 %1$d 秒后重试</string>
-    <string name="account_error_validation">请检查输入格式，并避免使用常见弱密码</string>
+    <string name="account_error_validation">请检查输入格式</string>
     <string name="account_error_username">用户名需为 3–32 位小写字母、数字或下划线，并以字母开头</string>
-    <string name="account_error_password">密码需为 8–128 位</string>
     <string name="account_error_required">请完整填写用户名、密码和设备名称</string>
     <string name="account_error_current_password">请输入当前密码</string>
+    <string name="account_error_new_password">请输入新密码</string>
     <string name="account_error_code_required">请输入恢复码</string>
     <string name="account_error_server">服务暂时不可用，请稍后重试</string>
     <string name="account_error_response">同步服务返回异常，请稍后重试</string>

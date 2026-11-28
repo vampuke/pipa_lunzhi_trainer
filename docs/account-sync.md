@@ -27,7 +27,7 @@ D1 数据库 `pipa-activity`（UUID `e9afa50e-3cf1-41d0-b98f-b422d4399bd4`，APA
 - `auth_attempts`：按 `scope`（`u:<username>` / `i:<ip>`）滑动窗口计数，用于失败锁定。
 - `mutation_guards`：条件更新的 `changes()` 守卫。
 
-密码：PBKDF2-HMAC-SHA256，WebCrypto，初始 10,000 次（免费档 10ms CPU 预算），存 `password_iterations` 以便日后在线升级；服务端 pepper 走 secret。密码长度 8–128，拒绝 Top-200 弱口令。未知用户名也必须跑一次 dummy PBKDF2，响应与密码错误完全一致（同状态码/错误码/文案/耗时量级）。
+密码：PBKDF2-HMAC-SHA256，WebCrypto，初始 10,000 次（免费档 10ms CPU 预算），存 `password_iterations` 以便日后在线升级；服务端 pepper 走 secret。密码必须非空，无复杂度要求；输入上限为 128 个字符。未知用户名也必须跑一次 dummy PBKDF2，响应与密码错误完全一致（同状态码/错误码/文案/耗时量级）。
 
 会话：token = 32 随机字节 base64url（43 字符）；`expires_at = now + 180d`（15,552,000 秒）。任何认证请求：若 `now - last_used_at >= 3600s`，则更新 `last_used_at=now`、`expires_at=now+180d`（滑动续期，最多每小时写一次）。过期/撤销返回 401 `session_invalid`。
 

@@ -5,44 +5,6 @@ export const PASSWORD_ITERATIONS = 10_000;
 export const SESSION_SECONDS = 180 * 24 * 60 * 60;
 export const SLIDE_SECONDS = 60 * 60;
 
-// Common-password denylist; case/NFKC folding here does not alter the stored password.
-export const WEAK_PASSWORDS = [
-  '123456', 'password', '123456789', '12345', '12345678', 'qwerty', '1234567', '111111',
-  '1234567890', '123123', 'abc123', 'password1', '1234', 'iloveyou', '1q2w3e4r', '000000',
-  'qwerty123', 'zaq12wsx', 'dragon', 'sunshine', 'princess', 'letmein', '654321', 'monkey',
-  '27653', '1qaz2wsx', '123321', 'qwertyuiop', 'superman', 'asdfghjkl', 'admin', 'welcome',
-  'football', 'login', 'starwars', 'hello', 'whatever', 'trustno1', 'master', 'freedom',
-  '11111111', '7777777', '666666', '121212', '555555', '222222', '444444', '999999',
-  '888888', '333333', '777777', '123abc', 'passw0rd', 'password123', 'password1234', 'password12',
-  'password01', 'password!', 'password1!', 'password123!', 'p@ssword', 'p@ssw0rd', 'p@ssw0rd!', 'pa55word',
-  'qwerty1', 'qwerty12', 'qwerty1234', 'qwerty12345', 'qwerty123456', 'qwerty!', 'qwe123', 'qweasdzxc',
-  'asdfgh', 'asdf1234', 'asdfasdf', 'asdfghjk', 'zxcvbnm', 'zxcvbnm123', '1q2w3e', '1q2w3e4r5t',
-  '1qazxsw2', 'qazwsx', 'qazwsxedc', 'qazwsx123', 'qazwsx12', 'zaq1xsw2', '!qaz2wsx', '123qwe',
-  '123qweasd', '123456a', '123456aa', '123456ab', '123456q', '123456789a', 'a123456', 'a12345678',
-  'abc12345', 'abcd1234', 'abcdef', 'abcdefgh', 'abcdefghij', '987654321', '9876543210', '87654321',
-  '112233', '11223344', '12344321', '12341234', '123123123', '1234512345', '1234554321', '123456654321',
-  '1111111', '111111111', '1111111111', '22222222', '33333333', '44444444', '55555555', '66666666',
-  '77777777', '88888888', '99999999', '00000000', '0000000000', '12121212', '10101010', '12340987',
-  'admin123', 'admin1234', 'administrator', 'rootroot', 'changeme', 'default', 'welcome1', 'welcome123',
-  'welcome!', 'welcome01', 'letmein1', 'letmein123', 'login123', 'test1234', 'testing123', 'testtest',
-  'guestguest', 'secret', 'secret123', 'access', 'access123', 'computer', 'computer1', 'internet',
-  'internet1', 'security', 'microsoft', 'windows', 'windows1', 'passpass', 'pass1234', 'pass12345',
-  'iloveyou1', 'iloveyou123', 'loveyou', 'love1234', 'lovelove', 'beautiful', 'lovely', 'michael',
-  'jennifer', 'jessica', 'ashley', 'daniel', 'charlie', 'thomas', 'robert', 'jordan',
-  'joshua', 'andrew', 'matthew', 'william', 'anthony', 'alexander', 'christopher', 'michelle',
-  'samantha', 'nicole', 'amanda', 'melissa', 'sophie', 'shadow', 'shadow123', 'sunshine1',
-  'sunshine123', 'princess1', 'princess123', 'dragon123', 'monkey123', 'superman1', 'batman', 'spiderman',
-  'pokemon', 'pokemon123', 'pokemon1', 'football1', 'football123', 'baseball', 'baseball1', 'basketball',
-  'basketball1', 'soccer', 'soccer123', 'hockey', 'chelsea', 'liverpool', 'arsenal', 'manchester',
-  'manutd', 'barcelona', 'real madrid', 'tiger', 'tigger', 'cookie', 'peanut', 'chocolate',
-  'butterfly', 'purple', 'orange', 'silver', 'flower', 'summer', 'summer123', 'winter123',
-  'spring123', 'autumn123', 'january', 'september', 'december', 'mustang', 'ferrari', 'mercedes',
-  'harley', 'hunter', 'killer', 'thunder', 'scooter', 'diamond', 'ginger', 'pepper',
-  'matrix', 'matrix123', 'starwars1', 'starwars123', 'whatever1', 'nothing', 'hello123', 'hello1234',
-  'hello12345', 'hellohello', 'helloworld', 'helloworld1', 'goodluck', 'goodluck123', '88888888a', 'woaini123',
-  'woaini1314', '5201314', '1314520', 'wang123456', 'zhang123', 'li123456', 'admin888', '8888888888',
-] as const;
-const weakPasswords: ReadonlySet<string> = new Set(WEAK_PASSWORDS);
 const encoder = new TextEncoder();
 
 export function normalizeUsername(value: string): string {
@@ -56,9 +18,7 @@ export function usernameField(body: Record<string, unknown>): string {
 }
 
 export function passwordField(body: Record<string, unknown>, field: string): string {
-  const password = stringField(body, field, 8, 128);
-  if (weakPasswords.has(password.normalize('NFKC').toLowerCase())) invalid(field, 'Choose a less common password.');
-  return password;
+  return stringField(body, field, 1, 128);
 }
 
 export function pepper(env: Env): string {
