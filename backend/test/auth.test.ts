@@ -2,11 +2,11 @@ import { env, SELF } from 'cloudflare:test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   constantTimeEqual, createSession, dummyVerify, findUser, hashPassword, PASSWORD_ITERATIONS,
-  pepper, SESSION_SECONDS, sha256Hex, SLIDE_SECONDS, verifyPassword, WEAK_PASSWORDS,
+  pepper, SESSION_SECONDS, sha256Hex, SLIDE_SECONDS, verifyPassword,
 } from '../src/auth';
 import worker from '../src/index';
 import { call, DEVICE, login, NEW_PASSWORD, NOW, PASSWORD, register } from './helpers';
-import type { AuthBody, MeBody } from './helpers';
+import type { AuthBody, ErrorBody, MeBody } from './helpers';
 import type { SessionRow } from '../src/types';
 
 beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(NOW * 1000); });
@@ -186,11 +186,22 @@ describe('authentication', () => {
     }
   });
 
-  it('rejects malformed input and maintains a common-password list of at least 200 entries', async () => {
-    expect(new Set(WEAK_PASSWORDS).size).toBeGreaterThanOrEqual(200);
-    for (const password of ['short', 'x'.repeat(129), 'password', 'Password123!', 'ｐａｓｓｗｏｒｄ']) {
-      expect((await call('/auth/register', { body: { username: 'pipa_user', password, ...DEVICE } })).status).toBe(400);
+  it('accepts one-character passwords but rejects empty or oversized passwords', async () => {
+    const username = 'short_password';
+    const registered = await call<AuthBody>('/auth/register', { body: { username, password: 'a', ...DEVICE } });
+    expect(registered.status).toBe(201);
+    expect(registered.body.user.username).toBe(username);
+    expect((await login(username, 'a')).user).toEqual(registered.body.user);
+
+    for (const password of ['', 'a'.repeat(129)]) {
+      const response = await call<ErrorBody>('/auth/register', { body: { username: 'bad_password_length', password, ...DEVICE } });
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('validation_failed');
+      expect(response.body.errors).toEqual([{ field: 'password', message: expect.any(String) }]);
     }
+  });
+
+  it('rejects malformed input', async () => {
     for (const username of ['ab', '1abc', 'a'.repeat(33), 'bad-name', '中文名称', 'a\u0000bc']) {
       expect((await call('/auth/register', { body: { username, password: PASSWORD, ...DEVICE } })).status).toBe(400);
     }

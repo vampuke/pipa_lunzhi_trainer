@@ -188,7 +188,6 @@ class AccountActivity : AppCompatActivity() {
         val error = when {
             username.isEmpty() || password.isEmpty() || deviceName.isEmpty() -> R.string.account_error_required
             !username.matches(Regex("[a-z][a-z0-9_]{2,31}")) -> R.string.account_error_username
-            mode != Mode.LOGIN && password.length !in 8..128 -> R.string.account_error_password
             mode == Mode.RECOVER && recovery.isEmpty() -> R.string.account_error_code_required
             else -> null
         }
@@ -225,8 +224,8 @@ class AccountActivity : AppCompatActivity() {
                 val newPassword = fields.newPassword.text.toString()
                 if (current.isEmpty()) {
                     fields.currentPassword.error = getString(R.string.account_error_current_password)
-                } else if (changePassword && newPassword.length !in 8..128) {
-                    fields.newPassword.error = getString(R.string.account_error_password)
+                } else if (changePassword && newPassword.isEmpty()) {
+                    fields.newPassword.error = getString(R.string.account_error_new_password)
                 } else {
                     perform {
                         val controls = listOf(fields.currentPassword, fields.newPassword,

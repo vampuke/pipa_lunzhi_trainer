@@ -19,7 +19,7 @@ import com.vampuck.pipa_trainer.sync.PracticeSyncer
 /** Free practice timer with local accounting and optional account sync. */
 class FreePracticeActivity : AppCompatActivity() {
     private lateinit var b: ActivityFreePracticeBinding
-    private var mode = FreePracticeMode.COUNTDOWN
+    private var mode = FreePracticeMode.STOPWATCH
     private var durationMin = DEFAULT_MINUTES
     private var timer = FreePracticeTimer(mode, durationMin * 60_000L)
     private var startedThisVisit = false
@@ -45,7 +45,7 @@ class FreePracticeActivity : AppCompatActivity() {
         setContentView(b.root)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        b.modeGroup.check(R.id.btnCountdown)
+        b.modeGroup.check(R.id.btnStopwatch)
         b.modeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked || timer.isStarted) return@addOnButtonCheckedListener
             mode = if (checkedId == R.id.btnStopwatch) {
@@ -61,10 +61,10 @@ class FreePracticeActivity : AppCompatActivity() {
         b.btnPause.setOnClickListener {
             if (timer.isPaused) resume() else pause(manual = true)
         }
-        b.btnReset.setOnClickListener { confirmFinish() }
+        b.btnReset.setOnClickListener { confirmFinish(leave = false) }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (timer.isStarted && !timer.isCompleted) confirmFinish() else finish()
+                if (timer.isStarted && !timer.isCompleted) confirmFinish(leave = true) else finish()
             }
         })
         render()
@@ -180,16 +180,23 @@ class FreePracticeActivity : AppCompatActivity() {
         b.timeValue.text = timer.displayAt(SystemClock.elapsedRealtime())
     }
 
-    private fun confirmFinish() {
+    private fun confirmFinish(leave: Boolean) {
         if (!startedThisVisit) {
-            finish()
+            if (leave) finish()
             return
         }
         pause(manual = true)
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.free_quit_title)
             .setMessage(R.string.free_quit_message)
-            .setPositiveButton(R.string.free_quit_confirm) { _, _ -> finish() }
+            .setPositiveButton(R.string.free_quit_confirm) { _, _ ->
+                if (leave) {
+                    finish()
+                } else {
+                    rebuildTimer()
+                    b.timeHint.setText(R.string.free_finished_saved)
+                }
+            }
             .setNegativeButton(R.string.free_resume) { _, _ -> resume() }
             .setOnCancelListener { resume() }
             .show()

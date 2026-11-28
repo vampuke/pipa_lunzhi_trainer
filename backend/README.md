@@ -56,8 +56,8 @@ and session tokens. `pepper_version` is currently 1. Passwords use HMAC-SHA256
 pepper prehashing followed by PBKDF2-SHA256, 10,000 iterations, a 16-byte random
 salt and a 32-byte derived hash. Stored binary values are unpadded base64url;
 session token hashes are SHA-256 hex of the pepper concatenated with the token.
-The password denylist contains over 200 common passwords; creation requires
-8–128 characters. Verification uses each user's stored iteration count.
+Passwords must be non-empty and are capped at 128 characters; there are no
+complexity requirements. Verification uses each user's stored iteration count.
 
 Deployment order is tests, the production migration, then the Worker. From a
 development machine, after arranging the Cloudflare credentials and `PEPPER`:
